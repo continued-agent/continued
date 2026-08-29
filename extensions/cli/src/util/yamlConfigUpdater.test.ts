@@ -1,6 +1,9 @@
 import { parse } from "yaml";
 
-import { updateAnthropicModelInYaml } from "./yamlConfigUpdater.js";
+import {
+  updateAnthropicModelInYaml,
+  updateProviderModelInYaml,
+} from "./yamlConfigUpdater.js";
 
 describe("updateAnthropicModelInYaml", () => {
   const testApiKey = "sk-ant-test123456789";
@@ -233,5 +236,46 @@ models: "not an array"
         expect(result).toContain(`apiKey: ${key}`);
       });
     });
+  });
+});
+
+describe("updateProviderModelInYaml", () => {
+  const providerModel = {
+    name: "OpenAI",
+    provider: "openai",
+    model: "gpt-4.1-mini",
+    apiKey: "${{ secrets.OPENAI_API_KEY }}",
+    roles: ["chat", "edit", "apply"],
+  };
+
+  it("creates a valid config with a secret reference", () => {
+    const result = updateProviderModelInYaml("", providerModel);
+    const parsed = parse(result) as any;
+
+    expect(parsed.name).toBe("Main Config");
+    expect(parsed.schema).toBe("v1");
+    expect(parsed.models).toEqual([providerModel]);
+    expect(result).not.toContain("sk-");
+  });
+
+  it("preserves existing models and replaces the selected model", () => {
+    const existingConfig = `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Other\n    provider: anthropic\n    model: claude-sonnet-4-6\n    roles:\n      - chat\n`;
+
+    const result = updateProviderModelInYaml(existingConfig, providerModel);
+    const parsed = parse(result) as any;
+
+    expect(parsed.models).toHaveLength(2);
+    expect(parsed.models[0].provider).toBe("anthropic");
+    expect(parsed.models[1]).toEqual(providerModel);
+
+    const updated = updateProviderModelInYaml(result, {
+      ...providerModel,
+      apiKey: "${{ secrets.NEW_OPENAI_API_KEY }}",
+    });
+    const updatedParsed = parse(updated) as any;
+    expect(updatedParsed.models).toHaveLength(2);
+    expect(updatedParsed.models[1].apiKey).toBe(
+      "${{ secrets.NEW_OPENAI_API_KEY }}",
+    );
   });
 });

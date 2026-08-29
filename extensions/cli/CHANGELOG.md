@@ -1,3 +1,9 @@
+## Unreleased
+
+### Features
+
+- add a scrollable first-run model-provider picker with masked secret storage
+
 ## [1.4.2](https://github.com/continuedev/cli/compare/v1.4.1...v1.4.2) (2025-07-17)
 
 ### Bug Fixes

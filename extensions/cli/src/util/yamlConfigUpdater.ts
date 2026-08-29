@@ -20,6 +20,16 @@ export interface ConfigStructure {
   models: ModelConfig[];
 }
 
+export interface ProviderModelConfig {
+  name: string;
+  provider: string;
+  model: string;
+  apiKey?: string;
+  apiBase?: string;
+  roles: string[];
+  env?: Record<string, string>;
+}
+
 // These model definitions are inlined copies of the corresponding Continue Hub
 // blocks (e.g. anthropic/claude-sonnet-4-6) that onboarding previously resolved
 // via `uses:` slugs. Since Hub/slug resolution has been removed, we reproduce
@@ -62,6 +72,63 @@ function isManagedAnthropicModel(model: any): boolean {
     model.provider === "anthropic" &&
     (model.model === "claude-sonnet-4-6" || model.model === "claude-opus-4-6")
   );
+}
+
+/**
+ * Adds or replaces one model in a Continue YAML configuration.
+ *
+ * The updater deliberately stores the API-key reference, not the secret value.
+ * Local secrets are resolved later from ~/.continue/.env or process.env.
+ */
+export function updateProviderModelInYaml(
+  yamlContent: string,
+  model: ProviderModelConfig,
+): string {
+  let doc = parseDocument(yamlContent);
+  let config: Record<string, any>;
+
+  try {
+    if (doc.errors.length > 0) {
+      throw new Error("Invalid YAML");
+    }
+
+    const parsed = doc.toJS();
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Configuration must be a YAML mapping");
+    }
+    config = parsed as Record<string, any>;
+  } catch {
+    doc = parseDocument("");
+    config = {};
+  }
+
+  if (!config.name) {
+    doc.set("name", "Main Config");
+  }
+  if (!config.version) {
+    doc.set("version", "1.0.0");
+  }
+  if (!config.schema) {
+    doc.set("schema", "v1");
+  }
+
+  const models = Array.isArray(config.models) ? [...config.models] : [];
+  const existingModelIndex = models.findIndex(
+    (existingModel) =>
+      existingModel &&
+      typeof existingModel === "object" &&
+      existingModel.provider === model.provider &&
+      existingModel.model === model.model,
+  );
+
+  if (existingModelIndex >= 0) {
+    models[existingModelIndex] = model;
+  } else {
+    models.push(model);
+  }
+
+  doc.set("models", models);
+  return doc.toString();
 }
 
 /**
