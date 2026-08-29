@@ -30,6 +30,9 @@ npm i -g @continuedev/cli
 cn
 ```
 
+Interactive messages and tool output use a small, consistent horizontal inset
+so bullets, responses, and wrapped text remain readable near the terminal edge.
+
 ### Headless Mode
 
 Headless mode (`-p` flag) runs without an interactive terminal UI, making it perfect for:

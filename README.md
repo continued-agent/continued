@@ -38,6 +38,9 @@ This included removing anonymous telemetry, pulling out authentication, squashin
 
 [![npm](https://img.shields.io/badge/npm-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/@continuedev/cli) [![View source](https://img.shields.io/badge/View_source-181717?logo=github&logoColor=white)](extensions/cli)
 
+The CLI TUI keeps chat bullets, responses, and tool output slightly inset with
+consistent horizontal spacing, including when long messages wrap.
+
 ### JetBrains
 
 > _Note: We recommend using the Continue CLI instead of the JetBrains plugin._

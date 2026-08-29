@@ -49,7 +49,7 @@ export const BottomStatusBar: React.FC<BottomStatusBarProps> = ({
 
   return (
     <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-      <Box marginLeft={2} flexDirection="row" alignItems="center">
+      <Box marginLeft={1} flexDirection="row" alignItems="center">
         {currentMode === "normal" && (
           <React.Fragment>
             {hasImageInClipboard ? (
@@ -88,7 +88,7 @@ export const BottomStatusBar: React.FC<BottomStatusBarProps> = ({
           </React.Fragment>
         )}
       </Box>
-      <Box marginRight={2} marginLeft={2}>
+      <Box marginRight={1} marginLeft={1}>
         <UpdateNotification isRemoteMode={isRemoteMode} />
       </Box>
     </Box>

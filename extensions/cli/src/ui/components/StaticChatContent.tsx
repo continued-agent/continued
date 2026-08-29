@@ -144,7 +144,9 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
         key={staticKey}
         items={staticItems}
         style={{
-          width: columns - 1,
+          // TUIChat reserves one column on each side and Static keeps one
+          // additional column as a wrapping guard.
+          width: Math.max(columns - 3, 1),
           textWrap: "wrap",
         }}
       >
@@ -160,7 +162,7 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
 
       {/* Queued messages - show at bottom with queue indicators */}
       {queuedMessages.length > 0 && (
-        <Box paddingLeft={2} paddingBottom={1}>
+        <Box paddingLeft={3} paddingBottom={1}>
           <Text color="dim" italic>
             {queuedMessages.map((msg) => msg.message).join("\n")}
           </Text>
