@@ -30,6 +30,10 @@ npm i -g @continuedev/cli
 cn
 ```
 
+The interactive startup screen displays a compact, color-gradient Continue mark
+that fits comfortably in a standard 80-column terminal. On narrower terminals,
+it falls back to the version number to avoid wrapping the artwork.
+
 ### Headless Mode
 
 Headless mode (`-p` flag) runs without an interactive terminal UI, making it perfect for:
