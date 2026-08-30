@@ -14,15 +14,11 @@
 
 ## What is Continued?
 
-Continued is a coding agent available as a [CLI](#cli), [VS Code extension](#vs-code).
+Continued is a coding agent available as a [CLI](#cli).
 
 ## Documentation
 
 To learn how to configure Continued, how it works, and how to customize it, check out the [Continue Docs](https://docs.continue.dev).
-
-### VS Code
-
-[![VS Code Marketplace](https://img.shields.io/badge/VS_Code_Marketplace-007ACC?logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=Continue.continue) [![OpenVSX Registry](https://img.shields.io/badge/OpenVSX_Registry-C160EF?logo=eclipseide&logoColor=white)](https://open-vsx.org/extension/Continue/continue) [![View source](https://img.shields.io/badge/View_source-181717?logo=github&logoColor=white)](extensions/vscode)
 
 ### CLI
 
