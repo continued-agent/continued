@@ -96,6 +96,7 @@ const logFormat = printf(
 
 // Track headless mode
 let isHeadlessMode = false;
+let isAcpMode = false;
 let isTTYlessEnvironment = false;
 
 // Create the winstonLogger instance
@@ -143,6 +144,10 @@ export function configureHeadlessMode(headless: boolean) {
   }
 }
 
+export function configureAcpMode(acp: boolean): void {
+  isAcpMode = acp;
+}
+
 // Export winstonLogger methods
 export const logger = {
   debug: (message: string, meta?: any) => winstonLogger.debug(message, meta),
@@ -164,7 +169,7 @@ export const logger = {
     }
 
     // In headless mode, also output to stderr
-    if (isHeadlessMode) {
+    if (isHeadlessMode || isAcpMode) {
       if (error instanceof Error) {
         console.error(chalk.red(`${message}: ${error.message}`));
       } else if (error) {

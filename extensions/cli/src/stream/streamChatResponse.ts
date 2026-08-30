@@ -193,7 +193,7 @@ interface ProcessStreamingResponseOptions {
 }
 
 // Process a single streaming response and return whether we need to continue
-// eslint-disable-next-line max-statements, complexity
+// eslint-disable-next-line max-statements
 export async function processStreamingResponse(
   options: ProcessStreamingResponseOptions,
 ): Promise<{
@@ -516,6 +516,10 @@ export async function streamChatResponse(
       isHeadless,
       usage,
     });
+
+    if (abortController?.signal.aborted) {
+      return finalResponse || content || fullResponse;
+    }
 
     if (shouldReturn) {
       return finalResponse || content || fullResponse;

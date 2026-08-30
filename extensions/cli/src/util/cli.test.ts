@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { hasSuppliedPrompt, isHeadlessMode, isServe } from "./cli.js";
+import {
+  hasSuppliedPrompt,
+  isAcpMode,
+  isHeadlessMode,
+  isServe,
+} from "./cli.js";
 
 describe("CLI utility functions", () => {
   let originalArgv: string[];
@@ -39,6 +44,18 @@ describe("CLI utility functions", () => {
     it("should return false when serve command is not present", () => {
       process.argv = ["node", "script.js", "-p", "test"];
       expect(isServe()).toBe(false);
+    });
+  });
+
+  describe("isAcpMode", () => {
+    it("should detect the ACP subcommand after global options", () => {
+      process.argv = ["node", "script.js", "--config", "agent.yaml", "acp"];
+      expect(isAcpMode()).toBe(true);
+    });
+
+    it("should not treat a headless prompt containing acp as the subcommand", () => {
+      process.argv = ["node", "script.js", "-p", "acp"];
+      expect(isAcpMode()).toBe(false);
     });
   });
 

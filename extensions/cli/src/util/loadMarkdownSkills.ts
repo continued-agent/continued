@@ -3,10 +3,14 @@ import fsPromises from "fs/promises";
 import * as path from "path";
 
 import { parseMarkdownRule } from "@continuedev/config-yaml";
-import { WalkerSync } from "ignore-walk";
+import ignoreWalk from "ignore-walk";
 import { z } from "zod";
 
 import { env } from "../env.js";
+
+import { getWorkspaceDirectory } from "./workspace.js";
+
+const { WalkerSync } = ignoreWalk;
 
 export interface Skill {
   name: string;
@@ -89,7 +93,7 @@ export async function loadMarkdownSkills(): Promise<LoadSkillsResult> {
   const errors: { fatal: boolean; message: string }[] = [];
   const skills: Skill[] = [];
 
-  const cwd = process.cwd();
+  const cwd = getWorkspaceDirectory();
 
   try {
     const skillsDirs = [

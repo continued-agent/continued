@@ -34,6 +34,8 @@ export interface PreprocessToolCallResult {
 
 export interface ToolRunContext {
   toolCallId: string;
+  /** Abort signal for the current ACP or CLI turn, when available. */
+  signal?: AbortSignal;
   /**
    * Number of tool calls being executed in parallel.
    * Tools should divide their output limits by this number to avoid context overflow.

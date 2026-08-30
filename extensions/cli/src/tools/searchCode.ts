@@ -6,6 +6,7 @@ import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 import { findUp } from "find-up";
 
 import { parseEnvNumber } from "../util/truncateOutput.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { Tool } from "./types.js";
 
@@ -144,7 +145,7 @@ export const searchCodeTool: Tool = {
     path?: string;
     file_pattern?: string;
   }): Promise<string> => {
-    const searchPath = args.path || process.cwd();
+    const searchPath = args.path || getWorkspaceDirectory();
     if (!fs.existsSync(searchPath)) {
       throw new ContinueError(
         ContinueErrorReason.Unspecified,

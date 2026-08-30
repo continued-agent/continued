@@ -6,6 +6,7 @@ import {
   parseEnvNumber,
   truncateOutputFromEnd,
 } from "../util/truncateOutput.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { Tool } from "./types.js";
 
@@ -50,7 +51,7 @@ export const viewDiffTool: Tool = {
   },
   run: async (args: { path?: string }): Promise<string> => {
     try {
-      const repoPath = args.path || process.cwd();
+      const repoPath = args.path || getWorkspaceDirectory();
       if (!fs.existsSync(repoPath)) {
         return `Error: Path does not exist: ${repoPath}`;
       }

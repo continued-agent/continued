@@ -9,13 +9,14 @@ import { processRule } from "./hubLoader.js";
 import { PermissionMode } from "./permissions/types.js";
 import { serviceContainer } from "./services/ServiceContainer.js";
 import { ConfigServiceState, SERVICE_NAMES } from "./services/types.js";
+import { getWorkspaceDirectory } from "./util/workspace.js";
 
 /**
  * Check if current directory is a git repository
  */
-function isGitRepo(): boolean {
+function isGitRepo(cwd = getWorkspaceDirectory()): boolean {
   try {
-    execSync("git rev-parse --is-inside-work-tree", { stdio: "ignore" });
+    execSync("git rev-parse --is-inside-work-tree", { cwd, stdio: "ignore" });
     return true;
   } catch {
     return false;
@@ -25,14 +26,14 @@ function isGitRepo(): boolean {
 /**
  * Get git status
  */
-function getGitStatus(): string {
+function getGitStatus(cwd = getWorkspaceDirectory()): string {
   try {
-    if (!isGitRepo()) {
+    if (!isGitRepo(cwd)) {
       return "Not a git repository";
     }
     const result = execSync("git status --porcelain", {
       encoding: "utf-8",
-      cwd: process.cwd(),
+      cwd,
     });
     return result.trim() || "Working tree clean";
   } catch {
@@ -40,15 +41,16 @@ function getGitStatus(): string {
   }
 }
 
-const baseSystemMessage = `You are an agent in the Continue CLI. Given the user's prompt, you should use the tools available to you to answer the user's question.
+function getBaseSystemMessage(cwd = getWorkspaceDirectory()): string {
+  return `You are an agent in the Continue CLI. Given the user's prompt, you should use the tools available to you to answer the user's question.
 
 Notes:
 1. IMPORTANT: You should be concise, direct, and to the point, since your responses will be displayed on a command line interface.
 2. When relevant, share file names and code snippets relevant to the query
 Here is useful information about the environment you are running in:
 <env>
-Working directory: ${process.cwd()}
-Is directory a git repo: ${isGitRepo()}
+Working directory: ${cwd}
+Is directory a git repo: ${isGitRepo(cwd)}
 Platform: ${process.platform}
 Today's date: ${new Date().toISOString().split("T")[0]}
 </env>
@@ -57,8 +59,9 @@ As you answer the user's questions, you can use the following context:
 
 <context name="gitStatus">This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.
 
-${getGitStatus()}
+${getGitStatus(cwd)}
 </context>`;
+}
 
 async function getConfigYamlRules(): Promise<string[]> {
   const configState = await serviceContainer.get<ConfigServiceState>(
@@ -87,7 +90,7 @@ function getRuleNameFromPath(filePath: string): string {
  * Scan .continue/rules/ directories for markdown rule files and return the rules with metadata that should be always-applied
  */
 export function loadMarkdownRulesWithMetadata(): RuleObject[] {
-  const cwd = process.cwd();
+  const cwd = getWorkspaceDirectory();
   const rulesDirs = [
     path.join(cwd, ".continue", "rules"),
     path.join(env.continueHome, "rules"),
@@ -170,7 +173,7 @@ export async function constructSystemMessage(
 
   try {
     for (const fileName of agentFiles) {
-      const filePath = path.join(process.cwd(), fileName);
+      const filePath = path.join(getWorkspaceDirectory(), fileName);
 
       if (fs.existsSync(filePath)) {
         agentContent = fs.readFileSync(filePath, "utf-8");
@@ -212,7 +215,7 @@ export async function constructSystemMessage(
   }
 
   // Construct the comprehensive system message
-  let systemMessage = baseSystemMessage;
+  let systemMessage = getBaseSystemMessage();
 
   // Add plan mode specific instructions if in plan mode
   if (mode === "plan") {

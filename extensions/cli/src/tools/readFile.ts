@@ -1,9 +1,11 @@
 import * as fs from "fs";
+import path from "node:path";
 
 import { throwIfFileIsSecurityConcern } from "core/indexing/ignore.js";
 import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 
 import { parseEnvNumber } from "../util/truncateOutput.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { formatToolArgument } from "./formatters.js";
 import { Tool, ToolRunContext } from "./types.js";
@@ -53,6 +55,9 @@ export const readFileTool: Tool = {
     if (filepath.startsWith("./")) {
       filepath = filepath.slice(2);
     }
+    filepath = path.isAbsolute(filepath)
+      ? filepath
+      : path.resolve(getWorkspaceDirectory(), filepath);
     throwIfFileIsSecurityConcern(filepath);
     return {
       args,
@@ -73,6 +78,9 @@ export const readFileTool: Tool = {
       if (filepath.startsWith("./")) {
         filepath = filepath.slice(2);
       }
+      filepath = path.isAbsolute(filepath)
+        ? filepath
+        : path.resolve(getWorkspaceDirectory(), filepath);
 
       if (!fs.existsSync(filepath)) {
         throw new ContinueError(

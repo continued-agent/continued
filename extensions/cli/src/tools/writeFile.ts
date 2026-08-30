@@ -9,6 +9,7 @@ import {
   calculateLinesOfCodeDiff,
   getLanguageFromFilePath,
 } from "../telemetry/utils.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { Tool, ToolCallPreview } from "./types.js";
 
@@ -49,11 +50,14 @@ export const writeFileTool: Tool = {
   readonly: false,
   isBuiltIn: true,
   preprocess: async (args) => {
-    const filepath = args?.filepath;
-    const content = args?.content ?? "";
-    if (typeof filepath !== "string") {
+    const inputPath = args?.filepath;
+    if (typeof inputPath !== "string") {
       throw new Error("Filepath must be a string");
     }
+    const filepath = path.isAbsolute(inputPath)
+      ? inputPath
+      : path.resolve(getWorkspaceDirectory(), inputPath);
+    const content = args?.content ?? "";
     if (typeof content !== "string") {
       throw new Error("New file content must be a string");
     }

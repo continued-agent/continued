@@ -17,9 +17,10 @@ import {
 import { configureConsoleForHeadless, safeStderr } from "./init.js";
 import { addCommonOptions, mergeParentOptions } from "./shared-options.js";
 import { post } from "./util/apiClient.js";
+import { isAcpMode } from "./util/cli.js";
 import { markUnhandledError } from "./util/errorState.js";
 import { gracefulExit } from "./util/exit.js";
-import { logger } from "./util/logger.js";
+import { configureAcpMode, logger } from "./util/logger.js";
 import { readStdinSync } from "./util/stdin.js";
 import { getVersion } from "./version.js";
 
@@ -164,9 +165,11 @@ process.on("uncaughtException", (error) => {
 });
 
 // keyboard interruption handler for non-TUI flows
-process.on("SIGINT", async () => {
-  await gracefulExit(130);
-});
+if (!isAcpMode()) {
+  process.on("SIGINT", async () => {
+    await gracefulExit(130);
+  });
+}
 
 const program = new Command();
 
@@ -337,6 +340,42 @@ program
     await serve(prompt, mergedOptions);
   });
 
+// ACP agent subcommand. Keep the SDK and ACP runtime out of the normal CLI
+// startup path so ACP mode can claim stdout before those dependencies load.
+const acpCommand = program
+  .command("acp")
+  .description("Run Continue as an Agent Client Protocol (ACP) agent");
+addCommonOptions(acpCommand).action(async (options) => {
+  configureAcpMode(true);
+  const mergedOptions = mergeParentOptions(program, options);
+  if (mergedOptions.verbose) {
+    logger.setLevel("debug");
+  }
+
+  const validation = validateFlags({
+    readonly: mergedOptions.readonly,
+    auto: mergedOptions.auto,
+    config: mergedOptions.config,
+    allow: mergedOptions.allow,
+    ask: mergedOptions.ask,
+    exclude: mergedOptions.exclude,
+    commandName: "acp",
+  });
+  if (!validation.isValid) {
+    handleValidationErrors(validation.errors);
+  }
+
+  const { runAcp } = await import("./acp/serve.js");
+  try {
+    await runAcp(mergedOptions);
+  } catch (error) {
+    safeStderr(
+      `ACP agent stopped: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+    await gracefulExit(1);
+  }
+});
+
 // Checks subcommand
 program
   .command("checks [action] [pr-url]")
@@ -385,7 +424,9 @@ export async function runCli(): Promise<void> {
     process.exit(1);
   }
 
-  process.on("SIGTERM", async () => {
-    await gracefulExit(0);
-  });
+  if (!isAcpMode()) {
+    process.on("SIGTERM", async () => {
+      await gracefulExit(0);
+    });
+  }
 }

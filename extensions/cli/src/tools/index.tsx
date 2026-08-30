@@ -213,7 +213,9 @@ export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
 
 export async function executeToolCall(
   toolCall: PreprocessedToolCall,
-  options: { parallelToolCallCount: number } = { parallelToolCallCount: 1 },
+  options: { parallelToolCallCount: number; signal?: AbortSignal } = {
+    parallelToolCallCount: 1,
+  },
 ): Promise<string> {
   const startTime = Date.now();
 
@@ -230,6 +232,7 @@ export async function executeToolCall(
     const context: ToolRunContext = {
       toolCallId: toolCall.id,
       parallelToolCallCount: options.parallelToolCallCount,
+      signal: options.signal,
     };
 
     // IMPORTANT: if preprocessed args are present, uses preprocessed args instead of original args
