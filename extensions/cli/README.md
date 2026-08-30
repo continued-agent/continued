@@ -30,6 +30,28 @@ npm i -g @continuedev/cli
 cn
 ```
 
+### First-run provider setup
+
+On the first interactive launch, `cn` shows a scrollable provider picker instead
+of requiring Anthropic. It includes OpenAI, Anthropic, Google Gemini, Meta Llama,
+xAI, Mistral, DeepSeek, OpenRouter, Perplexity, LiteLLM, OpenCode Zen, Azure,
+AWS Bedrock, NVIDIA, Hugging Face, and a generic OpenAI-compatible endpoint.
+
+After you choose a provider, `cn` asks for its API key with masked input and
+writes a model entry to `~/.continue/config.yaml` with `chat`, `edit`, and
+`apply` roles. The key itself is stored in `~/.continue/.env` with restrictive
+permissions and the YAML references it as `${{ secrets.VARIABLE_NAME }}`. You
+can use an exported environment variable instead; do not commit `.env` files.
+Existing valid configurations are kept and do not trigger the picker again.
+
+### Startup artwork
+
+The interactive startup screen displays a compact, color-gradient Continue mark
+that fits comfortably in a standard 80-column terminal. On narrower terminals,
+it falls back to the version number to avoid wrapping the artwork.
+
+### TUI spacing
+
 Interactive messages and tool output use a small, consistent horizontal inset
 so bullets, responses, and wrapped text remain readable near the terminal edge.
 

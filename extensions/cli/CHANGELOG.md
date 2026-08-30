@@ -1,5 +1,10 @@
 ## Unreleased
 
+### Features
+
+- add a scrollable first-run model-provider picker with masked secret storage
+- replace the CLI startup artwork with a compact terminal-friendly mark
+
 ### Improvements
 
 - add consistent horizontal inset to TUI messages, bullets, and tool output

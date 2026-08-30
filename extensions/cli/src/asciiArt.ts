@@ -5,27 +5,39 @@ import { getVersion } from "./version.js";
 
 const d = chalk.dim;
 
-export const CONTINUE_ASCII_ART = `
-${mind.multiline(`  ██████╗ ██████╗ ███╗   ██╗████████╗██╗███╗   ██╗██╗   ██╗███████╗
- ██╔════╝██╔═══██╗████╗  ██║╚══██╔══╝██║████╗  ██║██║   ██║██╔════╝
- ██║     ██║   ██║██╔██╗ ██║   ██║   ██║██╔██╗ ██║██║   ██║█████╗
- ██║     ██║   ██║██║╚██╗██║   ██║   ██║██║╚██╗██║██║   ██║██╔══╝
- ╚██████╗╚██████╔╝██║ ╚████║   ██║   ██║██║ ╚████║╚██████╔╝███████╗
-  ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝   ╚═╝   ╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚══════╝`)}
-                                                    ${d("v" + getVersion())}`;
+const CONTINUE_ASCII_ART_LINES = [
+  "                                        ",
+  "                                        ",
+  "                                        ",
+  "                                        ",
+  "           :##########+=.               ",
+  "          :##*-:::::::=##.              ",
+  "         .###-=+######++-###-*.         ",
+  "        -##+=##-....... :==:*##.        ",
+  "       -##++##- .-====-. =##=*##:       ",
+  "       :---##= .=-----:=. =##=*##.      ",
+  "       .*#*=- .+-=.  .+-+: =##-+##:     ",
+  "       .+**-. :=:=    =--: :**=-##=     ",
+  "       =**=*#: :=-+==+:=: -##++##-      ",
+  "       =##=+##: :++++++: :##+=##=       ",
+  "        +##-*##:        .**==##-        ",
+  "         -##++*:######*=:##*-#:         ",
+  "          -##+:++++++=-##-++=           ",
+  "           -##########=+-               ",
+];
 
-// ASCII art for just "CN" (first two letters)
-const CN_ASCII_ART = `
-${mind.multiline(`  ██████╗███╗   ██╗
- ██╔════╝████╗  ██║
- ██║     ██╔██╗ ██║
- ██║     ██║╚██╗██║
- ╚██████╗██║ ╚████║
-  ╚═════╝╚═╝  ╚═══╝`)}
-  ${d("v" + getVersion())}`;
+const CONTINUE_ASCII_ART_SOURCE = CONTINUE_ASCII_ART_LINES.join("\n");
+const ASCII_ART_WIDTH = Math.max(
+  ...CONTINUE_ASCII_ART_LINES.map((line) => line.length),
+);
 
-// Minimum terminal width required to display ASCII art properly
-const MIN_WIDTH_FOR_ASCII_ART = 75;
+export const CONTINUE_ASCII_ART = `${mind.multiline(CONTINUE_ASCII_ART_SOURCE)}\n${d(
+  ("v" + getVersion()).padStart(ASCII_ART_WIDTH),
+)}`;
+
+// The full mark is 40 columns wide. Account for IntroMessage's horizontal
+// padding so it does not wrap at the exact minimum terminal width.
+const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 2;
 
 /**
  * Returns the ASCII art only if the terminal is wide enough to display it properly.
@@ -38,8 +50,7 @@ export function getDisplayableAsciiArt(): string {
     return CONTINUE_ASCII_ART;
   }
 
-  // If terminal is too narrow, show just "CN" ASCII art
-  return CN_ASCII_ART;
+  return d("v" + getVersion());
 }
 
 export const CONTINUE_LOGO_ASCII_ART = `

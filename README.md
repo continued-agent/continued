@@ -41,6 +41,12 @@ This included removing anonymous telemetry, pulling out authentication, squashin
 The CLI TUI keeps chat bullets, responses, and tool output slightly inset with
 consistent horizontal spacing, including when long messages wrap.
 
+On first launch, the CLI offers a scrollable model-provider picker and stores
+credentials outside `config.yaml` using `~/.continue/.env` secret references.
+
+The CLI startup screen uses a compact color-gradient mark designed to remain
+readable in a standard terminal.
+
 ### JetBrains
 
 > _Note: We recommend using the Continue CLI instead of the JetBrains plugin._

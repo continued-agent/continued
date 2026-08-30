@@ -6,6 +6,7 @@ import {
   AssistantUnrolled,
   mergeUnrolledAssistants,
   PackageIdentifier,
+  parseConfigYaml,
   RegistryClient,
   unrollAssistant,
   unrollAssistantFromContent,
@@ -35,6 +36,25 @@ export type ConfigSource =
   | { type: "local-config-yaml" }
   | { type: "remote-default-config" }
   | { type: "no-config" };
+
+/**
+ * Returns whether a local config is syntactically valid and contains at least
+ * one model. This is intentionally checked before onboarding so an existing
+ * config is not mistaken for a first-run install just because the marker file
+ * is missing.
+ */
+export function hasValidConfigFile(configPath: string): boolean {
+  try {
+    if (!fs.existsSync(configPath)) {
+      return false;
+    }
+
+    const config = parseConfigYaml(fs.readFileSync(configPath, "utf8"));
+    return Array.isArray(config.models) && config.models.length > 0;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Streamlined configuration loader that implements the specification
