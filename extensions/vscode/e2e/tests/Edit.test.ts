@@ -65,6 +65,7 @@ describe("Edit Test", () => {
       0,
     );
     await tipTapEditor.clear();
+    await view.switchBack();
   });
 
   async function getCodeLensWithRetry(editor: TextEditor, text: string) {

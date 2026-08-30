@@ -360,7 +360,9 @@ jobs:
       - name: Run JetBrains tests
         uses: ./.github/actions/run-jetbrains-tests
         with:
-          github-token: ${{ github.event_name == 'push' && github.token || '' }}
+          # The FFmpeg setup action needs the read-only workflow token to query
+          # its public release metadata, including for pull-request runs.
+          github-token: ${{ github.token }}
           ci-github-token: ${{ github.event_name == 'push' && secrets.CI_GITHUB_TOKEN || '' }}
 
   # GitHub does not have a way of requiring that all checks pass (you must manually select each job)

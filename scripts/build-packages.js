@@ -4,7 +4,13 @@ const fs = require("fs");
 const fsPromises = require("fs/promises");
 
 const npmInstallArgs = process.env.CI === "true" ? ["ci"] : ["install"];
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+// Windows cannot execute .cmd files directly without a shell. Invoke the
+// trusted command interpreter explicitly while keeping npm arguments separate
+// from a shell command string.
+const npmCommand =
+  process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npm";
+const npmCommandPrefix =
+  process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd"] : [];
 
 function runCommand(command, args, cwd, packageName) {
   const displayCommand = [command, ...args].join(" ");
@@ -75,14 +81,14 @@ async function buildPackage(packageName, cleanNodeModules = false) {
 
   await runCommand(
     npmCommand,
-    npmInstallArgs,
+    [...npmCommandPrefix, ...npmInstallArgs],
     packagePath,
     `${packageName} (install)`,
   );
 
   return runCommand(
     npmCommand,
-    ["run", "build"],
+    [...npmCommandPrefix, "run", "build"],
     packagePath,
     `${packageName} (build)`,
   );
