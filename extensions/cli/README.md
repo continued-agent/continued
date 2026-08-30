@@ -50,6 +50,11 @@ The interactive startup screen displays a compact, color-gradient Continue mark
 that fits comfortably in a standard 80-column terminal. On narrower terminals,
 it falls back to the version number to avoid wrapping the artwork.
 
+### TUI spacing
+
+Interactive messages and tool output use a small, consistent horizontal inset
+so bullets, responses, and wrapped text remain readable near the terminal edge.
+
 ### Headless Mode
 
 Headless mode (`-p` flag) runs without an interactive terminal UI, making it perfect for:

@@ -1,3 +1,4 @@
+import { Box } from "ink";
 import { render } from "ink-testing-library";
 import React from "react";
 import { describe, expect, it } from "vitest";
@@ -28,6 +29,34 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     );
 
     expect(lastFrame()).toContain("Just a simple text message");
+  });
+
+  it("should keep message bullets away from the terminal edge", () => {
+    const historyItem = createTestHistoryItem("Padded message");
+
+    const { lastFrame } = render(
+      <MemoizedMessage item={historyItem} index={1} />,
+    );
+
+    expect(lastFrame()).toMatch(/^ /);
+  });
+
+  it("should wrap long messages inside the padded content width", () => {
+    const historyItem = createTestHistoryItem(
+      "A long message that should wrap instead of overflowing the terminal ".repeat(
+        4,
+      ),
+    );
+
+    const { lastFrame } = render(
+      <Box width={30}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
+    );
+
+    const frame = lastFrame();
+    expect(frame).toContain("A long message");
+    expect(frame?.split("\n").length).toBeGreaterThan(1);
   });
 
   it("should display message with images using placeholders", () => {

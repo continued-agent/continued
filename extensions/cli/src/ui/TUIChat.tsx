@@ -148,7 +148,7 @@ function useChatHandlers(
   };
 }
 
-// eslint-disable-next-line complexity
+/* eslint-disable complexity */
 const TUIChat: React.FC<TUIChatProps> = ({
   remoteUrl,
   configPath,
@@ -388,7 +388,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
   }, []);
 
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" height="100%" paddingX={1}>
       {/* Chat history - takes up all available space above input */}
       <Box flexDirection="column" flexGrow={1} overflow="hidden">
         {/* Debug component - comment out when not needed */}
@@ -499,5 +499,6 @@ const TUIChat: React.FC<TUIChatProps> = ({
     </Box>
   );
 };
+/* eslint-enable complexity */
 
 export { TUIChat };
