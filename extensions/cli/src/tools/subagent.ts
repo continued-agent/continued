@@ -1,7 +1,6 @@
 import { services } from "../services/index.js";
 import { serviceContainer } from "../services/ServiceContainer.js";
 import { ModelServiceState, SERVICE_NAMES } from "../services/types.js";
-import { executeSubAgent } from "../subagent/executor.js";
 import {
   generateSubagentToolDescription,
   getSubagent,
@@ -78,6 +77,9 @@ export const subagentTool = async (): Promise<Tool> => {
       }
 
       // Execute subagent with output streaming
+      // Load the executor lazily so the tool registry does not form an async
+      // initialization cycle through streamChatResponse.
+      const { executeSubAgent } = await import("../subagent/executor.js");
       const result = await executeSubAgent({
         agent,
         prompt,

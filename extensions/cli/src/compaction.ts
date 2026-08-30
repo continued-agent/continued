@@ -4,7 +4,6 @@ import type { ChatHistoryItem } from "core/index.js";
 import { encode } from "gpt-tokenizer";
 import { ChatCompletionTool } from "openai/resources.mjs";
 
-import { streamChatResponse } from "./stream/streamChatResponse.js";
 import { StreamCallbacks } from "./stream/streamChatResponse.types.js";
 import { logger } from "./util/logger.js";
 import {
@@ -128,6 +127,11 @@ export async function compactChatHistory(
   };
 
   try {
+    // Load the streamer lazily to avoid a circular module-initialization path:
+    // streamChatResponse imports pruneLastMessage from this module.
+    const { streamChatResponse } = await import(
+      "./stream/streamChatResponse.js"
+    );
     await streamChatResponse(
       historyForCompaction,
       model,
