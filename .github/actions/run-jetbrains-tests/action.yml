@@ -44,7 +44,8 @@ runs:
     - name: Setup FFmpeg
       uses: AnimMouse/setup-ffmpeg@v1
       with:
-        version: 7.1
+        # The BtbN latest release no longer publishes the old 7.1 asset.
+        version: 8.1
         token: ${{ inputs.github-token }}
 
     - name: Setup Gradle
