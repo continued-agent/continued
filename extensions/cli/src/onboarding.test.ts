@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { AuthConfig } from "./auth/workos.js";
 import {
+  checkHasAcceptableModel,
+  createOrUpdateBedrockConfig,
+  createTemporaryBedrockConfig,
   createOrUpdateProviderConfig,
   initializeWithOnboarding,
   writeSecretToEnvFile,
@@ -209,6 +212,142 @@ describe("provider onboarding persistence", () => {
       true,
     );
   });
+
+  test("requires an explicit chat-capable model for an acceptable config", async () => {
+    const configPath = path.join(globalDir, "config.yaml");
+
+    fs.writeFileSync(
+      configPath,
+      `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Embeddings\n    provider: openai\n    model: text-embedding-3-small\n    roles:\n      - embed\n`,
+    );
+    await expect(checkHasAcceptableModel(configPath)).resolves.toBe(false);
+
+    fs.writeFileSync(
+      configPath,
+      `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Chat\n    provider: openai\n    model: gpt-4.1-mini\n    roles:\n      - chat\n`,
+    );
+    await expect(checkHasAcceptableModel(configPath)).resolves.toBe(true);
+
+    fs.writeFileSync(
+      configPath,
+      `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Broken\n    provider: openai\n    model: gpt-4.1-mini\n    roles: chat\n`,
+    );
+    await expect(checkHasAcceptableModel(configPath)).resolves.toBe(false);
+  });
+
+  test("creates a Bedrock config with the shortcut helper", async () => {
+    const originalRegion = process.env.AWS_REGION;
+    const originalDefaultRegion = process.env.AWS_DEFAULT_REGION;
+    const originalProfile = process.env.AWS_PROFILE;
+    const originalApiKey = process.env.AWS_BEDROCK_API_KEY;
+    delete process.env.AWS_REGION;
+    delete process.env.AWS_DEFAULT_REGION;
+    delete process.env.AWS_PROFILE;
+    delete process.env.AWS_BEDROCK_API_KEY;
+
+    try {
+      await createOrUpdateBedrockConfig();
+
+      const config = fs.readFileSync(
+        path.join(globalDir, "config.yaml"),
+        "utf8",
+      );
+      expect(config).toContain("provider: bedrock");
+      expect(config).toContain(
+        "model: anthropic.claude-sonnet-4-5-20250929-v1:0",
+      );
+      expect(config).toContain("region: us-east-1");
+      expect(config).not.toContain("apiKey:");
+    } finally {
+      if (originalRegion === undefined) delete process.env.AWS_REGION;
+      else process.env.AWS_REGION = originalRegion;
+      if (originalDefaultRegion === undefined)
+        delete process.env.AWS_DEFAULT_REGION;
+      else process.env.AWS_DEFAULT_REGION = originalDefaultRegion;
+      if (originalProfile === undefined) delete process.env.AWS_PROFILE;
+      else process.env.AWS_PROFILE = originalProfile;
+      if (originalApiKey === undefined) delete process.env.AWS_BEDROCK_API_KEY;
+      else process.env.AWS_BEDROCK_API_KEY = originalApiKey;
+    }
+  });
+
+  test("uses AWS region and profile environment variables for Bedrock", async () => {
+    const originalRegion = process.env.AWS_REGION;
+    const originalDefaultRegion = process.env.AWS_DEFAULT_REGION;
+    const originalProfile = process.env.AWS_PROFILE;
+    process.env.AWS_REGION = "eu-west-1";
+    delete process.env.AWS_DEFAULT_REGION;
+    process.env.AWS_PROFILE = "engineering";
+
+    try {
+      await createOrUpdateBedrockConfig();
+      const config = fs.readFileSync(
+        path.join(globalDir, "config.yaml"),
+        "utf8",
+      );
+      expect(config).toContain("region: eu-west-1");
+      expect(config).toContain("profile: engineering");
+    } finally {
+      if (originalRegion === undefined) delete process.env.AWS_REGION;
+      else process.env.AWS_REGION = originalRegion;
+      if (originalDefaultRegion === undefined)
+        delete process.env.AWS_DEFAULT_REGION;
+      else process.env.AWS_DEFAULT_REGION = originalDefaultRegion;
+      if (originalProfile === undefined) delete process.env.AWS_PROFILE;
+      else process.env.AWS_PROFILE = originalProfile;
+    }
+  });
+
+  test("creates a one-shot Bedrock config without changing the saved config", () => {
+    const savedConfigPath = path.join(globalDir, "config.yaml");
+    fs.writeFileSync(
+      savedConfigPath,
+      `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Existing\n    provider: openai\n    model: gpt-4.1-mini\n`,
+    );
+    const savedConfig = fs.readFileSync(savedConfigPath, "utf8");
+
+    const temporary = createTemporaryBedrockConfig();
+    expect(fs.readFileSync(temporary.configPath, "utf8")).toContain(
+      "provider: bedrock",
+    );
+    expect(fs.readFileSync(savedConfigPath, "utf8")).toBe(savedConfig);
+
+    temporary.cleanup();
+    expect(fs.existsSync(temporary.configPath)).toBe(false);
+  });
+
+  test("uses a one-shot Bedrock config during onboarding without marking completion", async () => {
+    const originalBedrockSetting = process.env.CONTINUE_USE_BEDROCK;
+    process.env.CONTINUE_USE_BEDROCK = "1";
+
+    try {
+      const temporaryConfigPath = await initializeWithOnboarding(
+        null,
+        undefined,
+      );
+
+      expect(temporaryConfigPath).toMatch(
+        /continue-bedrock-[^/]+[\\/]config\.yaml$/,
+      );
+      expect(fs.existsSync(path.join(globalDir, "config.yaml"))).toBe(false);
+      expect(fs.existsSync(path.join(globalDir, ".onboarding_complete"))).toBe(
+        false,
+      );
+
+      if (temporaryConfigPath) {
+        fs.rmSync(path.dirname(temporaryConfigPath), {
+          recursive: true,
+          force: true,
+        });
+      }
+    } finally {
+      if (originalBedrockSetting === undefined) {
+        delete process.env.CONTINUE_USE_BEDROCK;
+      } else {
+        process.env.CONTINUE_USE_BEDROCK = originalBedrockSetting;
+      }
+    }
+  });
 });
 
 // Separate describe block with its own mocking for BEDROCK tests
@@ -245,6 +384,15 @@ describe("CONTINUE_USE_BEDROCK environment variable", () => {
     } else {
       delete process.env.CONTINUE_USE_BEDROCK;
     }
+    const globalDir = process.env.CONTINUE_GLOBAL_DIR;
+    if (globalDir) {
+      for (const filename of ["config.yaml", ".env", ".onboarding_complete"]) {
+        const filePath = path.join(globalDir, filename);
+        if (fs.existsSync(filePath)) {
+          fs.rmSync(filePath, { force: true });
+        }
+      }
+    }
     vi.restoreAllMocks();
     vi.doUnmock("./config.js");
   });
@@ -259,6 +407,9 @@ describe("CONTINUE_USE_BEDROCK environment variable", () => {
     const result = await runOnboardingFlow(undefined);
 
     expect(result).toBe(true);
+    expect(
+      fs.existsSync(path.join(process.env.CONTINUE_GLOBAL_DIR!, "config.yaml")),
+    ).toBe(false);
     expect(mockConsoleLog).toHaveBeenCalledWith(
       expect.stringContaining(
         "✓ Using AWS Bedrock (CONTINUE_USE_BEDROCK detected)",

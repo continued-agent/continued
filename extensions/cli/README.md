@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/continued-agent/continued/main/exte
 irm https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.ps1 | iex
 ```
 
-Or install with npm if you have Node.js 20+:
+Or install with npm if you have Node.js 20.20.1 or newer:
 
 ```bash
 npm i -g @continuedev/cli
@@ -29,7 +29,9 @@ this fork’s `cli-latest` GitHub release, verify its SHA-256 checksum, and
 install it globally without compiling the monorepo on your machine. The npm
 command installs the published package, which may not contain the fork changes.
 To use a different release asset, set `CONTINUE_CLI_RELEASE_URL` before running
-the installer.
+the installer. The checksum downloaded beside the asset protects against
+transfer corruption; use an immutable asset URL if the mutable `cli-latest`
+tag is not an acceptable trust boundary.
 
 ## Usage
 
@@ -50,6 +52,10 @@ writes a model entry to `~/.continue/config.yaml` with `chat`, `edit`, and
 permissions and the YAML references it as `${{ secrets.VARIABLE_NAME }}`. You
 can use an exported environment variable instead; do not commit `.env` files.
 Existing valid configurations are kept and do not trigger the picker again.
+
+Set `CONTINUE_USE_BEDROCK=1` for a one-shot Bedrock override. It uses the AWS
+credential chain and respects `AWS_REGION`, `AWS_DEFAULT_REGION`, and
+`AWS_PROFILE` without replacing the saved configuration.
 
 ### Startup artwork
 
@@ -113,6 +119,7 @@ cn ls --json
 ## Environment Variables
 
 - `CONTINUE_CLI_DISABLE_COMMIT_SIGNATURE`: Disable adding the Continue commit signature to generated commit messages
+- `CONTINUE_USE_BEDROCK=1`: Use a one-shot AWS Bedrock configuration without replacing the saved config
 - `FORCE_NO_TTY`: Force TTY-less mode, prevents stdin reading (useful for testing and automation)
 
 ## Commands

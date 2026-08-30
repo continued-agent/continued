@@ -3,11 +3,11 @@ name: CLI PR Checks
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 jobs:
   track-rerun:
@@ -58,7 +58,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        node-version: [18, 20, 22, 24]
+        node-version: [20, 22, 24]
       fail-fast: false
     runs-on: ${{ matrix.os }}
 
@@ -120,8 +120,8 @@ jobs:
           npm run test:e2e
 
   smoke-api:
-    # Only runs when secrets are available (not on fork PRs)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    # Live API tests run only against trusted code after it reaches main.
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

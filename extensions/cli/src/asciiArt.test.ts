@@ -29,7 +29,7 @@ describe("asciiArt", () => {
 
     it("should return only the version when terminal is too narrow", () => {
       // Set process.stdout.columns to simulate a terminal narrower than the art
-      process.stdout.columns = 41;
+      process.stdout.columns = 43;
 
       const result = getDisplayableAsciiArt();
 
@@ -38,8 +38,8 @@ describe("asciiArt", () => {
     });
 
     it("should return only the version when terminal is below threshold", () => {
-      // Test the edge case at exactly 41 columns (below our threshold of 42)
-      process.stdout.columns = 41;
+      // Test the edge case at exactly 43 columns (below our threshold of 44)
+      process.stdout.columns = 43;
 
       const result = getDisplayableAsciiArt();
 
@@ -48,8 +48,8 @@ describe("asciiArt", () => {
     });
 
     it("should return full ASCII art when terminal is exactly at threshold", () => {
-      // Test the edge case at exactly 42 columns (our threshold)
-      process.stdout.columns = 42;
+      // Test the edge case at exactly 44 columns (our threshold)
+      process.stdout.columns = 44;
 
       const result = getDisplayableAsciiArt();
 

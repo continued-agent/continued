@@ -9,6 +9,9 @@ on:
       - "extensions/cli/**"
       - "packages/**"
       - "scripts/build-packages.js"
+      - "package.json"
+      - "package-lock.json"
+      - ".nvmrc"
   workflow_dispatch:
 
 concurrency:
@@ -53,17 +56,47 @@ jobs:
 
       - name: Build CLI
         working-directory: extensions/cli
+        env:
+          CONTINUE_RELEASE_BUILD: "true"
         run: npm run build
+
+      - name: Run CLI tests
+        working-directory: extensions/cli
+        env:
+          CONTINUE_RELEASE_BUILD: "true"
+        run: |
+          npm test
+          npm run test:smoke
 
       - name: Create release package
         working-directory: extensions/cli
         shell: bash
+        env:
+          CONTINUE_RELEASE_BUILD: "true"
         run: |
+          rm -f "$RUNNER_TEMP"/continue-cli.tgz "$RUNNER_TEMP"/continue-cli.tgz.sha256
+          # Build metadata and source maps are useful locally but are not
+          # runtime files and make the public artifact unnecessarily large.
+          rm -f dist/meta.json dist/*.map
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
           package_path="$(find "$RUNNER_TEMP" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
           test -n "$package_path"
           cp "$package_path" "$RUNNER_TEMP/continue-cli.tgz"
-          sha256sum "$RUNNER_TEMP/continue-cli.tgz" > "$RUNNER_TEMP/continue-cli.tgz.sha256"
+          (
+            cd "$RUNNER_TEMP"
+            sha256sum continue-cli.tgz > continue-cli.tgz.sha256
+          )
+
+      - name: Verify installed CLI artifact
+        shell: bash
+        run: |
+          smoke_dir="$(mktemp -d)"
+          trap 'rm -rf "$smoke_dir"' EXIT
+          npm install --prefix "$smoke_dir" \
+            "$RUNNER_TEMP/continue-cli.tgz" \
+            --ignore-scripts \
+            --omit=dev
+          "$smoke_dir/node_modules/.bin/cn" --version
 
       - name: Publish latest fork release
         env:
@@ -74,10 +107,18 @@ jobs:
           release_title="Continue CLI (latest fork build)"
 
           if gh release view "$release_tag" >/dev/null 2>&1; then
+            # Upload before retagging so an upload failure leaves the existing
+            # release/tag pair intact instead of pointing at missing assets.
             gh release upload "$release_tag" \
               "$RUNNER_TEMP/continue-cli.tgz" \
               "$RUNNER_TEMP/continue-cli.tgz.sha256" \
               --clobber
+            # cli-latest is intentionally mutable, but its tag must point at
+            # the same commit as the assets to preserve provenance.
+            gh api --method PATCH \
+              "repos/$GITHUB_REPOSITORY/git/refs/tags/$release_tag" \
+              -f sha="$GITHUB_SHA" \
+              -F force=true
           else
             gh release create "$release_tag" \
               "$RUNNER_TEMP/continue-cli.tgz" \

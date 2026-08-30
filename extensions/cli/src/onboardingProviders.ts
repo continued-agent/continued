@@ -14,6 +14,7 @@ export interface OnboardingProvider {
   apiKeyEnv?: string;
   apiBase?: string;
   description: string;
+  capabilities?: string[];
   apiKeyOptional?: boolean;
   requiresCustomApiBase?: boolean;
   requiresCustomModel?: boolean;
@@ -29,6 +30,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     model: "gpt-4.1-mini",
     apiKeyEnv: "OPENAI_API_KEY",
     description: "GPT models for general coding and chat",
+    capabilities: ["tool_use", "image_input"],
   },
   {
     id: "anthropic",
@@ -37,6 +39,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     model: "claude-sonnet-4-6",
     apiKeyEnv: "ANTHROPIC_API_KEY",
     description: "Claude models with strong reasoning and long context",
+    capabilities: ["tool_use", "image_input"],
   },
   {
     id: "google",
@@ -45,6 +48,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     model: "gemini-2.5-flash",
     apiKeyEnv: "GEMINI_API_KEY",
     description: "Fast multimodal Gemini models",
+    capabilities: ["tool_use", "image_input"],
   },
   {
     id: "meta",
@@ -126,6 +130,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     model: "gpt-4o",
     apiKeyEnv: "AZURE_OPENAI_API_KEY",
     description: "Azure OpenAI deployments",
+    capabilities: ["tool_use", "image_input"],
     requiresAzureSettings: true,
   },
   {
@@ -135,6 +140,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     model: "anthropic.claude-sonnet-4-5-20250929-v1:0",
     apiKeyEnv: "AWS_BEDROCK_API_KEY",
     description: "Use AWS IAM credentials or an optional Bedrock API key",
+    capabilities: ["tool_use", "image_input"],
     apiKeyOptional: true,
     requiresBedrockSettings: true,
   },

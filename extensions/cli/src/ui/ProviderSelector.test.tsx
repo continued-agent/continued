@@ -61,4 +61,13 @@ describe("ProviderSelector", () => {
     expect(onSelect).toHaveBeenCalledWith(providers[1]);
     unmount();
   });
+
+  it("renders a useful empty state without trapping the selector", () => {
+    const { lastFrame, unmount } = render(
+      <ProviderSelector options={[]} onSelect={vi.fn()} onCancel={vi.fn()} />,
+    );
+
+    expect(lastFrame()).toContain("No model providers are available");
+    unmount();
+  });
 });

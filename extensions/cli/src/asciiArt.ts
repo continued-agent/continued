@@ -35,9 +35,9 @@ export const CONTINUE_ASCII_ART = `${mind.multiline(CONTINUE_ASCII_ART_SOURCE)}\
   ("v" + getVersion()).padStart(ASCII_ART_WIDTH),
 )}`;
 
-// The full mark is 40 columns wide. Account for IntroMessage's horizontal
-// padding so it does not wrap at the exact minimum terminal width.
-const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 2;
+// The full mark is 40 columns wide. Account for IntroMessage and TUIChat's
+// horizontal padding so it does not wrap at the exact minimum terminal width.
+const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 4;
 
 /**
  * Returns the ASCII art only if the terminal is wide enough to display it properly.

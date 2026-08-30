@@ -21,14 +21,12 @@ describe("updateAnthropicModelInYaml", () => {
       expect(result).not.toContain("uses:");
     });
 
-    it("should create new config from invalid YAML", () => {
+    it("should reject invalid YAML instead of replacing it", () => {
       const invalidYaml = "invalid: [yaml content";
-      const result = updateAnthropicModelInYaml(invalidYaml, testApiKey);
 
-      expect(result).toContain("name: Main Config");
-      expect(result).toContain("model: claude-sonnet-4-6");
-      expect(result).toContain("apiKey: sk-ant-test123456789");
-      expect(result).not.toContain("uses:");
+      expect(() => updateAnthropicModelInYaml(invalidYaml, testApiKey)).toThrow(
+        "Cannot update invalid YAML configuration",
+      );
     });
   });
 
@@ -94,6 +92,34 @@ models:
       expect(result).toContain("provider: anthropic");
       expect(result).toContain("model: claude-sonnet-4-6");
       expect(result).toContain("apiKey: sk-ant-test123456789");
+    });
+
+    it("should preserve custom fields on managed models", () => {
+      const existingConfig = `name: Main Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Claude Sonnet 4.6
+    provider: anthropic
+    model: claude-sonnet-4-6
+    apiKey: old-key
+    apiBase: https://old.example.com
+    env:
+      region: old-region
+    requestOptions:
+      timeout: 30000
+    defaultCompletionOptions:
+      temperature: 0.2
+`;
+
+      const result = updateAnthropicModelInYaml(existingConfig, testApiKey);
+      const parsed = parse(result) as any;
+
+      expect(parsed.models[0].requestOptions.timeout).toBe(30000);
+      expect(parsed.models[0].defaultCompletionOptions.temperature).toBe(0.2);
+      expect(parsed.models[0].apiKey).toBe(testApiKey);
+      expect(parsed.models[0].apiBase).toBeUndefined();
+      expect(parsed.models[0].env).toBeUndefined();
     });
   });
 
@@ -213,15 +239,14 @@ models:
   });
 
   describe("edge cases", () => {
-    it("should handle malformed models array gracefully", () => {
+    it("should reject a malformed models array instead of replacing it", () => {
       const malformedConfig = `name: Main Config
 models: "not an array"
 `;
 
-      const result = updateAnthropicModelInYaml(malformedConfig, testApiKey);
-
-      expect(result).toContain("model: claude-sonnet-4-6");
-      expect(result).toContain("apiKey: sk-ant-test123456789");
+      expect(() =>
+        updateAnthropicModelInYaml(malformedConfig, testApiKey),
+      ).toThrow("models must be an array");
     });
 
     it("should handle different API key formats", () => {
@@ -277,5 +302,56 @@ describe("updateProviderModelInYaml", () => {
     expect(updatedParsed.models[1].apiKey).toBe(
       "${{ secrets.NEW_OPENAI_API_KEY }}",
     );
+  });
+
+  it("preserves custom fields while updating a provider model", () => {
+    const existingConfig = `name: Existing
+version: 1.0.0
+schema: v1
+models:
+  - name: OpenAI
+    provider: openai
+    model: gpt-4.1-mini
+    roles:
+      - chat
+    requestOptions:
+      timeout: 30000
+    defaultCompletionOptions:
+      temperature: 0.1
+`;
+
+    const result = updateProviderModelInYaml(existingConfig, providerModel);
+    const parsed = parse(result) as any;
+
+    expect(parsed.models[0].requestOptions.timeout).toBe(30000);
+    expect(parsed.models[0].defaultCompletionOptions.temperature).toBe(0.1);
+    expect(parsed.models[0].apiKey).toBe(providerModel.apiKey);
+  });
+
+  it("rejects malformed YAML rather than destroying the existing config", () => {
+    expect(() =>
+      updateProviderModelInYaml("models: [unterminated", providerModel),
+    ).toThrow("Cannot update invalid YAML configuration");
+  });
+
+  it("can prepend the selected model as the default", () => {
+    const existingConfig = `name: Existing
+version: 1.0.0
+schema: v1
+models:
+  - name: Other
+    provider: anthropic
+    model: claude-sonnet-4-6
+    roles:
+      - chat
+`;
+
+    const result = updateProviderModelInYaml(existingConfig, providerModel, {
+      prepend: true,
+    });
+    const parsed = parse(result) as any;
+
+    expect(parsed.models[0]).toEqual(providerModel);
+    expect(parsed.models[1].provider).toBe("anthropic");
   });
 });

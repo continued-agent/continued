@@ -1,56 +1,47 @@
 # Onboarding
 
-When a user first runs `cn` in interactive mode, they will be taken through "onboarding". After they have completed onboarding once, they will follow a normal config loading flow.
+When a user first runs `cn` in interactive mode, they are taken through
+onboarding. After onboarding is complete, normal config loading is used.
 
 ## Onboarding flow
 
-**The onboarding flow runs when the user hasn't completed onboarding before, regardless of whether they have a valid config.yaml file.**
+1. If `--config` is provided, load that file and do not modify the default
+   configuration.
+2. If `CONTINUE_USE_BEDROCK=1` is set, use a protected temporary Bedrock config
+   and skip interactive prompts. The saved configuration is not replaced.
+3. If a valid local `~/.continue/config.yaml` already contains an explicit
+   chat-capable model, keep it and skip the provider picker.
+4. Otherwise, present the provider picker. The selected provider's API key is
+   stored in `~/.continue/.env` with restrictive permissions, while
+   `config.yaml` contains only a `${{ secrets.VARIABLE_NAME }}` reference.
 
-1. If the --config flag is provided, load this config
-2. If the CONTINUE_USE_BEDROCK environment variable is set to "1", automatically use AWS Bedrock configuration and skip interactive prompts
-3. Present the user with available options:
+The provider picker includes OpenAI, Anthropic, Google Gemini, Meta Llama, xAI,
+Mistral, DeepSeek, OpenRouter, Perplexity, LiteLLM, OpenCode Zen, Azure, AWS
+Bedrock, NVIDIA, Hugging Face, and a generic OpenAI-compatible endpoint.
 
-   - Log in with Continue: log them in, which will automatically create their assistant and then we can load the first assistant from the first org
-   - Enter your Anthropic API key: let them enter the key, and then either create a ~/.continue/config.yaml with the following contents OR update the existing config.yaml to add the model
+When onboarding is performed automatically, the CLI displays a confirmation,
+for example: `✓ Using AWS Bedrock (CONTINUE_USE_BEDROCK detected)`.
 
-   ```yaml
-   name: Local Config
-   version: 1.0.0
-   schema: v1
+### AWS Bedrock environment variable
 
-   models:
-     - uses: anthropic/claude-4-sonnet
-       with:
-         ANTHROPIC_API_KEY: <THEIR_ANTHROPIC_API_KEY>
-   ```
-
-   When CONTINUE_USE_BEDROCK=1 is detected, it will use AWS Bedrock configuration. The user must have AWS credentials configured through the standard AWS credential chain (AWS CLI, environment variables, IAM roles, etc.).
-
-When something in the onboarding flow is done automatically, we should tell the user what happened. For example, when CONTINUE_USE_BEDROCK=1 is detected, the CLI displays: "✓ Using AWS Bedrock (CONTINUE_USE_BEDROCK detected)"
-
-### AWS Bedrock Environment Variable
-
-Users can bypass the interactive onboarding menu by setting the `CONTINUE_USE_BEDROCK` environment variable to "1":
+`CONTINUE_USE_BEDROCK=1` requires credentials from the standard AWS credential
+chain (AWS environment variables, an AWS profile, or an attached IAM role). The
+region is read from `AWS_REGION`, then `AWS_DEFAULT_REGION`, and otherwise
+defaults to `us-east-1`; `AWS_PROFILE` is also respected.
 
 ```bash
 export CONTINUE_USE_BEDROCK=1
-cn <command>
+cn -p "Review the current changes"
 ```
 
-This will:
-
-- Skip the interactive onboarding prompts
-- Automatically configure the CLI to use AWS Bedrock
-- Require that AWS credentials are already configured through the standard AWS credential chain
-- Display a confirmation message to the user
-- Mark onboarding as completed
+This override applies to the current process only and does not mark or rewrite
+the user's saved configuration.
 
 ## Normal flow
 
-**The normal flow runs when the user has already completed onboarding.**
-
-1. If the --config flag is provided, load this config
-2. If the user is logged in, look for the first assistant in the selected org
-3. If there are no assistants in that org, then look for a local ~/.continue/config.yaml
-4. If there is no config.yaml, look for an ANTHROPIC_API_KEY in the environment and manually construct the config object to include just the claude-4-sonnet model with that API key
-5. If none of the above, then bring the user to step 3 of the onboarding flow
+1. If `--config` is provided, load that file.
+2. If a local `config.yaml` exists, load it.
+3. If no usable local config exists and `ANTHROPIC_API_KEY` is present, create a
+   local config that references that environment variable.
+4. If none of the above applies, use the normal provider picker in an
+   interactive terminal or return without prompting in headless mode.

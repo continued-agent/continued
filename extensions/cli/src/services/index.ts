@@ -1,5 +1,8 @@
 import { HookService } from "../hooks/HookService.js";
-import { initializeWithOnboarding } from "../onboarding.js";
+import {
+  createTemporaryBedrockConfig,
+  initializeWithOnboarding,
+} from "../onboarding.js";
 import {
   setBetaSubagentToolEnabled,
   setBetaUploadArtifactToolEnabled,
@@ -64,6 +67,17 @@ export async function initializeServices(initOptions: ServiceInitOptions = {}) {
 
   const commandOptions = initOptions.options || {};
 
+  // Headless mode does not run initializeWithOnboarding, so create the
+  // one-shot config here. Interactive mode lets initializeWithOnboarding own
+  // the temporary file and confirmation message.
+  if (
+    !commandOptions.config &&
+    process.env.CONTINUE_USE_BEDROCK === "1" &&
+    (initOptions.headless || initOptions.skipOnboarding)
+  ) {
+    commandOptions.config = createTemporaryBedrockConfig().configPath;
+  }
+
   // Configure beta tools based on command options
   if (commandOptions.betaUploadArtifactTool) {
     setBetaUploadArtifactToolEnabled(true);
@@ -73,7 +87,13 @@ export async function initializeServices(initOptions: ServiceInitOptions = {}) {
   }
   // Handle onboarding for TUI mode (headless: false) unless explicitly skipped
   if (!initOptions.headless && !initOptions.skipOnboarding) {
-    await initializeWithOnboarding(null, commandOptions.config);
+    const onboardingConfigPath = await initializeWithOnboarding(
+      null,
+      commandOptions.config,
+    );
+    if (!commandOptions.config && onboardingConfigPath) {
+      commandOptions.config = onboardingConfigPath;
+    }
   }
 
   // Handle ANTHROPIC_API_KEY in headless mode when no config path is provided

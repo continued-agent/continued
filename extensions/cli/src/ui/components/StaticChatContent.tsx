@@ -43,13 +43,18 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
   const [staticKey, setStaticKey] = useState(0);
   const isInitialMount = useRef(true);
 
-  // Refresh function that clears terminal and remounts Static component
-  const refreshStatic = useCallback(() => {
-    // Clear terminal completely including scrollback buffer (3J)
-    stdout.write("\x1b[2J\x1b[H");
-    setStaticKey((prev) => prev + 1);
-    stdout.write("\x1b[3J");
-  }, [stdout]);
+  // Refresh function that clears the visible terminal and remounts Static.
+  // Resizing must not erase the user's scrollback buffer.
+  const refreshStatic = useCallback(
+    (clearScrollback = false) => {
+      stdout.write("\x1b[2J\x1b[H");
+      setStaticKey((prev) => prev + 1);
+      if (clearScrollback) {
+        stdout.write("\x1b[3J");
+      }
+    },
+    [stdout],
+  );
 
   // Debounced terminal resize handler (300ms like gemini-cli)
   useEffect(() => {
@@ -72,7 +77,7 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
   // Trigger refresh when refreshTrigger prop changes (for /clear command)
   useEffect(() => {
     if (refreshTrigger !== undefined && refreshTrigger > 0) {
-      refreshStatic();
+      refreshStatic(true);
     }
   }, [refreshTrigger, refreshStatic]);
 
@@ -144,9 +149,9 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
         key={staticKey}
         items={staticItems}
         style={{
-          // TUIChat reserves one column on each side and Static keeps one
-          // additional column as a wrapping guard.
-          width: Math.max(columns - 3, 1),
+          // TUIChat reserves one column on each side. Keep static and pending
+          // message content at the same width so wrapping is consistent.
+          width: Math.max(columns - 2, 1),
           textWrap: "wrap",
         }}
       >

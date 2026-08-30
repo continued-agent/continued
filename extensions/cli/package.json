@@ -5,6 +5,9 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "cn": "dist/cn.js"
   },
@@ -47,23 +50,19 @@
   "dependencies": {
     "fdir": "^6.4.2",
     "find-up": "^8.0.0",
-    "fzf": "^0.5.2",
-    "js-yaml": "^4.1.1"
+    "fzf": "^0.5.2"
   },
   "devDependencies": {
     "@continuedev/config-yaml": "file:../../packages/config-yaml",
     "@continuedev/openai-adapters": "file:../../packages/openai-adapters",
     "@continuedev/sdk": "^0.0.13",
     "@continuedev/terminal-security": "file:../../packages/terminal-security",
-    "@modelcontextprotocol/sdk": "^1.24.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.203.0",
-    "@opentelemetry/exporter-metrics-otlp-http": "^0.203.0",
-    "@opentelemetry/instrumentation-fs": "^0.23.0",
-    "@opentelemetry/instrumentation-http": "^0.203.0",
-    "@opentelemetry/resources": "^2.0.1",
-    "@opentelemetry/sdk-node": "^0.203.0",
-    "@opentelemetry/semantic-conventions": "^1.36.0",
+    "@opentelemetry/exporter-metrics-otlp-http": "^0.221.0",
+    "@opentelemetry/resources": "^2.10.0",
+    "@opentelemetry/sdk-metrics": "^2.10.0",
+    "@opentelemetry/semantic-conventions": "^1.43.0",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/github": "^11.0.3",
@@ -81,11 +80,9 @@
     "@types/shell-quote": "^1.7.5",
     "@types/supertest": "^6.0.3",
     "@types/turndown": "^5.0.5",
-    "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.39.0",
     "@typescript-eslint/parser": "^8.39.0",
-    "@vitest/ui": "^3.2.4",
-    "@workos-inc/node": "^7.45.0",
+    "@vitest/ui": "^3.2.7",
     "chalk": "^5.4.1",
     "clipboardy": "^4.0.0",
     "commander": "^14.0.0",
@@ -122,32 +119,32 @@
     "prettier-plugin-tailwindcss": "^0.6.14",
     "react": "^19.1.0",
     "semantic-release": "^24.2.7",
-    "shell-quote": "^1.8.3",
+    "shell-quote": "^1.10.0",
     "supertest": "^7.1.3",
     "swr": "^2.3.4",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.3",
     "turndown": "^7.2.0",
     "typescript": "^5.8.3",
-    "uuid": "^9.0.1",
-    "vitest": "^3.2.4",
+    "uuid": "^11.1.1",
+    "vitest": "^3.2.7",
     "winston": "^3.17.0",
     "yaml": "^2.8.0"
   },
-  "engine": {
-    "node": ">=18"
+  "engines": {
+    "node": ">=20.20.1"
   },
   "overrides": {
+    "brace-expansion": "^2.1.4",
+    "js-yaml": "^4.3.2",
+    "lodash": "^4.18.1",
+    "lodash-es": "^4.18.1",
     "minimatch@<9.0.7": "^9.0.7",
+    "protobufjs": "^7.6.6",
     "qs": "^6.14.2",
     "picomatch": "^4.0.2"
   },
   "optionalDependencies": {
-    "@img/sharp-darwin-arm64": "^0.33.5",
-    "@img/sharp-darwin-x64": "^0.33.5",
-    "@img/sharp-linux-arm": "^0.33.5",
-    "@img/sharp-linux-arm64": "^0.33.5",
-    "@img/sharp-linux-x64": "^0.33.5",
-    "@img/sharp-win32-x64": "^0.33.5"
+    "sharp": "^0.35.4"
   }
 }

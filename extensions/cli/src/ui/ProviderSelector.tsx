@@ -22,7 +22,10 @@ export function ProviderSelector({
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const { rows } = useTerminalSize();
 
-  const visibleCount = Math.max(4, Math.min(options.length, rows - 8));
+  const visibleCount = Math.max(
+    1,
+    Math.min(options.length, Math.max(1, rows - 8)),
+  );
   const { visibleOptions, offset } = useMemo(() => {
     if (options.length <= visibleCount) {
       return { visibleOptions: options, offset: 0 };
@@ -40,6 +43,10 @@ export function ProviderSelector({
   }, [options, selectedIndex, visibleCount]);
 
   useInput((input, key) => {
+    if (options.length === 0) {
+      return;
+    }
+
     if (key.escape || (key.ctrl && input === "c")) {
       onCancel();
       return;
@@ -66,6 +73,14 @@ export function ProviderSelector({
 
   const hasMoreAbove = offset > 0;
   const hasMoreBelow = offset + visibleOptions.length < options.length;
+
+  if (options.length === 0) {
+    return (
+      <Box flexDirection="column" paddingX={1}>
+        <Text color="red">No model providers are available.</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box flexDirection="column" paddingX={1}>
@@ -108,6 +123,10 @@ export function ProviderSelector({
 export function selectOnboardingProvider(
   options: OnboardingProvider[] = ONBOARDING_PROVIDERS,
 ): Promise<OnboardingProvider | null> {
+  if (options.length === 0) {
+    return Promise.resolve(null);
+  }
+
   return new Promise((resolve) => {
     const app = render(
       React.createElement(ProviderSelector, {

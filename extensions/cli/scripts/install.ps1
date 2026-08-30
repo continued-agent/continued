@@ -23,6 +23,11 @@ $ProgressPreference = 'SilentlyContinue'  # Faster downloads
 $script:RequiredNodeVersion = [version]"20.20.1"
 $script:PackageName = "@continuedev/cli"
 $script:CliCommand = "cn"
+$script:FnmVersion = "1.39.0"
+$script:FnmSha256 = "8183bed4348cb78fdfd8abb3d1247fbeab7b2082f941363929c61e747c001e10"
+# The release URL defaults to a mutable GitHub tag. The adjacent checksum
+# protects against transfer corruption; use CONTINUE_CLI_RELEASE_URL pointing
+# at an immutable asset when the release/tag trust boundary is not sufficient.
 $script:ReleaseUrl = if ($env:CONTINUE_CLI_RELEASE_URL) {
     $env:CONTINUE_CLI_RELEASE_URL
 } else {
@@ -131,12 +136,29 @@ function Install-Fnm {
         Write-Info "Downloading fnm binary directly..."
         try {
             $arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
-            $fnmZipUrl = "https://github.com/Schniz/fnm/releases/latest/download/fnm-windows.zip"
+            $fnmZipUrl = "https://github.com/Schniz/fnm/releases/download/v$($script:FnmVersion)/fnm-windows.zip"
             $tempZip = Join-Path $env:TEMP "fnm-windows.zip"
             $extractPath = $script:FnmPath
 
             # Download the zip file
             Invoke-SafeWebRequest -Uri $fnmZipUrl -OutFile $tempZip
+
+            # Verify the pinned archive before extracting or executing it.
+            $actualFnmHash = (Get-FileHash -Path $tempZip -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualFnmHash -ne $script:FnmSha256) {
+                throw "The downloaded fnm archive checksum does not match the pinned release."
+            }
+
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zipArchive = [System.IO.Compression.ZipFile]::OpenRead($tempZip)
+            try {
+                $archiveEntries = $zipArchive.Entries
+                if ($archiveEntries.Count -ne 1 -or $archiveEntries[0].FullName -ne "fnm.exe") {
+                    throw "The pinned fnm archive contains unexpected files."
+                }
+            } finally {
+                $zipArchive.Dispose()
+            }
 
             # Create fnm directory if it doesn't exist
             if (-not (Test-Path $extractPath)) {
@@ -154,7 +176,7 @@ function Install-Fnm {
                 $script:FnmInstalled = $true
             }
         } catch {
-            Write-Warn "Direct download failed: $($_.Exception.Message)"
+            Write-Warn "Direct download of fnm v$($script:FnmVersion) failed: $($_.Exception.Message)"
         }
     }
 
@@ -333,7 +355,16 @@ function Install-Cli {
             $env:PATH = "$npmBinPath;$env:PATH"
         }
 
-        Write-Success "$PackageName installed!"
+        $cli = Get-Command $script:CliCommand -ErrorAction SilentlyContinue
+        if ($null -eq $cli) {
+            throw "$script:CliCommand was not found in PATH after installation. Restart PowerShell or add the npm global bin directory to PATH."
+        }
+        $cliVersion = & $script:CliCommand --version 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            throw "$script:CliCommand was installed but could not run --version."
+        }
+
+        Write-Success "$PackageName installed ($cliVersion)!"
     } finally {
         if (Test-Path $tempDir) {
             Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
