@@ -5,7 +5,7 @@
 .DESCRIPTION
     Installs Node.js (if needed) and the Continue CLI globally
 .EXAMPLE
-    irm https://continue.dev/install.ps1 | iex
+    irm https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.ps1 | iex
 .NOTES
     Supports Windows 10/11, Windows Server 2016+
     Requires internet connectivity
@@ -23,6 +23,12 @@ $ProgressPreference = 'SilentlyContinue'  # Faster downloads
 $script:RequiredNodeVersion = [version]"20.20.1"
 $script:PackageName = "@continuedev/cli"
 $script:CliCommand = "cn"
+$script:ReleaseUrl = if ($env:CONTINUE_CLI_RELEASE_URL) {
+    $env:CONTINUE_CLI_RELEASE_URL
+} else {
+    "https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz"
+}
+$script:ChecksumUrl = "$($script:ReleaseUrl).sha256"
 $script:FnmInstalled = $false
 $script:FnmPath = "$env:LOCALAPPDATA\fnm"
 
@@ -257,7 +263,7 @@ function Add-ToProfile {
 }
 
 function Install-Cli {
-    Write-Info "Installing $PackageName..."
+    Write-Info "Installing $PackageName from the continued-agent/continued release..."
 
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
         Write-Err "npm not found. Please restart PowerShell and try again."
@@ -289,22 +295,50 @@ function Install-Cli {
         }
     }
 
-    $npmOutput = npm install -g $PackageName 2>&1
-    $npmExitCode = $LASTEXITCODE
+    $tempDir = Join-Path $env:TEMP ("continue-cli-" + [Guid]::NewGuid().ToString("N"))
+    $archivePath = Join-Path $tempDir "continue-cli.tgz"
+    $checksumPath = Join-Path $tempDir "continue-cli.tgz.sha256"
 
-    if ($npmExitCode -ne 0) {
-        Write-Host $npmOutput -ForegroundColor Red
-        Write-Err "Failed to install $PackageName (exit code: $npmExitCode)"
-        exit 1
+    try {
+        New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+        Write-Info "Downloading the prebuilt CLI..."
+        Invoke-SafeWebRequest -Uri $script:ReleaseUrl -OutFile $archivePath
+
+        Write-Info "Downloading the release checksum..."
+        Invoke-SafeWebRequest -Uri $script:ChecksumUrl -OutFile $checksumPath
+
+        $expectedHash = ((Get-Content -Path $checksumPath | Select-Object -First 1) -split '\s+')[0].Trim().ToUpperInvariant()
+        if ($expectedHash -notmatch '^[0-9A-F]{64}$') {
+            throw "The release checksum has an invalid format."
+        }
+
+        $actualHash = (Get-FileHash -Path $archivePath -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($expectedHash -ne $actualHash) {
+            throw "The downloaded CLI checksum does not match the release checksum."
+        }
+        Write-Success "Verified the CLI release checksum"
+
+        $npmOutput = npm install -g $archivePath --ignore-scripts --omit=dev 2>&1
+        $npmExitCode = $LASTEXITCODE
+
+        if ($npmExitCode -ne 0) {
+            Write-Host ($npmOutput -join [Environment]::NewLine) -ForegroundColor Red
+            throw "Failed to install $PackageName (exit code: $npmExitCode)"
+        }
+
+        # Verify the CLI was installed
+        $npmBinPath = npm config get prefix 2>$null
+        if ($npmBinPath) {
+            $env:PATH = "$npmBinPath;$env:PATH"
+        }
+
+        Write-Success "$PackageName installed!"
+    } finally {
+        if (Test-Path $tempDir) {
+            Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
-
-    # Verify the CLI was installed
-    $npmBinPath = npm config get prefix 2>$null
-    if ($npmBinPath) {
-        $env:PATH = "$npmBinPath;$env:PATH"
-    }
-
-    Write-Success "$PackageName installed!"
 }
 
 function Show-Complete {

@@ -2,16 +2,19 @@
 set -euo pipefail
 
 # Continue CLI Installer - Unix (macOS, Linux, WSL, Git Bash)
-# curl -fsSL https://continue.dev/install.sh | bash
+# curl -fsSL https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.sh | bash
 
 REQUIRED_NODE_VERSION="20.20.1"
 PACKAGE_NAME="@continuedev/cli"
 CLI_COMMAND="cn"
 NETWORK_TIMEOUT=60
 FNM_INSTALL_DIR="$HOME/.local/share/fnm"
+RELEASE_URL="${CONTINUE_CLI_RELEASE_URL:-https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz}"
+CHECKSUM_URL="${RELEASE_URL}.sha256"
 
 # Cleanup tracking
 CLEANUP_FNM=false
+INSTALL_TEMP_DIR=""
 
 # Colors
 if [ -t 1 ] && [ "$(tput colors 2>/dev/null || echo 0)" -ge 8 ]; then
@@ -28,6 +31,9 @@ error()   { printf "${RED}==> Error:${NC} %s\n" "$1" >&2; exit 1; }
 
 cleanup() {
     local exit_code=$?
+    if [ -n "$INSTALL_TEMP_DIR" ] && [ -d "$INSTALL_TEMP_DIR" ]; then
+        rm -rf "$INSTALL_TEMP_DIR" 2>/dev/null || true
+    fi
     if [ $exit_code -ne 0 ]; then
         warn "Installation failed. Cleaning up..."
         if [ "$CLEANUP_FNM" = true ] && [ -d "$FNM_INSTALL_DIR" ]; then
@@ -56,6 +62,10 @@ check_dependencies() {
 
     if ! command -v unzip &>/dev/null; then
         missing_deps+=("unzip")
+    fi
+
+    if ! command -v sha256sum &>/dev/null && ! command -v shasum &>/dev/null; then
+        missing_deps+=("sha256sum or shasum")
     fi
 
     if [ ${#missing_deps[@]} -gt 0 ]; then
@@ -142,7 +152,10 @@ version_gte() {
 
 source_nvm() {
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        # shellcheck source=/dev/null
+        . "$NVM_DIR/nvm.sh"
+    fi
 }
 
 source_fnm() {
@@ -267,14 +280,34 @@ check_npm_permissions() {
 }
 
 install_cli() {
-    info "Installing $PACKAGE_NAME..."
+    info "Installing $PACKAGE_NAME from the continued-agent/continued release..."
+
+    if ! command -v npm &>/dev/null; then
+        error "npm was not found after Node.js setup. Please restart your shell and try again."
+    fi
 
     check_npm_permissions
+
+    INSTALL_TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/continue-cli.XXXXXX")"
+    local archive="$INSTALL_TEMP_DIR/continue-cli.tgz"
+    local checksum="$INSTALL_TEMP_DIR/continue-cli.tgz.sha256"
+
+    info "Downloading the prebuilt CLI..."
+    if ! download "$RELEASE_URL" "$archive"; then
+        error "Could not download the fork release. The cli-latest release may not have been published yet: $RELEASE_URL"
+    fi
+
+    info "Downloading the release checksum..."
+    if ! download "$CHECKSUM_URL" "$checksum"; then
+        error "Could not download the release checksum: $CHECKSUM_URL"
+    fi
+
+    verify_checksum "$archive" "$checksum"
 
     local npm_output
     local npm_exit_code=0
 
-    npm_output=$(npm install -g "$PACKAGE_NAME" 2>&1) || npm_exit_code=$?
+    npm_output=$(npm install -g "$archive" --ignore-scripts --omit=dev 2>&1) || npm_exit_code=$?
 
     if [ $npm_exit_code -ne 0 ]; then
         echo "$npm_output" >&2
@@ -289,6 +322,31 @@ install_cli() {
     fi
 
     success "$PACKAGE_NAME installed!"
+}
+
+verify_checksum() {
+    local archive="$1"
+    local checksum_file="$2"
+    local expected actual
+
+    expected="$(awk 'NF { print $1; exit }' "$checksum_file")"
+    if [[ ! "$expected" =~ ^[[:xdigit:]]{64}$ ]]; then
+        error "The release checksum has an invalid format."
+    fi
+
+    if command -v sha256sum &>/dev/null; then
+        actual="$(sha256sum "$archive" | awk '{print $1}')"
+    else
+        actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
+    fi
+
+    expected="$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')"
+    actual="$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')"
+    if [ "$expected" != "$actual" ]; then
+        error "The downloaded CLI checksum does not match the release checksum."
+    fi
+
+    success "Verified the CLI release checksum"
 }
 
 finalize() {
@@ -310,7 +368,7 @@ finalize() {
 main() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    printf "${BOLD}           Continue CLI Installer${NC}\n"
+    printf "%s           Continue CLI Installer%s\n" "$BOLD" "$NC"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 

@@ -1,0 +1,89 @@
+name: CLI Release Artifact
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cli-release-artifact.yml"
+      - "core/**"
+      - "extensions/cli/**"
+      - "packages/**"
+      - "scripts/build-packages.js"
+  workflow_dispatch:
+
+concurrency:
+  group: cli-release-artifact
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build and publish CLI artifact
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: extensions/cli/package-lock.json
+
+      - name: Setup packages
+        uses: ./.github/actions/setup-packages
+
+      - name: Setup core component
+        uses: ./.github/actions/setup-component
+        with:
+          component: core
+          include-root: true
+
+      - name: Build core
+        working-directory: core
+        run: npm run build
+
+      - name: Install CLI dependencies
+        working-directory: extensions/cli
+        run: npm ci --include=optional
+
+      - name: Build CLI
+        working-directory: extensions/cli
+        run: npm run build
+
+      - name: Create release package
+        working-directory: extensions/cli
+        shell: bash
+        run: |
+          npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
+          package_path="$(find "$RUNNER_TEMP" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
+          test -n "$package_path"
+          cp "$package_path" "$RUNNER_TEMP/continue-cli.tgz"
+          sha256sum "$RUNNER_TEMP/continue-cli.tgz" > "$RUNNER_TEMP/continue-cli.tgz.sha256"
+
+      - name: Publish latest fork release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_tag="cli-latest"
+          release_title="Continue CLI (latest fork build)"
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" \
+              "$RUNNER_TEMP/continue-cli.tgz" \
+              "$RUNNER_TEMP/continue-cli.tgz.sha256" \
+              --clobber
+          else
+            gh release create "$release_tag" \
+              "$RUNNER_TEMP/continue-cli.tgz" \
+              "$RUNNER_TEMP/continue-cli.tgz.sha256" \
+              --target "$GITHUB_SHA" \
+              --title "$release_title" \
+              --notes "Prebuilt Continue CLI artifact from the main branch. The installer downloads the assets from this release." \
+              --prerelease
+          fi

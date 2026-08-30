@@ -9,13 +9,13 @@ The Continue CLI (`cn`) is a customizable command line coding agent.
 **macOS / Linux:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.sh | bash
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-irm https://raw.githubusercontent.com/continuedev/continue/main/extensions/cli/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.ps1 | iex
 ```
 
 Or install with npm if you have Node.js 20+:
@@ -23,6 +23,13 @@ Or install with npm if you have Node.js 20+:
 ```bash
 npm i -g @continuedev/cli
 ```
+
+The curl and PowerShell installers download the latest prebuilt artifact from
+this fork’s `cli-latest` GitHub release, verify its SHA-256 checksum, and
+install it globally without compiling the monorepo on your machine. The npm
+command installs the published package, which may not contain the fork changes.
+To use a different release asset, set `CONTINUE_CLI_RELEASE_URL` before running
+the installer.
 
 ## Usage
 

@@ -4,6 +4,7 @@
 
 - add a scrollable first-run model-provider picker with masked secret storage
 - replace the CLI startup artwork with a compact terminal-friendly mark
+- add one-line installers for the latest prebuilt fork CLI artifact
 
 ### Improvements
 
