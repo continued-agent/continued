@@ -11,14 +11,20 @@ import { afterEach, describe, expect, it } from "vitest";
 const cliDirectory = fileURLToPath(new URL("../..", import.meta.url));
 const children: ReturnType<typeof spawn>[] = [];
 
+async function stopChild(child: ReturnType<typeof spawn>): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    child.once("close", () => resolve());
+    child.stdin?.end();
+    child.kill();
+  });
+}
+
 afterEach(async () => {
   for (const child of children.splice(0)) {
-    if (child.exitCode === null && child.signalCode === null) {
-      child.kill("SIGTERM");
-      await new Promise<void>((resolve) =>
-        child.once("close", () => resolve()),
-      );
-    }
+    await stopChild(child);
   }
 });
 
@@ -57,25 +63,28 @@ describe("ACP CLI transport", () => {
       Writable.toWeb(child.stdin!) as WritableStream<Uint8Array>,
       Readable.toWeb(child.stdout!) as ReadableStream<Uint8Array>,
     );
-    const result = await acp
-      .client({ name: "vitest-client" })
-      .connectWith(stream, async (ctx) => {
-        const initialized = await ctx.request(acp.methods.agent.initialize, {
-          protocolVersion: acp.PROTOCOL_VERSION,
-          clientCapabilities: {},
+    try {
+      const result = await acp
+        .client({ name: "vitest-client" })
+        .connectWith(stream, async (ctx) => {
+          const initialized = await ctx.request(acp.methods.agent.initialize, {
+            protocolVersion: acp.PROTOCOL_VERSION,
+            clientCapabilities: {},
+          });
+          const session = await ctx.request(acp.methods.agent.session.new, {
+            cwd: workspace,
+            mcpServers: [],
+          });
+          return { initialized, session };
         });
-        const session = await ctx.request(acp.methods.agent.session.new, {
-          cwd: workspace,
-          mcpServers: [],
-        });
-        return { initialized, session };
-      });
 
-    expect(result.initialized.protocolVersion).toBe(acp.PROTOCOL_VERSION);
-    expect(result.initialized.agentInfo?.name).toBe("continue");
-    expect(result.session.sessionId).toEqual(expect.any(String));
-    expect(stderr).not.toMatch(/stdout|console\.log/);
-
-    await rm(workspace, { recursive: true, force: true });
+      expect(result.initialized.protocolVersion).toBe(acp.PROTOCOL_VERSION);
+      expect(result.initialized.agentInfo?.name).toBe("continue");
+      expect(result.session.sessionId).toEqual(expect.any(String));
+      expect(stderr).not.toMatch(/stdout|console\.log/);
+    } finally {
+      await stopChild(child);
+      await rm(workspace, { recursive: true, force: true });
+    }
   }, 30000);
 });
