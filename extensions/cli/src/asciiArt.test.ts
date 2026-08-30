@@ -27,33 +27,29 @@ describe("asciiArt", () => {
       expect(result).toBe(CONTINUE_ASCII_ART);
     });
 
-    it("should return CN ASCII art version when terminal is too narrow", () => {
-      // Set process.stdout.columns to simulate narrow terminal
-      process.stdout.columns = 60;
+    it("should return only the version when terminal is too narrow", () => {
+      // Set process.stdout.columns to simulate a terminal narrower than the art
+      process.stdout.columns = 41;
 
       const result = getDisplayableAsciiArt();
 
-      expect(result).toContain("██████╗");
-
       expect(result).not.toBe(CONTINUE_ASCII_ART);
-      // Should be much shorter than the full ASCII art
-      expect(result.length).toBeLessThan(CONTINUE_ASCII_ART.length / 2);
+      expect(result).toContain("v");
     });
 
-    it("should return CN ASCII art version when terminal is below threshold", () => {
-      // Test the edge case at exactly 74 columns (below our threshold of 75)
-      process.stdout.columns = 74;
+    it("should return only the version when terminal is below threshold", () => {
+      // Test the edge case at exactly 41 columns (below our threshold of 42)
+      process.stdout.columns = 41;
 
       const result = getDisplayableAsciiArt();
 
-      expect(result).toContain("██████╗");
-
       expect(result).not.toBe(CONTINUE_ASCII_ART);
+      expect(result).toContain("v");
     });
 
     it("should return full ASCII art when terminal is exactly at threshold", () => {
-      // Test the edge case at exactly 75 columns (our threshold)
-      process.stdout.columns = 75;
+      // Test the edge case at exactly 42 columns (our threshold)
+      process.stdout.columns = 42;
 
       const result = getDisplayableAsciiArt();
 
