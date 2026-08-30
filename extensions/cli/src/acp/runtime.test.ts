@@ -68,7 +68,7 @@ vi.mock("../util/logger.js", () => ({ logger: harness.logger }));
 
 const { AcpRuntime } = await import("./runtime.js");
 
-const cwd = "/tmp";
+const cwd = process.cwd();
 
 function clientFor(
   optionId: "allow_once" | "reject_once" = "allow_once",
