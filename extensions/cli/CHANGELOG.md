@@ -2,6 +2,7 @@
 
 ### Features
 
+- add a scrollable first-run model-provider picker with masked secret storage
 - replace the CLI startup artwork with a compact terminal-friendly mark
 
 ## [1.4.2](https://github.com/continuedev/cli/compare/v1.4.1...v1.4.2) (2025-07-17)

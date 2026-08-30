@@ -5,7 +5,12 @@ import * as path from "path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { AuthConfig } from "./auth/workos.js";
-import { initializeWithOnboarding } from "./onboarding.js";
+import {
+  createOrUpdateProviderConfig,
+  initializeWithOnboarding,
+  writeSecretToEnvFile,
+} from "./onboarding.js";
+import { ONBOARDING_PROVIDERS } from "./onboardingProviders.js";
 
 describe("onboarding config flag handling", () => {
   let tempDir: string;
@@ -152,6 +157,57 @@ name: "Incomplete Config"
       // This should NOT have our "Failed to load config from" prefix
       expect(errorMessage).not.toMatch(/^Failed to load config from "/);
     }
+  });
+});
+
+describe("provider onboarding persistence", () => {
+  const globalDir = process.env.CONTINUE_GLOBAL_DIR!;
+
+  afterEach(() => {
+    for (const filename of [
+      "config.yaml",
+      ".env",
+      "secrets.env",
+      ".onboarding_complete",
+    ]) {
+      const filePath = path.join(globalDir, filename);
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+      }
+    }
+  });
+
+  test("writes API keys to .env and only references them from config.yaml", async () => {
+    const envPath = path.join(globalDir, "secrets.env");
+    writeSecretToEnvFile("OPENAI_API_KEY", "sk-test-value", envPath);
+
+    expect(fs.readFileSync(envPath, "utf8")).toContain(
+      'OPENAI_API_KEY="sk-test-value"',
+    );
+
+    await createOrUpdateProviderConfig({
+      provider: ONBOARDING_PROVIDERS[0],
+      model: ONBOARDING_PROVIDERS[0].model,
+      apiKey: "sk-test-value",
+    });
+
+    const config = fs.readFileSync(path.join(globalDir, "config.yaml"), "utf8");
+    expect(config).toContain("apiKey: ${{ secrets.OPENAI_API_KEY }}");
+    expect(config).not.toContain("sk-test-value");
+  });
+
+  test("treats an existing valid config as already onboarded", async () => {
+    fs.mkdirSync(globalDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(globalDir, "config.yaml"),
+      `name: Existing\nversion: 1.0.0\nschema: v1\nmodels:\n  - name: Existing\n    provider: openai\n    model: gpt-4.1-mini\n    roles:\n      - chat\n`,
+    );
+
+    await initializeWithOnboarding(null, undefined);
+
+    expect(fs.existsSync(path.join(globalDir, ".onboarding_complete"))).toBe(
+      true,
+    );
   });
 });
 

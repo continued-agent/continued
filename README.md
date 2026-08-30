@@ -38,6 +38,9 @@ This included removing anonymous telemetry, pulling out authentication, squashin
 
 [![npm](https://img.shields.io/badge/npm-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/package/@continuedev/cli) [![View source](https://img.shields.io/badge/View_source-181717?logo=github&logoColor=white)](extensions/cli)
 
+On first launch, the CLI offers a scrollable model-provider picker and stores
+credentials outside `config.yaml` using `~/.continue/.env` secret references.
+
 The CLI startup screen uses a compact color-gradient mark designed to remain
 readable in a standard terminal.
 
