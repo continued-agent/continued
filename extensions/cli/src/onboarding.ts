@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 
 import chalk from "chalk";
@@ -16,6 +17,7 @@ import { selectOnboardingProvider } from "./ui/ProviderSelector.js";
 import { question, secretQuestion } from "./util/prompt.js";
 import {
   ProviderModelConfig,
+  updateAnthropicModelInYaml,
   updateProviderModelInYaml,
 } from "./util/yamlConfigUpdater.js";
 
@@ -28,9 +30,23 @@ export interface ProviderSetup {
   apiKey?: string;
   apiBase?: string;
   env?: Record<string, string>;
+  prepend?: boolean;
+}
+
+export interface TemporaryConfig {
+  configPath: string;
+  cleanup: () => void;
 }
 
 const MODEL_ROLES = ["chat", "edit", "apply"];
+const temporaryConfigCleanups = new Set<() => void>();
+let temporaryCleanupHandlerRegistered = false;
+
+function cleanupTemporaryConfigs(): void {
+  for (const cleanup of [...temporaryConfigCleanups]) {
+    cleanup();
+  }
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -121,16 +137,22 @@ async function collectProviderSetup(
 
   let apiKey: string | undefined;
   if (provider.apiKeyEnv) {
-    const optionalMessage = provider.apiKeyOptional
-      ? " (leave blank to use your AWS credentials)"
-      : "";
-    const enteredApiKey = await secretQuestion(
-      `Enter your ${provider.label} API key${optionalMessage}: `,
-    );
-    if (!enteredApiKey && !provider.apiKeyOptional) {
-      throw new Error(`${provider.label} API key cannot be empty.`);
+    const existingApiKey = process.env[provider.apiKeyEnv];
+    if (existingApiKey) {
+      // Reuse an exported key instead of making the user enter it again.
+      apiKey = existingApiKey;
+    } else {
+      const optionalMessage = provider.apiKeyOptional
+        ? " (leave blank to use your AWS credentials)"
+        : "";
+      const enteredApiKey = await secretQuestion(
+        `Enter your ${provider.label} API key${optionalMessage}: `,
+      );
+      if (!enteredApiKey && !provider.apiKeyOptional) {
+        throw new Error(`${provider.label} API key cannot be empty.`);
+      }
+      apiKey = enteredApiKey || undefined;
     }
-    apiKey = enteredApiKey || undefined;
   }
 
   if (provider.requiresCustomApiBase) {
@@ -164,7 +186,75 @@ async function collectProviderSetup(
     }
   }
 
-  return { provider, model, apiKey, apiBase, env: providerEnv };
+  return {
+    provider,
+    model,
+    apiKey,
+    apiBase,
+    env: providerEnv,
+  };
+}
+
+function getBedrockSetup(): ProviderSetup {
+  const provider = ONBOARDING_PROVIDERS.find(
+    (candidate) => candidate.provider === "bedrock",
+  );
+  if (!provider) {
+    throw new Error("AWS Bedrock onboarding provider is not configured.");
+  }
+
+  const region =
+    process.env.AWS_REGION?.trim() ||
+    process.env.AWS_DEFAULT_REGION?.trim() ||
+    "us-east-1";
+  const profile = process.env.AWS_PROFILE?.trim();
+
+  return {
+    provider,
+    model: provider.model,
+    apiKey: provider.apiKeyEnv ? process.env[provider.apiKeyEnv] : undefined,
+    env: {
+      region,
+      ...(profile ? { profile } : {}),
+    },
+    prepend: true,
+  };
+}
+
+function toProviderModelConfig(
+  setup: ProviderSetup,
+  useSecretReference = true,
+): ProviderModelConfig {
+  return {
+    name: setup.provider.label,
+    provider: setup.provider.provider,
+    model: setup.model,
+    roles: MODEL_ROLES,
+    ...(setup.provider.capabilities
+      ? { capabilities: setup.provider.capabilities }
+      : {}),
+    ...(setup.apiKey && setup.provider.apiKeyEnv
+      ? {
+          apiKey: useSecretReference
+            ? "${{ secrets." + setup.provider.apiKeyEnv + " }}"
+            : setup.apiKey,
+        }
+      : {}),
+    ...(setup.apiBase ? { apiBase: setup.apiBase } : {}),
+    ...(setup.env ? { env: setup.env } : {}),
+  };
+}
+
+function updateProviderConfigContent(
+  existingContent: string,
+  setup: ProviderSetup,
+  useSecretReference = true,
+): string {
+  return updateProviderModelInYaml(
+    existingContent,
+    toProviderModelConfig(setup, useSecretReference),
+    { prepend: setup.prepend },
+  );
 }
 
 export async function createOrUpdateProviderConfig(
@@ -176,31 +266,15 @@ export async function createOrUpdateProviderConfig(
     fs.mkdirSync(configDir, { recursive: true });
   }
 
+  const existingContent = fs.existsSync(CONFIG_PATH)
+    ? fs.readFileSync(CONFIG_PATH, "utf8")
+    : "";
+  const updatedContent = updateProviderConfigContent(existingContent, setup);
+
   if (setup.apiKey && setup.provider.apiKeyEnv) {
     writeSecretToEnvFile(setup.provider.apiKeyEnv, setup.apiKey);
   }
 
-  const modelConfig: ProviderModelConfig = {
-    name: setup.provider.label,
-    provider: setup.provider.provider,
-    model: setup.model,
-    roles: MODEL_ROLES,
-    ...(setup.apiKey && setup.provider.apiKeyEnv
-      ? {
-          apiKey: "${{ secrets." + setup.provider.apiKeyEnv + " }}",
-        }
-      : {}),
-    ...(setup.apiBase ? { apiBase: setup.apiBase } : {}),
-    ...(setup.env ? { env: setup.env } : {}),
-  };
-
-  const existingContent = fs.existsSync(CONFIG_PATH)
-    ? fs.readFileSync(CONFIG_PATH, "utf8")
-    : "";
-  const updatedContent = updateProviderModelInYaml(
-    existingContent,
-    modelConfig,
-  );
   fs.writeFileSync(CONFIG_PATH, updatedContent);
   setConfigFilePermissions(CONFIG_PATH);
 }
@@ -220,11 +294,69 @@ export async function createOrUpdateConfig(apiKey: string): Promise<void> {
     throw new Error("Anthropic onboarding provider is not configured.");
   }
 
-  await createOrUpdateProviderConfig({
-    provider: anthropicProvider,
-    model: anthropicProvider.model,
-    apiKey,
-  });
+  if (!anthropicProvider.apiKeyEnv) {
+    throw new Error("Anthropic onboarding provider has no API key variable.");
+  }
+
+  const configDir = path.dirname(CONFIG_PATH);
+  if (!fs.existsSync(configDir)) {
+    fs.mkdirSync(configDir, { recursive: true });
+  }
+
+  const apiKeyReference = `\${{ secrets.${anthropicProvider.apiKeyEnv} }}`;
+  const existingContent = fs.existsSync(CONFIG_PATH)
+    ? fs.readFileSync(CONFIG_PATH, "utf8")
+    : "";
+  const updatedContent = updateAnthropicModelInYaml(
+    existingContent,
+    apiKeyReference,
+  );
+
+  writeSecretToEnvFile(anthropicProvider.apiKeyEnv, apiKey);
+  fs.writeFileSync(CONFIG_PATH, updatedContent);
+  setConfigFilePermissions(CONFIG_PATH);
+}
+
+export async function createOrUpdateBedrockConfig(): Promise<void> {
+  await createOrUpdateProviderConfig(getBedrockSetup());
+}
+
+/**
+ * Create a one-shot Bedrock config without changing the user's saved config.
+ * The file is mode 0600 and is removed when the process exits.
+ */
+export function createTemporaryBedrockConfig(): TemporaryConfig {
+  const temporaryDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "continue-bedrock-"),
+  );
+  const configPath = path.join(temporaryDir, "config.yaml");
+  let cleanedUp = false;
+  const cleanup = () => {
+    if (cleanedUp) {
+      return;
+    }
+    cleanedUp = true;
+    temporaryConfigCleanups.delete(cleanup);
+    fs.rmSync(temporaryDir, { recursive: true, force: true });
+  };
+
+  try {
+    // A temporary config may contain an API key only when the caller supplied
+    // AWS_BEDROCK_API_KEY. It is protected on disk and removed at process exit;
+    // normal persisted configs always use the .env secret reference.
+    const content = updateProviderConfigContent("", getBedrockSetup(), false);
+    fs.writeFileSync(configPath, content, { mode: 0o600 });
+    fs.chmodSync(configPath, 0o600);
+    temporaryConfigCleanups.add(cleanup);
+    if (!temporaryCleanupHandlerRegistered) {
+      temporaryCleanupHandlerRegistered = true;
+      process.once("exit", cleanupTemporaryConfigs);
+    }
+    return { configPath, cleanup };
+  } catch (error) {
+    cleanup();
+    throw error;
+  }
 }
 
 export async function runOnboardingFlow(
@@ -235,17 +367,17 @@ export async function runOnboardingFlow(
     return false;
   }
 
-  // A valid local config is authoritative, even when the marker file is
-  // missing (for example after an upgrade or a restored home directory).
-  if (hasValidConfigFile(CONFIG_PATH)) {
-    return true;
-  }
-
   // Step 2: Check for CONTINUE_USE_BEDROCK environment variable first (before test env check)
   if (process.env.CONTINUE_USE_BEDROCK === "1") {
     console.log(
       chalk.blue("✓ Using AWS Bedrock (CONTINUE_USE_BEDROCK detected)"),
     );
+    return true;
+  }
+
+  // A valid local config is authoritative when no explicit provider override
+  // was requested, even when the marker file is missing.
+  if (hasValidConfigFile(CONFIG_PATH)) {
     return true;
   }
 
@@ -304,30 +436,46 @@ export async function markOnboardingComplete(): Promise<void> {
 export async function initializeWithOnboarding(
   authConfig: AuthConfig,
   configPath: string | undefined,
-) {
+): Promise<string | undefined> {
   const firstTime = await isFirstTime();
+  const usesTemporaryBedrockConfig =
+    configPath === undefined && process.env.CONTINUE_USE_BEDROCK === "1";
+  const temporaryConfig = usesTemporaryBedrockConfig
+    ? createTemporaryBedrockConfig()
+    : undefined;
+  const effectiveConfigPath = temporaryConfig?.configPath ?? configPath;
 
-  if (configPath !== undefined) {
+  if (effectiveConfigPath !== undefined) {
     // throw an early error is configPath is invalid or has errors
     try {
       await loadConfiguration(
         authConfig,
-        configPath,
+        effectiveConfigPath,
         getApiClient(undefined),
         [],
         false,
       );
     } catch (errorMessage) {
+      temporaryConfig?.cleanup();
       throw new Error(
-        `Failed to load config from "${configPath}": ${errorMessage}`,
+        `Failed to load config from "${effectiveConfigPath}": ${errorMessage}`,
       );
     }
   }
 
-  if (!firstTime) return;
+  if (usesTemporaryBedrockConfig) {
+    console.log(
+      chalk.blue("✓ Using AWS Bedrock (CONTINUE_USE_BEDROCK detected)"),
+    );
+    return effectiveConfigPath;
+  }
+
+  if (!firstTime) return effectiveConfigPath;
 
   const wasOnboarded = await runOnboardingFlow(configPath);
   if (wasOnboarded) {
     await markOnboardingComplete();
   }
+
+  return effectiveConfigPath;
 }

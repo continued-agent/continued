@@ -148,7 +148,7 @@ function useChatHandlers(
   };
 }
 
-/* eslint-disable complexity */
+// eslint-disable-next-line complexity
 const TUIChat: React.FC<TUIChatProps> = ({
   remoteUrl,
   configPath,
@@ -499,6 +499,5 @@ const TUIChat: React.FC<TUIChatProps> = ({
     </Box>
   );
 };
-/* eslint-enable complexity */
 
 export { TUIChat };

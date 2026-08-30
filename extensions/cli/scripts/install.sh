@@ -9,6 +9,10 @@ PACKAGE_NAME="@continuedev/cli"
 CLI_COMMAND="cn"
 NETWORK_TIMEOUT=60
 FNM_INSTALL_DIR="$HOME/.local/share/fnm"
+FNM_VERSION="1.39.0"
+# The release URL defaults to a mutable GitHub tag. The adjacent checksum
+# protects against transfer corruption; use CONTINUE_CLI_RELEASE_URL pointing
+# at an immutable asset when the release/tag trust boundary is not sufficient.
 RELEASE_URL="${CONTINUE_CLI_RELEASE_URL:-https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz}"
 CHECKSUM_URL="${RELEASE_URL}.sha256"
 
@@ -54,14 +58,6 @@ check_dependencies() {
 
     if ! command -v curl &>/dev/null && ! command -v wget &>/dev/null; then
         missing_deps+=("curl or wget")
-    fi
-
-    if ! command -v tar &>/dev/null; then
-        missing_deps+=("tar")
-    fi
-
-    if ! command -v unzip &>/dev/null; then
-        missing_deps+=("unzip")
     fi
 
     if ! command -v sha256sum &>/dev/null && ! command -v shasum &>/dev/null; then
@@ -147,7 +143,25 @@ detect_shell_profile() {
 }
 
 version_gte() {
-    [ "$(printf '%s\n' "$2" "$1" | sort -V | head -n1)" = "$2" ]
+    local current="${1#v}"
+    local required="${2#v}"
+
+    # Use POSIX awk rather than sort -V, which is unavailable on macOS's
+    # default userland. Node reports a normal three-component semver here.
+    current="${current%%-*}"
+    current="${current%%+*}"
+    required="${required%%-*}"
+    required="${required%%+*}"
+    awk -F. -v current="$current" -v required="$required" '
+      BEGIN {
+        split(current, c); split(required, r);
+        for (i = 1; i <= 3; i++) {
+          if ((c[i] + 0) > (r[i] + 0)) exit 0;
+          if ((c[i] + 0) < (r[i] + 0)) exit 1;
+        }
+        exit 0;
+      }
+    '
 }
 
 source_nvm() {
@@ -196,16 +210,73 @@ install_node() {
     if [ ! -d "$FNM_INSTALL_DIR" ]; then
         CLEANUP_FNM=true
     fi
-    info "Installing fnm (Fast Node Manager)..."
+    info "Installing fnm (Fast Node Manager) v$FNM_VERSION..."
 
-    mkdir -p "$FNM_INSTALL_DIR"
-
-    if ! download "https://fnm.vercel.app/install" | bash -s -- --install-dir "$FNM_INSTALL_DIR" --skip-shell; then
-        error "Failed to install fnm. Check your network connection and try again."
+    if ! command -v unzip &>/dev/null; then
+        error "Missing required dependency: unzip. Please install it before installing Node.js."
     fi
 
-    if [ ! -x "$FNM_INSTALL_DIR/fnm" ]; then
-        error "fnm installation failed - binary not found at $FNM_INSTALL_DIR/fnm"
+    local fnm_asset fnm_sha256 fnm_binary
+    case "$PLATFORM:$ARCH" in
+        linux:x64)
+            fnm_asset="fnm-linux.zip"
+            fnm_sha256="7807664f39d39fc518da1c35ba0181e4b3267603c4b1dedeb4b5fc6ae440a224"
+            fnm_binary="fnm"
+            ;;
+        linux:arm64)
+            fnm_asset="fnm-arm64.zip"
+            fnm_sha256="4eaff58b2c5bf30d0934027572dd0b5bbb60d2a1af309230b53662d4b1d45599"
+            fnm_binary="fnm"
+            ;;
+        linux:armv7l)
+            fnm_asset="fnm-arm32.zip"
+            fnm_sha256="3d11d96a49d49cb3f11051a1aabf968fce30db665e79ee7d81851059731fa4ac"
+            fnm_binary="fnm"
+            ;;
+        darwin:x64|darwin:arm64)
+            fnm_asset="fnm-macos.zip"
+            fnm_sha256="f046483e85c53b3278efe49a3620c8680f22efa58a8dabfd03eafc6b59b31a25"
+            fnm_binary="fnm"
+            ;;
+        windows:x64|windows:arm64)
+            fnm_asset="fnm-windows.zip"
+            fnm_sha256="8183bed4348cb78fdfd8abb3d1247fbeab7b2082f941363929c61e747c001e10"
+            fnm_binary="fnm.exe"
+            ;;
+        *)
+            error "No pinned fnm binary is available for $PLATFORM-$ARCH. Install Node.js $REQUIRED_NODE_VERSION manually."
+            ;;
+    esac
+
+    mkdir -p "$FNM_INSTALL_DIR"
+    local fnm_temp_dir fnm_archive fnm_checksum_file archive_entries
+    fnm_temp_dir="$(mktemp -d "${TMPDIR:-/tmp}/continue-fnm.XXXXXX")"
+    INSTALL_TEMP_DIR="$fnm_temp_dir"
+    fnm_archive="$fnm_temp_dir/$fnm_asset"
+    fnm_checksum_file="$fnm_temp_dir/$fnm_asset.sha256"
+
+    if ! download "https://github.com/Schniz/fnm/releases/download/v$FNM_VERSION/$fnm_asset" "$fnm_archive"; then
+        error "Failed to download pinned fnm v$FNM_VERSION. Check your network connection and try again."
+    fi
+
+    printf '%s  %s\n' "$fnm_sha256" "$fnm_asset" > "$fnm_checksum_file"
+    verify_checksum "$fnm_archive" "$fnm_checksum_file"
+
+    archive_entries="$(unzip -Z1 "$fnm_archive" | tr -d '\r')"
+    if [ "$archive_entries" != "$fnm_binary" ]; then
+        error "The pinned fnm archive contains unexpected files."
+    fi
+
+    if ! unzip -q -o "$fnm_archive" -d "$FNM_INSTALL_DIR"; then
+        error "Failed to extract pinned fnm archive."
+    fi
+
+    chmod +x "$FNM_INSTALL_DIR/$fnm_binary"
+    rm -rf "$fnm_temp_dir"
+    INSTALL_TEMP_DIR=""
+
+    if [ ! -x "$FNM_INSTALL_DIR/$fnm_binary" ]; then
+        error "fnm installation failed - binary not found at $FNM_INSTALL_DIR/$fnm_binary"
     fi
 
     export PATH="$FNM_INSTALL_DIR:$PATH"

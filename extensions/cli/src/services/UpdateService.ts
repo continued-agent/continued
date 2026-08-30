@@ -1,4 +1,4 @@
-import { exec, spawn } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 
 import { GlobalContext } from "core/util/GlobalContext.js";
@@ -10,7 +10,7 @@ import { compareVersions, getLatestVersion, getVersion } from "../version.js";
 import { BaseService } from "./BaseService.js";
 import { serviceContainer } from "./ServiceContainer.js";
 import { UpdateServiceState, UpdateStatus } from "./types.js";
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 /**
  * Service for checking and performing CLI updates
@@ -145,7 +145,32 @@ export class UpdateService extends BaseService<UpdateServiceState> {
       });
 
       // Install the update
-      const { stdout, stderr } = await execAsync("npm i -g @continuedev/cli");
+      const latestVersion = this.currentState.latestVersion;
+      if (
+        !latestVersion ||
+        !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
+          latestVersion,
+        )
+      ) {
+        throw new Error("The latest CLI version is not a valid semver value.");
+      }
+
+      const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+      const npmArgs = [
+        "install",
+        "--global",
+        `@continuedev/cli@${latestVersion}`,
+      ];
+      const { stdout, stderr } =
+        process.platform === "win32"
+          ? await execFileAsync(process.env.ComSpec || "cmd.exe", [
+              "/d",
+              "/s",
+              "/c",
+              npmCommand,
+              ...npmArgs,
+            ])
+          : await execFileAsync(npmCommand, npmArgs);
       logger.debug("Update output:", { stdout, stderr });
 
       if (stderr) {

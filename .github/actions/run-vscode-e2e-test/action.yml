@@ -98,11 +98,14 @@ runs:
 
     - name: Run e2e tests
       shell: bash
-      run: |
-        cd extensions/vscode
-        IGNORE_SSH_TESTS="${{ inputs.is_fork }}" TEST_FILE="${{ inputs.test_file }}" npm run ${{ inputs.command }}
       env:
         DISPLAY: :99
+        E2E_COMMAND: ${{ inputs.command }}
+        IGNORE_SSH_TESTS: ${{ inputs.is_fork }}
+        TEST_FILE: ${{ inputs.test_file }}
+      run: |
+        cd extensions/vscode
+        IGNORE_SSH_TESTS="$IGNORE_SSH_TESTS" TEST_FILE="$TEST_FILE" npm run "$E2E_COMMAND"
 
     - name: Delete continue from test extensions
       shell: bash
@@ -114,9 +117,13 @@ runs:
       id: sanitize_filename
       if: always()
       shell: bash
+      env:
+        TEST_FILE: ${{ inputs.test_file }}
       run: |
-        FILENAME="${{ inputs.test_file }}"
-        SANITIZED_FILENAME="${FILENAME//\//-}" # Replace / with - using bash parameter expansion
+        FILENAME="$TEST_FILE"
+        SANITIZED_FILENAME="$(printf '%s' "$FILENAME" | tr -c '[:alnum:]_.-' '-')"
+        SANITIZED_FILENAME="${SANITIZED_FILENAME:0:100}"
+        [ -n "$SANITIZED_FILENAME" ] || SANITIZED_FILENAME="unknown"
         echo "sanitized_test_file=${SANITIZED_FILENAME}" >> $GITHUB_OUTPUT
 
     - name: Upload e2e test screenshots

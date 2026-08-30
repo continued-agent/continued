@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 
 import * as esbuild from "esbuild";
-import { chmodSync, copyFileSync, writeFileSync } from "fs";
+import { chmodSync, copyFileSync, unlinkSync, writeFileSync } from "fs";
 import { dirname, resolve } from "path";
 import { fileURLToPath } from "url";
 
 // Parse command line arguments
 const args = process.argv.slice(2);
 const noMinify = args.includes("--no-minify");
+const isReleaseBuild = process.env.CONTINUE_RELEASE_BUILD === "true";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -37,11 +38,11 @@ try {
     entryPoints: ["src/index.ts"],
     bundle: true,
     platform: "node",
-    target: "node18",
+    target: "node20",
     format: "esm",
     outfile: "dist/index.js",
     external,
-    sourcemap: true,
+    sourcemap: !isReleaseBuild,
     minify: !noMinify, // Use --no-minify flag to control minification
     metafile: true,
     plugins: [optionalDevtoolsPlugin],
@@ -85,8 +86,22 @@ const require = __createRequire(import.meta.url);`,
     },
   });
 
-  // Write metafile for analysis
-  writeFileSync("dist/meta.json", JSON.stringify(result.metafile, null, 2));
+  // Keep build metadata and source maps for local analysis, but do not leave
+  // them in release artifacts. `npm pack` runs the prepare hook, so cleanup
+  // belongs here rather than only in the release workflow.
+  if (isReleaseBuild) {
+    for (const generatedFile of ["dist/meta.json", "dist/index.js.map"]) {
+      try {
+        unlinkSync(generatedFile);
+      } catch (error) {
+        if (error.code !== "ENOENT") {
+          throw error;
+        }
+      }
+    }
+  } else {
+    writeFileSync("dist/meta.json", JSON.stringify(result.metafile, null, 2));
+  }
 
   // Create wrapper script with shebang that explicitly runs the CLI
   // Note: We must call runCli(); a plain dynamic import will not execute the CLI.

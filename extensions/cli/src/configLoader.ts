@@ -39,9 +39,8 @@ export type ConfigSource =
 
 /**
  * Returns whether a local config is syntactically valid and contains at least
- * one model. This is intentionally checked before onboarding so an existing
- * config is not mistaken for a first-run install just because the marker file
- * is missing.
+ * one explicit chat-capable model. Model blocks that still require Hub/slug
+ * resolution are not usable by this CLI and must not suppress onboarding.
  */
 export function hasValidConfigFile(configPath: string): boolean {
   try {
@@ -50,7 +49,28 @@ export function hasValidConfigFile(configPath: string): boolean {
     }
 
     const config = parseConfigYaml(fs.readFileSync(configPath, "utf8"));
-    return Array.isArray(config.models) && config.models.length > 0;
+    return (
+      Array.isArray(config.models) &&
+      config.models.some((model) => {
+        if (
+          !model ||
+          typeof model !== "object" ||
+          Array.isArray(model) ||
+          "uses" in model
+        ) {
+          return false;
+        }
+
+        return (
+          typeof model.provider === "string" &&
+          model.provider.trim().length > 0 &&
+          typeof model.model === "string" &&
+          model.model.trim().length > 0 &&
+          (model.roles === undefined ||
+            (Array.isArray(model.roles) && model.roles.includes("chat")))
+        );
+      })
+    );
   } catch {
     return false;
   }

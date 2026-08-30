@@ -3,17 +3,23 @@ const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs/promises");
 
-const npmInstallCmd = process.env.CI === "true" ? "npm ci" : "npm install";
+const npmInstallArgs = process.env.CI === "true" ? ["ci"] : ["install"];
+// Windows cannot execute .cmd files directly without a shell. Invoke the
+// trusted command interpreter explicitly while keeping npm arguments separate
+// from a shell command string.
+const npmCommand =
+  process.platform === "win32" ? process.env.ComSpec || "cmd.exe" : "npm";
+const npmCommandPrefix =
+  process.platform === "win32" ? ["/d", "/s", "/c", "npm.cmd"] : [];
 
-function runCommand(command, cwd, packageName) {
+function runCommand(command, args, cwd, packageName) {
+  const displayCommand = [command, ...args].join(" ");
   return new Promise((resolve, reject) => {
-    console.log(`Starting ${packageName}: ${command}`);
+    console.log(`Starting ${packageName}: ${displayCommand}`);
 
-    const [cmd, ...args] = command.split(" ");
-    const child = spawn(cmd, args, {
+    const child = spawn(command, args, {
       cwd,
       stdio: "pipe",
-      shell: true,
     });
 
     let stdout = "";
@@ -29,20 +35,29 @@ function runCommand(command, cwd, packageName) {
 
     child.on("close", (code) => {
       if (code === 0) {
-        console.log(`✅ ${packageName}: ${command} completed successfully`);
-        resolve({ packageName, command, stdout, stderr });
+        console.log(
+          `✅ ${packageName}: ${displayCommand} completed successfully`,
+        );
+        resolve({ packageName, command: displayCommand, stdout, stderr });
       } else {
-        console.error(`❌ ${packageName}: ${command} failed with code ${code}`);
+        console.error(
+          `❌ ${packageName}: ${displayCommand} failed with code ${code}`,
+        );
         console.error(`stderr: ${stderr}`);
         console.error(`stdout: ${stdout}`);
         reject(
-          new Error(`${packageName} failed: ${command} (exit code ${code})`),
+          new Error(
+            `${packageName} failed: ${displayCommand} (exit code ${code})`,
+          ),
         );
       }
     });
 
     child.on("error", (error) => {
-      console.error(`❌ ${packageName}: Failed to start ${command}:`, error);
+      console.error(
+        `❌ ${packageName}: Failed to start ${displayCommand}:`,
+        error,
+      );
       reject(error);
     });
   });
@@ -64,9 +79,19 @@ async function buildPackage(packageName, cleanNodeModules = false) {
     }
   }
 
-  await runCommand(npmInstallCmd, packagePath, `${packageName} (install)`);
+  await runCommand(
+    npmCommand,
+    [...npmCommandPrefix, ...npmInstallArgs],
+    packagePath,
+    `${packageName} (install)`,
+  );
 
-  return runCommand("npm run build", packagePath, `${packageName} (build)`);
+  return runCommand(
+    npmCommand,
+    [...npmCommandPrefix, "run", "build"],
+    packagePath,
+    `${packageName} (build)`,
+  );
 }
 
 async function buildPackagesInParallel(packages, cleanNodeModules = false) {

@@ -11,12 +11,19 @@ on:
         description: "PR number to test with"
         required: true
 
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
 jobs:
   republish-pr-artifacts:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        platform: [Linux, macOS]
+        # pr-checks currently publishes the Linux build only. Do not request
+        # artifacts that the producer workflow cannot create.
+        platform: [Linux]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -26,16 +33,26 @@ jobs:
         id: get-pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TEST_PR_NUMBER: ${{ inputs.test_pr_number }}
         run: |
-          # Get PR number for the current commit using GitHub API
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "Getting PR for commit: $COMMIT_SHA"
+          if [ -n "$TEST_PR_NUMBER" ]; then
+            if [[ ! "$TEST_PR_NUMBER" =~ ^[0-9]+$ ]]; then
+              echo "test_pr_number must be a numeric PR number" >&2
+              exit 1
+            fi
+            PR_NUMBER="$TEST_PR_NUMBER"
+            echo "Using manually selected PR: #$PR_NUMBER"
+          else
+            # Get the PR number for the merge commit using GitHub's API.
+            COMMIT_SHA="$GITHUB_SHA"
+            echo "Getting PR for commit: $COMMIT_SHA"
 
-          PR_NUMBER=$(curl -s -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/commits/$COMMIT_SHA/pulls" \
-            | jq -r '.[0].number // empty')
+            PR_NUMBER=$(curl -fsSL -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/${{ github.repository }}/commits/$COMMIT_SHA/pulls" \
+              | jq -r '.[0].number // empty')
+          fi
 
-          if [ -z "$PR_NUMBER" ]; then
+          if [[ ! "$PR_NUMBER" =~ ^[0-9]+$ ]]; then
             echo "❌ Could not find PR for commit $COMMIT_SHA"
             exit 1
           fi
@@ -51,23 +68,41 @@ jobs:
         run: |
           echo "🔍 Getting branch name for PR #$PR_NUMBER..."
 
-          # Get the branch name for the PR
-          BRANCH_NAME=$(gh pr view "$PR_NUMBER" --repo "${{ github.repository }}" --json headRefName --jq '.headRefName')
+          # Resolve the exact PR head SHA so an older successful branch run
+          # cannot be republished for a newer merge.
+          PR_HEAD_SHA=$(gh pr view "$PR_NUMBER" \
+            --repo "${{ github.repository }}" \
+            --json headRefName,headRefOid \
+            --jq '.headRefName + "\n" + .headRefOid')
+          BRANCH_NAME="${PR_HEAD_SHA%%$'\n'*}"
+          PR_HEAD_SHA="${PR_HEAD_SHA#*$'\n'}"
 
           if [ -z "$BRANCH_NAME" ]; then
             echo "❌ Could not find PR #$PR_NUMBER"
             exit 1
           fi
 
-          echo "Branch name: $BRANCH_NAME"
+          if [ -z "$PR_HEAD_SHA" ]; then
+            echo "❌ Could not resolve the head SHA for PR #$PR_NUMBER"
+            exit 1
+          fi
+          if [[ ! "$PR_HEAD_SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "❌ PR head SHA has an unexpected format"
+            exit 1
+          fi
 
-          # Get the latest successful workflow run for the branch
+          echo "Branch name: $BRANCH_NAME"
+          echo "PR head SHA: $PR_HEAD_SHA"
+
+          # Get a successful run for this exact PR head SHA. The workflow file
+          # is hyphenated; the old underscore name caused a 404.
           RUN_ID=$(gh run list \
             --repo "${{ github.repository }}" \
-            --workflow="pr_checks.yaml" \
-            --branch="$BRANCH_NAME" \
-            --json databaseId,status,conclusion \
-            --jq ".[] | select(.status == \"completed\" and .conclusion == \"success\") | .databaseId" \
+            --workflow="pr-checks.yaml" \
+            --commit="$PR_HEAD_SHA" \
+            --limit 100 \
+            --json databaseId,status,conclusion,headSha \
+            | jq -r --arg sha "$PR_HEAD_SHA" '.[] | select(.headSha == $sha and .status == "completed" and .conclusion == "success") | .databaseId' \
             | head -1)
 
           if [ -z "$RUN_ID" ]; then
@@ -75,7 +110,7 @@ jobs:
             exit 1
           fi
 
-          echo "Found successful workflow run: $RUN_ID"
+          echo "Found successful workflow run for $PR_HEAD_SHA: $RUN_ID"
           echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
 
       - name: Download PR artifact

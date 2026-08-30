@@ -4,22 +4,24 @@ on:
   workflow_call:
     inputs:
       agents-path:
-        description: 'Path to agents folder'
+        description: "Path to agents folder"
         required: false
-        default: '.continue/agents'
+        default: ".continue/agents"
         type: string
     secrets:
       ANTHROPIC_API_KEY:
-        description: 'Anthropic API key for Claude'
+        description: "Anthropic API key for Claude"
         required: true
 
 permissions:
-  contents: write
-  checks: write
-  pull-requests: write
+  contents: read
+  checks: read
+  pull-requests: read
 
 jobs:
   discover:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
@@ -29,8 +31,22 @@ jobs:
 
       - name: Discover agents
         id: discover
+        env:
+          AGENTS_DIR: ${{ inputs.agents-path }}
         run: |
-          AGENTS_DIR="${{ inputs.agents-path }}"
+          case "$AGENTS_DIR" in
+            .continue/agents|.continue/agents/*)
+              if [[ "$AGENTS_DIR" == *..* ]]; then
+                echo "agents-path must not contain parent-directory segments" >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "agents-path must stay within .continue/agents" >&2
+              exit 1
+              ;;
+          esac
+
           if [ -d "$AGENTS_DIR" ]; then
             # Use -sc for compact single-line JSON (required for GitHub Actions output)
             FILES=$(find "$AGENTS_DIR" -name "*.md" -type f 2>/dev/null | jq -R . | jq -sc .)
@@ -49,6 +65,10 @@ jobs:
   run-agent:
     needs: discover
     if: needs.discover.outputs.has-agents == 'true'
+    permissions:
+      contents: write
+      checks: write
+      pull-requests: write
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -60,15 +80,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install Continue CLI
         run: npm i -g @continuedev/cli
 
       - name: Extract agent name
         id: agent-name
+        env:
+          AGENT_FILE: ${{ matrix.agent }}
         run: |
-          AGENT_FILE="${{ matrix.agent }}"
           AGENT_NAME=$(basename "$AGENT_FILE" .md)
           echo "name=$AGENT_NAME" >> $GITHUB_OUTPUT
 
@@ -94,24 +115,24 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
+          AGENT_FILE: ${{ matrix.agent }}
         run: |
-          AGENT_FILE="${{ matrix.agent }}"
-
           # Run agent in non-interactive mode (-p flag)
+          OUTPUT_DELIMITER="CONTINUE_AGENT_OUTPUT_$(date +%s%N)_$RANDOM"
           if OUTPUT=$(cn -p --agent "$AGENT_FILE" 2>&1); then
             echo "success=true" >> $GITHUB_OUTPUT
-            echo "output<<EOF" >> $GITHUB_OUTPUT
-            echo "$OUTPUT" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            printf 'output<<%s\n' "$OUTPUT_DELIMITER" >> $GITHUB_OUTPUT
+            printf '%s\n' "$OUTPUT" >> $GITHUB_OUTPUT
+            printf '%s\n' "$OUTPUT_DELIMITER" >> $GITHUB_OUTPUT
             echo "✅ Agent completed successfully"
             echo ""
             echo "--- Agent Output ---"
             echo "$OUTPUT"
           else
             echo "success=false" >> $GITHUB_OUTPUT
-            echo "error<<EOF" >> $GITHUB_OUTPUT
-            echo "$OUTPUT" >> $GITHUB_OUTPUT
-            echo "EOF" >> $GITHUB_OUTPUT
+            printf 'error<<%s\n' "$OUTPUT_DELIMITER" >> $GITHUB_OUTPUT
+            printf '%s\n' "$OUTPUT" >> $GITHUB_OUTPUT
+            printf '%s\n' "$OUTPUT_DELIMITER" >> $GITHUB_OUTPUT
             echo "❌ Agent failed"
             echo ""
             echo "--- Agent Output ---"

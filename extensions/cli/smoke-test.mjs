@@ -170,8 +170,15 @@ runTest("CLI can be invoked", () => {
   }
 });
 
-// Test 8: Check metadata file
-runTest("Build metadata exists", () => {
+// Test 8: Check the build metadata policy
+runTest("Build metadata policy", () => {
+  if (process.env.CONTINUE_RELEASE_BUILD === "true") {
+    if (existsSync(resolve(__dirname, "dist/meta.json"))) {
+      throw new Error("Release build must not contain dist/meta.json");
+    }
+    return;
+  }
+
   if (!existsSync(resolve(__dirname, "dist/meta.json"))) {
     throw new Error("dist/meta.json not found");
   }

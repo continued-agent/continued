@@ -54,5 +54,18 @@ describe("messageHistorySplitting", () => {
       // Last message should still be last
       expect(result[result.length - 1].message.content).toBe("Last");
     });
+
+    it("accounts for the actual content width on narrow terminals", () => {
+      const chatHistory = [
+        createMockChatHistoryItem(
+          Array(20).fill("x".repeat(17)).join("\n\n"),
+          "assistant",
+        ),
+      ];
+
+      const result = splitChatHistory(chatHistory, 21);
+
+      expect(result.length).toBeGreaterThan(1);
+    });
   });
 });
