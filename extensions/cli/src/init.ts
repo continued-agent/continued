@@ -3,11 +3,15 @@
  * This file intercepts console and stdout/stderr to prevent dependency logging
  */
 
-import { isHeadlessMode as checkIsHeadlessMode } from "./util/cli.js";
+import {
+  isAcpMode as checkIsAcpMode,
+  isHeadlessMode as checkIsHeadlessMode,
+} from "./util/cli.js";
 
 // Check if we're in headless mode by looking at process arguments
 // We need to do this before any imports to catch early logging
 const isHeadlessMode = checkIsHeadlessMode();
+const isAcpMode = checkIsAcpMode();
 
 // Store original methods before ANY dependencies can use them
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -76,6 +80,28 @@ if (isHeadlessMode) {
     }
     return true;
   };
+} else if (isAcpMode) {
+  // ACP owns stdout. Redirect accidental console output to stderr and keep a
+  // raw writer available for the SDK transport below.
+  const writeDiagnostic = (...args: any[]) => {
+    originalStderrWrite(`${args.map(String).join(" ")}\n`);
+  };
+  Object.keys(originalConsole).forEach((method) => {
+    (console as any)[method] = writeDiagnostic;
+  });
+
+  process.stdout.write = function (
+    _chunk: any,
+    _encoding?: any,
+    callback?: any,
+  ): boolean {
+    if (typeof _encoding === "function") {
+      _encoding();
+    } else if (typeof callback === "function") {
+      callback();
+    }
+    return true;
+  };
 }
 
 /**
@@ -116,6 +142,19 @@ export function safeStderr(message: string): void {
     // In non-headless mode, just use normal stderr
     process.stderr.write(message);
   }
+}
+
+/**
+ * Create a Web WritableStream backed by the original stdout writer. ACP uses
+ * this instead of process.stdout because init.ts intentionally blocks direct
+ * stdout writes in ACP mode.
+ */
+export function createRawStdoutStream(): WritableStream<Uint8Array> {
+  return new WritableStream<Uint8Array>({
+    write(chunk) {
+      originalStdoutWrite(chunk);
+    },
+  });
 }
 
 /**

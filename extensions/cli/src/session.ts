@@ -538,6 +538,14 @@ export function updateSessionHistory(history: ChatHistoryItem[]): void {
 }
 
 /**
+ * Bind an existing session to the process-wide session manager for one
+ * serialized operation. ACP uses this without changing process.cwd().
+ */
+export function setCurrentSession(session: Session): void {
+  SessionManager.getInstance().setSession(session);
+}
+
+/**
  * Update the current session's title
  */
 export function updateSessionTitle(title: string): void {

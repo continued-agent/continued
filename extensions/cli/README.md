@@ -94,6 +94,39 @@ cn -p "Write a README" --silent
 
 **TTY-less Environments**: Headless mode is designed to work in environments without a terminal (TTY), such as when called from VSCode/IntelliJ extensions using terminal commands. The CLI will not attempt to read stdin or initialize the interactive UI when running in headless mode with a supplied prompt.
 
+### ACP Agent Mode
+
+`cn acp` runs Continue as an [Agent Client Protocol (ACP)](https://agentclientprotocol.com/)
+Agent. An external editor or application acts as the ACP Client and sends
+`session/new`, `session/prompt`, and `session/cancel` messages over stdin. The
+transport is stdio with newline-delimited JSON (NDJSON): stdout contains only
+ACP messages, while diagnostics are sent to stderr.
+
+```json
+{
+  "agent_servers": {
+    "Continued": {
+      "command": "cn",
+      "args": ["acp", "--config", "/path/to/config.yaml"]
+    }
+  }
+}
+```
+
+ACP is distinct from MCP: ACP connects an external client to Continue, while
+MCP connects Continue to tools and data sources. Continue currently accepts an
+empty `mcpServers` list from ACP clients; configured Continue MCP servers can
+still be supplied with the existing `--mcp` option. Remote network access is
+not exposed by `cn acp`; use a runner, SSH, or an authenticated gateway.
+
+ACP sessions require an existing absolute `cwd`. Each session has isolated
+history, and turns are serialized because some Continue services are currently
+process-wide singletons. `additionalDirectories` and client-provided MCP
+servers are rejected explicitly until they can be supported without weakening
+workspace and permission controls. Tool policies (`--allow`, `--ask`,
+`--exclude`, `--readonly`, and `--auto`) remain active; tools in `ask` mode use
+the ACP `session/request_permission` request.
+
 ### Session Management
 
 The CLI automatically saves your chat history for each terminal session. You can resume where you left off:
@@ -130,6 +163,7 @@ cn ls --json
 - `cn logout`: Sign out of current session
 - `cn remote`: Launch a remote instance
 - `cn serve`: Start HTTP server mode
+- `cn acp`: Run Continue as an ACP Agent over stdio
 
 ### Session Listing (`cn ls`)
 

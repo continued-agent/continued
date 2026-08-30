@@ -19,6 +19,7 @@ import {
   parseEnvNumber,
   truncateOutputFromStart,
 } from "../util/truncateOutput.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { Tool, ToolRunContext } from "./types.js";
 
@@ -120,7 +121,7 @@ export const runTerminalCommandTool: Tool = {
   displayName: "Bash",
   description: `Executes a terminal command and returns the output
 
-Commands are automatically executed from the current working directory (${process.cwd()}), so there's no need to change directories with 'cd' commands.
+Commands are automatically executed from the current workspace directory, so there's no need to change directories with 'cd' commands.
 
 IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed, awk, etc).
 `,
@@ -189,11 +190,18 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
     const terminalOutput: string = await new Promise((resolve, reject) => {
       // Use same shell logic as core implementation
       const { shell, args } = getShellCommand(command);
-      const child = spawn(shell, args);
+      const child = spawn(shell, args, { cwd: getWorkspaceDirectory() });
       let stdout = "";
       let stderr = "";
       let timeoutId: NodeJS.Timeout;
       let isResolved = false;
+
+      const abortChild = () => {
+        if (!isResolved) {
+          child.kill();
+        }
+      };
+      context?.signal?.addEventListener("abort", abortChild, { once: true });
 
       // Determine timeout: use provided timeout (capped at 600s), test env variable, or default 120s
       let TIMEOUT_MS = 180000; // 180 seconds default
@@ -229,6 +237,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
+        context?.signal?.removeEventListener("abort", abortChild);
         backgroundSignalManager.off("backgroundRequested", moveToBackground);
 
         // Detach stdout/stderr listeners so they don't accumulate in local
@@ -271,6 +280,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
           if (isResolved) return;
           isResolved = true;
           child.kill();
+          context?.signal?.removeEventListener("abort", abortChild);
           let output = stdout + (stderr ? `\nStderr: ${stderr}` : "");
           output += `\n\n[Command timed out after ${TIMEOUT_MS / 1000} seconds of no output]`;
 
@@ -329,6 +339,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
           "backgroundRequested",
           moveToBackground,
         );
+        context?.signal?.removeEventListener("abort", abortChild);
 
         // Only reject on non-zero exit code if there's also stderr
         if (code !== 0 && stderr) {
@@ -367,6 +378,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
+        context?.signal?.removeEventListener("abort", abortChild);
         backgroundSignalManager.off("backgroundRequested", moveToBackground);
         reject(`Error: ${error.message}`);
       });

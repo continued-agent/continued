@@ -57,7 +57,12 @@ export function handlePermissionDenied(
     content: deniedMessage,
   });
 
-  callbacks?.onToolResult?.(deniedMessage, toolCall.name, "canceled");
+  callbacks?.onToolResult?.(
+    deniedMessage,
+    toolCall.name,
+    "canceled",
+    toolCall.id,
+  );
   logger.debug(`Tool call rejected (${reason}) - stopping stream`);
 }
 
@@ -92,6 +97,7 @@ export async function requestUserPermission(
         event.toolCall.arguments,
         event.requestId,
         event.toolCall.preview,
+        toolCall.id,
       );
     }
   };
@@ -421,7 +427,7 @@ export async function preprocessStreamedToolCalls(
       preprocessedCalls.push(preprocessedCall);
     } catch (error) {
       // Notify the UI about the tool start, even though it failed
-      callbacks?.onToolStart?.(toolCall.name, toolCall.arguments);
+      callbacks?.onToolStart?.(toolCall.name, toolCall.arguments, toolCall.id);
 
       const errorReason =
         error instanceof ContinueError
@@ -453,7 +459,7 @@ export async function preprocessStreamedToolCalls(
       });
 
       // Notify about the error
-      callbacks?.onToolError?.(errorMessage, toolCall.name);
+      callbacks?.onToolError?.(errorMessage, toolCall.name, toolCall.id);
     }
   }
 
@@ -503,7 +509,7 @@ export async function executeStreamedToolCalls(
       });
 
       // Notify tool start before permission check to display in UI fallbacks
-      callbacks?.onToolStart?.(call.name, call.arguments);
+      callbacks?.onToolStart?.(call.name, call.arguments, call.id);
 
       // Check tool permissions using helper
       const permissionState =
@@ -536,6 +542,7 @@ export async function executeStreamedToolCalls(
           String(deniedEntry.content),
           call.name,
           "canceled",
+          call.id,
         );
         // Immediate service update for UI feedback
         try {
@@ -566,6 +573,7 @@ export async function executeStreamedToolCalls(
 
             const toolResult = await executeToolCall(call, {
               parallelToolCallCount,
+              signal: callbacks?.abortSignal,
             });
             const entry: ToolResultWithStatus = {
               role: "tool",
@@ -574,7 +582,7 @@ export async function executeStreamedToolCalls(
               status: "done",
             };
             entriesByIndex.set(index, entry);
-            callbacks?.onToolResult?.(toolResult, call.name, "done");
+            callbacks?.onToolResult?.(toolResult, call.name, "done", call.id);
             // Immediate service update for UI feedback
             try {
               services.chatHistory.addToolResult(
@@ -597,7 +605,7 @@ export async function executeStreamedToolCalls(
               content: errorMessage,
               status: "errored",
             });
-            callbacks?.onToolError?.(errorMessage, call.name);
+            callbacks?.onToolError?.(errorMessage, call.name, call.id);
             // Immediate service update for UI feedback
             try {
               services.chatHistory.addToolResult(
@@ -623,7 +631,7 @@ export async function executeStreamedToolCalls(
         content: errorMessage,
         status: "errored",
       });
-      callbacks?.onToolError?.(errorMessage, call.name);
+      callbacks?.onToolError?.(errorMessage, call.name, call.id);
       // Treat permission errors like execution errors but do not stop the batch
       try {
         services.chatHistory.addToolResult(

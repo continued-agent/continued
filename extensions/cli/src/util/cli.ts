@@ -12,6 +12,51 @@ export function isHeadlessMode(): boolean {
   return args.includes("-p") || args.includes("--print");
 }
 
+/**
+ * Check for ACP mode before the rest of the CLI dependency graph is loaded.
+ */
+export function isAcpMode(): boolean {
+  const args = process.argv.slice(2);
+  if (
+    args.includes("--help") ||
+    args.includes("-h") ||
+    args.includes("--version")
+  ) {
+    return false;
+  }
+  const optionsWithValues = new Set([
+    "--config",
+    "--org",
+    "--rule",
+    "--mcp",
+    "--model",
+    "--prompt",
+    "--allow",
+    "--ask",
+    "--exclude",
+    "--agent",
+  ]);
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (optionsWithValues.has(arg)) {
+      index++;
+      continue;
+    }
+    if (arg === "-p" || arg === "--print") {
+      return false;
+    }
+    if (arg === "--") {
+      return false;
+    }
+    if (arg.startsWith("-") || arg.includes("=")) {
+      continue;
+    }
+    return arg === "acp";
+  }
+  return false;
+}
+
 export function isServe(): boolean {
   return process.argv?.includes("serve") ?? false;
 }

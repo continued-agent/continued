@@ -11,6 +11,7 @@ import {
   calculateLinesOfCodeDiff,
   getLanguageFromFilePath,
 } from "../telemetry/utils.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { EditOperation } from "./multiEdit.js";
 import { readFilesSet, readFileTool } from "./readFile.js";
@@ -32,7 +33,7 @@ export function validateAndResolveFilePath(args: any): {
 
   const absolutePath = path.isAbsolute(file_path)
     ? file_path
-    : path.resolve(process.cwd(), file_path);
+    : path.resolve(getWorkspaceDirectory(), file_path);
 
   const resolvedPath = fs.realpathSync(absolutePath);
 

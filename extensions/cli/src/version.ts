@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 
 import node_machine_id from "node-machine-id";
 
+import { isAcpMode } from "./util/cli.js";
 import { logger } from "./util/logger.js";
 
 export function getVersion(): string {
@@ -62,17 +63,19 @@ export async function getLatestVersion(
   return latestVersionCache;
 }
 
-getLatestVersion()
-  .then((version) => {
-    if (version) {
-      logger?.info(`Latest version: ${version}`);
-    }
-  })
-  .catch((error) => {
-    logger?.debug(
-      `Warning: Could not fetch latest version from api.continue.dev: ${error}`,
-    );
-  });
+if (!isAcpMode()) {
+  getLatestVersion()
+    .then((version) => {
+      if (version) {
+        logger?.info(`Latest version: ${version}`);
+      }
+    })
+    .catch((error) => {
+      logger?.debug(
+        `Warning: Could not fetch latest version from api.continue.dev: ${error}`,
+      );
+    });
+}
 
 export function compareVersions(
   current: string,
