@@ -38,12 +38,6 @@ credentials outside `config.yaml` using `~/.continue/.env` secret references.
 The CLI startup screen uses a compact color-gradient mark designed to remain
 readable in a standard terminal.
 
-## Contributors
-
-<a href="https://github.com/continuedev/continue/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=continuedev/continue&max=500" />
-</a>
-
 ## License
 
 Apache 2.0 © 2023-2026 Continue Dev, Inc.
