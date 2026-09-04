@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import path from "path";
 
 import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -29,7 +30,7 @@ vi.mock("fs", async () => {
 });
 
 describe("editTool", () => {
-  const testFilePath = "/tmp/test-edit-file.txt";
+  const testFilePath = path.join(process.cwd(), "test-edit-file.txt");
   const originalContent = "Hello world\nThis is a test file\nGoodbye world";
 
   beforeEach(() => {
@@ -68,7 +69,7 @@ describe("editTool", () => {
     });
 
     it("should throw error if file does not exist", async () => {
-      const nonExistentFile = "/tmp/non-existent-file.txt";
+      const nonExistentFile = path.join(process.cwd(), "non-existent-file.txt");
       markFileAsRead(nonExistentFile);
       vi.mocked(fs.existsSync).mockReturnValue(false);
 

@@ -6,6 +6,9 @@ on:
     - cron: "0 9 * * *"
   workflow_dispatch: # Allows manual triggering
 
+permissions:
+  contents: read
+
 jobs:
   run-cn-task:
     runs-on: ubuntu-latest
@@ -24,7 +27,7 @@ jobs:
           node-version: "20"
 
       - name: Install Continue CLI globally
-        run: npm install -g @continuedev/cli@latest
+        run: npm install -g @continuedev/cli@1.5.47
 
       - name: Run Snyk Agent
         run: cd extensions/cli && cn -p --agent continuedev/snyk-code-scan-agent "The current directory"

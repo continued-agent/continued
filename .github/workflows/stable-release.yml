@@ -10,9 +10,7 @@ on:
 
 permissions:
   contents: write
-  issues: write
-  pull-requests: write
-  id-token: write  # Required for OIDC
+  id-token: write # Required for OIDC
 
 jobs:
   stable-release:
@@ -46,13 +44,25 @@ jobs:
           cd core
           npm run build
 
+      - name: Setup Node.js for CLI tooling
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
       - name: Install CLI dependencies
         working-directory: extensions/cli
         run: npm ci
 
       - name: Update version
         working-directory: extensions/cli
-        run: npm version ${{ inputs.stable_version }} --no-git-tag-version
+        env:
+          STABLE_VERSION: ${{ inputs.stable_version }}
+        run: |
+          if [[ ! "$STABLE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "stable_version must be a semantic version such as 1.2.3" >&2
+            exit 1
+          fi
+          npm version "$STABLE_VERSION" --no-git-tag-version
 
       - name: Build
         working-directory: extensions/cli
@@ -70,34 +80,38 @@ jobs:
 
       - name: Publish to npm
         working-directory: extensions/cli
+        env:
+          STABLE_VERSION: ${{ inputs.stable_version }}
         run: |
           unset NODE_AUTH_TOKEN
           npm publish --tag latest --provenance
-          echo "Published version: ${{ inputs.stable_version }}"
+          echo "Published version: $STABLE_VERSION"
 
       - name: Create release on GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
+          STABLE_VERSION: ${{ inputs.stable_version }}
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git tag "v${{ inputs.stable_version }}"
-          git push origin "v${{ inputs.stable_version }}"
+          git tag "v$STABLE_VERSION"
+          git push origin "v$STABLE_VERSION"
 
-          gh release create "v${{ inputs.stable_version }}" \
-            --title "CLI Release v${{ inputs.stable_version }}" \
-            --notes "Release v${{ inputs.stable_version }} built and published from the main branch." \
+          gh release create "v$STABLE_VERSION" \
+            --title "CLI Release v$STABLE_VERSION" \
+            --notes "Release v$STABLE_VERSION built and published from the main branch." \
             --latest
 
       - name: Publish Blueprints to Runloop
         env:
           RUNLOOP_API_KEY: ${{ secrets.RUNLOOP_API_KEY }}
+          STABLE_VERSION: ${{ inputs.stable_version }}
         run: |
           publish_blueprint() {
             local name=$1
             local template=$2
 
-            echo "Publishing blueprint '$name' to Runloop API for version ${{ inputs.stable_version }}"
+            echo "Publishing blueprint '$name' to Runloop API for version $STABLE_VERSION"
 
             # Use blueprint configuration from template file
             cp ".github/workflows/$template" blueprint.json

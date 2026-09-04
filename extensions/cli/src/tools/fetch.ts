@@ -1,13 +1,14 @@
-import type { ContextItem } from "core/index.js";
+import type { ContextItem, FetchFunction } from "core/index.js";
 import { fetchUrlContentImpl } from "core/tools/implementations/fetchUrlContent.js";
 import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 
+import { safeFetch } from "../util/network.js";
 import {
   parseEnvNumber,
   truncateOutputFromEnd,
 } from "../util/truncateOutput.js";
 
-import { Tool } from "./types.js";
+import { Tool, ToolRunContext } from "./types.js";
 
 // Output truncation defaults
 const DEFAULT_FETCH_MAX_CHARS = 20000;
@@ -47,7 +48,10 @@ export const fetchTool: Tool = {
       args,
     };
   },
-  run: async (args: { url: string }): Promise<string> => {
+  run: async (
+    args: { url: string },
+    context?: ToolRunContext,
+  ): Promise<string> => {
     const { url } = args;
 
     try {
@@ -56,10 +60,24 @@ export const fetchTool: Tool = {
       console.error = () => {};
 
       // Use the core fetchUrlContent implementation
-      const contextItems = await fetchUrlContentImpl({ url }, { fetch });
-
-      // Restore console.error
-      console.error = originalConsoleError;
+      let contextItems: ContextItem[];
+      try {
+        contextItems = await fetchUrlContentImpl(
+          { url },
+          {
+            fetch: context?.signal
+              ? (((input, init) =>
+                  safeFetch(input, {
+                    ...init,
+                    signal: context.signal,
+                  })) as FetchFunction)
+              : safeFetch,
+          },
+        );
+      } finally {
+        // Restore console.error even when the request fails or is cancelled.
+        console.error = originalConsoleError;
+      }
 
       if (contextItems.length === 0) {
         throw new ContinueError(

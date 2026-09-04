@@ -11,6 +11,32 @@ import {
 
 import { MCPConnectionInfo } from "./types.js";
 
+export const MCP_ENV_ALLOWLIST = [
+  "PATH",
+  "HOME",
+  "USER",
+  "USERPROFILE",
+  "LOGNAME",
+  "USERNAME",
+  "TMPDIR",
+  "TEMP",
+  "TMP",
+] as const;
+
+export function buildMcpEnvironment(
+  configuredEnv?: Record<string, string>,
+): Record<string, string> {
+  const inheritedEnv = Object.fromEntries(
+    MCP_ENV_ALLOWLIST.filter((key) => process.env[key] !== undefined).map(
+      (key) => [key, process.env[key] as string],
+    ),
+  );
+  return {
+    ...inheritedEnv,
+    ...configuredEnv,
+  };
+}
+
 export function constructSseTransport(
   serverConfig: SseMcpServer,
   apiKey: string | undefined,
@@ -74,14 +100,7 @@ export function constructStdioTransport(
   serverConfig: StdioMcpServer,
   connection: MCPConnectionInfo,
 ): StdioClientTransport {
-  const env: Record<string, string> = serverConfig.env || {};
-  if (process.env) {
-    for (const [key, value] of Object.entries(process.env)) {
-      if (!(key in env) && !!value) {
-        env[key] = value;
-      }
-    }
-  }
+  const env = buildMcpEnvironment(serverConfig.env);
 
   const transport = new StdioClientTransport({
     command: serverConfig.command,

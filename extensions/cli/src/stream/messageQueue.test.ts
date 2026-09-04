@@ -27,5 +27,21 @@ describe("messageQueue", () => {
 
     const queued = await event;
     expect(queued.message).toBe("hello world");
+    expect(messageQueue.getNextMessage()?.message).toBe("hello world");
+  });
+
+  it("applies a bounded queue limit", async () => {
+    const { MAX_QUEUED_MESSAGES } = await import("./messageQueue.js");
+
+    for (let i = 0; i < MAX_QUEUED_MESSAGES; i++) {
+      await expect(messageQueue.enqueueMessage(`message-${i}`)).resolves.toBe(
+        true,
+      );
+    }
+    await expect(messageQueue.enqueueMessage("overflow")).resolves.toBe(false);
+
+    while (messageQueue.getNextMessage()) {
+      // Drain the singleton queue for isolation from other tests.
+    }
   });
 });

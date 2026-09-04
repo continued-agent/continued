@@ -8,6 +8,7 @@
 
 import { services } from "../services/index.js";
 import { getCurrentSession } from "../session.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import type {
   HookEventResult,
@@ -41,14 +42,14 @@ function getCommonFields(): {
     return {
       session_id: session.sessionId,
       transcript_path: "", // We don't have a transcript file like Claude Code
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
       permission_mode: permissionMode,
     };
   } catch {
     return {
       session_id: "",
       transcript_path: "",
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
     };
   }
 }

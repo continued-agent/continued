@@ -1,5 +1,7 @@
-import { exec, execSync } from "child_process";
+import { exec, execFileSync } from "child_process";
 import { promisify } from "util";
+
+import { getWorkspaceDirectory } from "./workspace.js";
 
 const execAsync = promisify(exec);
 const LARGE_STDIO_BUFFER_BYTES = 10 * 1024 * 1024; // bump buffer for large git output
@@ -11,9 +13,9 @@ const LARGE_STDIO_BUFFER_BYTES = 10 * 1024 * 1024; // bump buffer for large git 
  */
 export function getGitRemoteUrl(remote: string = "origin"): string | null {
   try {
-    const result = execSync(`git remote get-url ${remote}`, {
+    const result = execFileSync("git", ["remote", "get-url", remote], {
       encoding: "utf-8",
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
       stdio: "pipe",
     });
     return result.trim();
@@ -28,9 +30,9 @@ export function getGitRemoteUrl(remote: string = "origin"): string | null {
  */
 export function getGitBranch(): string | null {
   try {
-    const result = execSync("git branch --show-current", {
+    const result = execFileSync("git", ["branch", "--show-current"], {
       encoding: "utf-8",
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
       stdio: "pipe",
     });
     return result.trim() || null;
@@ -44,9 +46,9 @@ export function getGitBranch(): string | null {
  */
 export function isGitRepo(): boolean {
   try {
-    execSync("git rev-parse --is-inside-work-tree", {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], {
       stdio: "ignore",
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
     });
     return true;
   } catch {
@@ -106,12 +108,12 @@ export function getRepoUrl(): string {
 
   // Then check if we're in a git repository
   if (!isGitRepo()) {
-    return process.cwd();
+    return getWorkspaceDirectory();
   }
 
   // Try to get the remote URL from git
   const remoteUrl = getGitRemoteUrl();
-  const url = remoteUrl || process.cwd();
+  const url = remoteUrl || getWorkspaceDirectory();
   return url.endsWith(".git") ? url.slice(0, -4) : url;
 }
 
@@ -134,6 +136,7 @@ export async function getGitDiffSnapshot(): Promise<GitDiffSnapshot> {
   try {
     await execAsync("git rev-parse --git-dir", {
       maxBuffer: LARGE_STDIO_BUFFER_BYTES,
+      cwd: getWorkspaceDirectory(),
     });
   } catch (error) {
     if (isExecError(error) && error.code === 128) {
@@ -145,6 +148,7 @@ export async function getGitDiffSnapshot(): Promise<GitDiffSnapshot> {
   try {
     const { stdout } = await execAsync("git diff main", {
       maxBuffer: LARGE_STDIO_BUFFER_BYTES,
+      cwd: getWorkspaceDirectory(),
     });
     return { diff: stdout, repoFound: true };
   } catch (error) {

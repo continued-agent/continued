@@ -6,14 +6,19 @@ import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 import { findUp } from "find-up";
 
 import { parseEnvNumber } from "../util/truncateOutput.js";
-import { getWorkspaceDirectory } from "../util/workspace.js";
+import {
+  getWorkspaceDirectory,
+  resolvePathInWorkspace,
+} from "../util/workspace.js";
 
-import { Tool } from "./types.js";
+import { Tool, ToolRunContext } from "./types.js";
 
-const execPromise = util.promisify(child_process.exec);
+const execFilePromise = util.promisify(child_process.execFile);
 
-async function getGitignorePatterns() {
-  const gitIgnorePath = await findUp(".gitignore");
+async function getGitignorePatterns(
+  searchPath: string = getWorkspaceDirectory(),
+) {
+  const gitIgnorePath = await findUp(".gitignore", { cwd: searchPath });
   if (!gitIgnorePath) return [];
   const content = fs.readFileSync(gitIgnorePath, "utf-8");
   const ignorePatterns = [];
@@ -29,7 +34,7 @@ async function getGitignorePatterns() {
 // procedure 1: search with ripgrep
 export async function checkIfRipgrepIsInstalled(): Promise<boolean> {
   try {
-    await execPromise("rg --version");
+    await execFilePromise("rg", ["--version"]);
     return true;
   } catch {
     return false;
@@ -40,20 +45,25 @@ async function searchWithRipgrep(
   pattern: string,
   searchPath: string,
   filePattern?: string,
+  signal?: AbortSignal,
 ) {
-  let command = `rg --line-number --with-filename --color never "${pattern}"`;
+  const args = ["--line-number", "--with-filename", "--color", "never"];
 
   if (filePattern) {
-    command += ` -g "${filePattern}"`;
+    args.push("-g", filePattern);
   }
 
-  const ignorePatterns = await getGitignorePatterns();
+  const ignorePatterns = await getGitignorePatterns(searchPath);
   for (const ignorePattern of ignorePatterns) {
-    command += ` -g "!${ignorePattern}"`;
+    args.push("-g", `!${ignorePattern}`);
   }
 
-  command += ` "${searchPath}"`;
-  const { stdout, stderr } = await execPromise(command);
+  // End option parsing before user-controlled pattern and path arguments.
+  args.push("--", pattern, searchPath);
+  const { stdout, stderr } = await execFilePromise("rg", args, {
+    maxBuffer: 10 * 1024 * 1024,
+    signal,
+  });
   return { stdout, stderr };
 }
 
@@ -62,25 +72,34 @@ async function searchWithGrepOrFindstr(
   pattern: string,
   searchPath: string,
   filePattern?: string,
+  signal?: AbortSignal,
 ) {
   const isWindows = process.platform === "win32";
-  const ignorePatterns = await getGitignorePatterns();
-  let command: string;
+  const ignorePatterns = await getGitignorePatterns(searchPath);
   if (isWindows) {
     const fileSpec = filePattern ? filePattern : "*";
-    command = `findstr /S /N /P /R "${pattern}" "${fileSpec}"`; // findstr does not support ignoring patterns
+    const args = ["/S", "/N", "/P", "/R", pattern, fileSpec];
+    return await execFilePromise("findstr", args, {
+      cwd: searchPath,
+      maxBuffer: 10 * 1024 * 1024,
+      signal,
+    });
   } else {
-    let excludeArgs = "";
-    for (const ignorePattern of ignorePatterns) {
-      excludeArgs += ` --exclude="${ignorePattern}" --exclude-dir="${ignorePattern}"`; // use both exclude and exclude-dir because ignorePattern can be a file or directory
-    }
+    const args = ["-R", "-n", "-H", "-I"];
     if (filePattern) {
-      command = `find . -type f -path "${filePattern}" -print0 | xargs -0 grep -nH -I${excludeArgs} "${pattern}"`;
-    } else {
-      command = `grep -R -n -H -I${excludeArgs} "${pattern}" .`;
+      args.push("--include", filePattern);
     }
+    for (const ignorePattern of ignorePatterns) {
+      // Use separate argv entries so patterns cannot become shell syntax.
+      args.push("--exclude", ignorePattern, "--exclude-dir", ignorePattern);
+    }
+    args.push("--", pattern, ".");
+    return await execFilePromise("grep", args, {
+      cwd: searchPath,
+      maxBuffer: 10 * 1024 * 1024,
+      signal,
+    });
   }
-  return await execPromise(command, { cwd: searchPath });
 }
 
 // Output truncation defaults
@@ -140,12 +159,17 @@ export const searchCodeTool: Tool = {
       ],
     };
   },
-  run: async (args: {
-    pattern: string;
-    path?: string;
-    file_pattern?: string;
-  }): Promise<string> => {
-    const searchPath = args.path || getWorkspaceDirectory();
+  run: async (
+    args: {
+      pattern: string;
+      path?: string;
+      file_pattern?: string;
+    },
+    context?: ToolRunContext,
+  ): Promise<string> => {
+    const searchPath = resolvePathInWorkspace(
+      args.path || getWorkspaceDirectory(),
+    );
     if (!fs.existsSync(searchPath)) {
       throw new ContinueError(
         ContinueErrorReason.Unspecified,
@@ -161,6 +185,7 @@ export const searchCodeTool: Tool = {
           args.pattern,
           searchPath,
           args.file_pattern,
+          context?.signal,
         );
         stdout = results.stdout;
         stderr = results.stderr;
@@ -169,6 +194,7 @@ export const searchCodeTool: Tool = {
           args.pattern,
           searchPath,
           args.file_pattern,
+          context?.signal,
         );
         stdout = results.stdout;
         stderr = results.stderr;

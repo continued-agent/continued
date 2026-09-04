@@ -204,8 +204,12 @@ export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
     },
     readonly: undefined, // MCP tools don't have readonly property
     isBuiltIn: false,
-    run: async (args: any) => {
-      const result = await services.mcp?.runTool(mcpTool.name, args);
+    run: async (args: any, context?: ToolRunContext) => {
+      const result = await services.mcp?.runTool(
+        mcpTool.name,
+        args,
+        context?.signal,
+      );
       return JSON.stringify(result?.content) ?? "";
     },
   };

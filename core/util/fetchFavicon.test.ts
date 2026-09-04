@@ -271,4 +271,13 @@ describe("fetchFavicon", () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
     expect(global.fetch).toHaveBeenCalledWith("https://example.com");
   });
+
+  it("should not fetch local network favicon URLs", async () => {
+    global.fetch = jest.fn();
+
+    const result = await fetchFavicon(new URL("http://127.0.0.1:8000"));
+
+    expect(result).toBeUndefined();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 });

@@ -101,7 +101,12 @@ export function runCommandInBackground(command: string): {
   }
 
   const { shell, args } = getShellCommand(command);
-  const child = backgroundJobService.startJob(job.id, shell, args);
+  const child = backgroundJobService.startJob(
+    job.id,
+    shell,
+    args,
+    getWorkspaceDirectory(),
+  );
 
   if (!child) {
     return {
