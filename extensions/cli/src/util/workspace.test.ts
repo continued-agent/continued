@@ -31,7 +31,9 @@ describe("resolvePathInWorkspace", () => {
       resolvePathInWorkspace("src/new-file.ts"),
     );
 
-    expect(resolved).toBe(path.join(workspace, "src/new-file.ts"));
+    expect(resolved).toBe(
+      path.join(fs.realpathSync(workspace), "src/new-file.ts"),
+    );
   });
 
   it("rejects absolute paths outside the workspace", () => {
@@ -69,6 +71,8 @@ describe("resolvePathInWorkspace", () => {
       resolvePathInWorkspace("linked-directory/file.txt"),
     );
 
-    expect(resolved).toBe(path.join(workspace, "real/file.txt"));
+    expect(resolved).toBe(
+      path.join(fs.realpathSync(workspace), "real/file.txt"),
+    );
   });
 });
