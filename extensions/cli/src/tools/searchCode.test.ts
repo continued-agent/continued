@@ -1,17 +1,17 @@
 import * as nodeUtil from "util";
 
-import { vi } from "vitest";
+import { expect, vi } from "vitest";
 
-const execMock: any = vi.fn();
-(execMock as any)[(nodeUtil as any).promisify.custom] = (cmd: any) =>
+const execFileMock: any = vi.fn();
+(execFileMock as any)[(nodeUtil as any).promisify.custom] = (...args: any[]) =>
   new Promise((resolve, reject) => {
-    execMock(cmd, (err: any, stdout: any, stderr: any) => {
+    execFileMock(...args, (err: any, stdout: any, stderr: any) => {
       if (err) reject(err);
       else resolve({ stdout, stderr });
     });
   });
 
-vi.mock("child_process", () => ({ exec: execMock }));
+vi.mock("child_process", () => ({ execFile: execFileMock }));
 
 // Since we want to test just the interface and not the internals,
 // let's create a simplified version of the run function to test the truncation logic
@@ -77,12 +77,18 @@ describe("searchCodeTool", () => {
       const childProc = await import("child_process");
       const long = "a".repeat(1001);
 
-      vi.mocked(childProc.exec as any).mockImplementation((...args: any[]) => {
-        // exec callback signature: (error, stdout, stderr)
-        const cb = args[args.length - 1];
-        cb(null, `path/file.ts:1:${long}\npath/file.ts:2:match`, "");
-        return {} as any;
-      });
+      vi.mocked(childProc.execFile as any).mockImplementation(
+        (...args: any[]) => {
+          // execFile callback signature: (error, stdout, stderr)
+          const cb = args[args.length - 1];
+          if (args[0] === "rg" && args[1]?.[0] === "--version") {
+            cb(null, "rg 14.0.0", "");
+          } else {
+            cb(null, `path/file.ts:1:${long}\npath/file.ts:2:match`, "");
+          }
+          return {} as any;
+        },
+      );
 
       const { searchCodeTool } = await import("./searchCode.js");
       const result = await searchCodeTool.run({ pattern: "match", path: "." });
@@ -90,6 +96,36 @@ describe("searchCodeTool", () => {
       expect(result).toContain("path/file.ts:2:match");
       expect(result).not.toContain(long);
       expect(result).not.toContain("[Results truncated:");
+    });
+
+    it("passes the pattern and path as arguments instead of shell source", async () => {
+      const childProc = await import("child_process");
+      const pattern = "$(touch /tmp/should-not-run); echo pwned";
+
+      vi.mocked(childProc.execFile as any).mockImplementation(
+        (...args: any[]) => {
+          const cb = args[args.length - 1];
+          cb(
+            null,
+            args[0] === "rg" && args[1]?.[0] === "--version" ? "rg" : "",
+            "",
+          );
+          return {} as any;
+        },
+      );
+
+      const { searchCodeTool } = await import("./searchCode.js");
+      await searchCodeTool.run({ pattern, path: "." });
+
+      const searchCall = vi
+        .mocked(childProc.execFile as any)
+        .mock.calls.find(
+          (call: any[]) => call[0] === "rg" && call[1]?.includes(pattern),
+        );
+      expect(searchCall).toBeDefined();
+      expect(searchCall?.[1]).toContain("--");
+      expect(searchCall?.[1]).toContain(pattern);
+      expect(searchCall?.[2]).toMatchObject({ maxBuffer: 10 * 1024 * 1024 });
     });
   });
 });

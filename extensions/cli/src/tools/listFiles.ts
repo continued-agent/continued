@@ -1,7 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
-import { getWorkspaceDirectory } from "../util/workspace.js";
+import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { formatToolArgument } from "./formatters.js";
 import { Tool } from "./types.js";
@@ -26,7 +26,7 @@ export const listFilesTool: Tool = {
   preprocess: async (args) => {
     // Resolve relative paths
     const normalizedPath = path.normalize(args.dirpath);
-    const dirPath = path.resolve(getWorkspaceDirectory(), normalizedPath);
+    const dirPath = resolvePathInWorkspace(normalizedPath);
 
     if (!fs.existsSync(dirPath)) {
       throw new Error(`Directory does not exist: ${dirPath}`);
@@ -52,16 +52,17 @@ export const listFilesTool: Tool = {
   },
   run: async (args: { dirpath: string }): Promise<string> => {
     try {
-      const files = fs.readdirSync(args.dirpath);
+      const dirpath = resolvePathInWorkspace(args.dirpath);
+      const files = fs.readdirSync(dirpath);
       const fileDetails = files.map((file) => {
-        const fullPath = path.join(args.dirpath, file);
+        const fullPath = path.join(dirpath, file);
         const stats = fs.statSync(fullPath);
         const type = stats.isDirectory() ? "directory" : "file";
         const size = stats.isFile() ? `${stats.size} bytes` : "";
         return `${file} (${type}${size ? `, ${size}` : ""})`;
       });
 
-      return `Files in ${args.dirpath}:\n${fileDetails.join("\n")}`;
+      return `Files in ${dirpath}:\n${fileDetails.join("\n")}`;
     } catch (error) {
       throw new Error(
         `Error listing files: ${

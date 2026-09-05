@@ -4,6 +4,7 @@ import { AsyncFzf, FzfResultItem } from "fzf";
 import { FILE_IGNORE_PATTERNS } from "../util/filePatterns.js";
 import { isGitRepo } from "../util/git.js";
 import { logger } from "../util/logger.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { BaseService } from "./BaseService.js";
 import { serviceContainer } from "./ServiceContainer.js";
@@ -129,7 +130,7 @@ export class FileIndexService extends BaseService<FileIndexServiceState> {
     this.setState({ isIndexing: true, error: null });
 
     try {
-      const currentDir = process.cwd();
+      const currentDir = getWorkspaceDirectory();
       logger.debug(`Starting file index in directory: ${currentDir}`);
 
       // Determine max depth based on git repository status

@@ -180,7 +180,11 @@ export class MCPService
   /**
    * Run a tool by name
    */
-  public async runTool(name: string, args: Record<string, any>) {
+  public async runTool(
+    name: string,
+    args: Record<string, any>,
+    signal?: AbortSignal,
+  ) {
     for (const connection of this.connections.values()) {
       if (connection.status === "connected" && connection.client) {
         const tool = connection.tools.find((t) => t.name === name);
@@ -191,10 +195,14 @@ export class MCPService
             if (!conn?.client) {
               throw new Error(`Client for ${serverName} not available`);
             }
-            return await conn.client.callTool({
-              name,
-              arguments: args,
-            });
+            return await conn.client.callTool(
+              {
+                name,
+                arguments: args,
+              },
+              undefined,
+              { signal },
+            );
           });
         }
       }

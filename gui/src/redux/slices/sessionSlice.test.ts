@@ -21,7 +21,9 @@ describe("sessionSlice streamUpdate", () => {
 
     // Mock uuidv4 to return predictable values
     let callCount = 0;
-    mockUuidv4.mockImplementation(() => `mock-uuid-${++callCount}`);
+    mockUuidv4.mockImplementation(
+      () => `mock-uuid-${++callCount}` as unknown as ReturnType<typeof uuidv4>,
+    );
 
     // Mock renderChatMessage to return content as is
     mockRenderChatMessage.mockImplementation((message: ChatMessage) => {

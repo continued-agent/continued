@@ -36,7 +36,7 @@ vi.mock("fs", async () => {
 });
 
 describe("multiEditTool CLI specific", () => {
-  const testFilePath = "/tmp/test-multi-edit-file.txt";
+  const testFilePath = path.join(process.cwd(), "test-multi-edit-file.txt");
   const originalContent = "Hello world\nThis is a test file\nGoodbye world";
 
   beforeEach(() => {
@@ -78,7 +78,7 @@ describe("multiEditTool CLI specific", () => {
     });
 
     it("should throw error if file does not exist", async () => {
-      const nonExistentFile = "/tmp/non-existent-file.txt";
+      const nonExistentFile = path.join(process.cwd(), "non-existent-file.txt");
       markFileAsRead(nonExistentFile);
       vi.mocked(fs.existsSync).mockReturnValue(false);
 
@@ -134,7 +134,7 @@ describe("multiEditTool CLI specific", () => {
       expect(result.preview).toHaveLength(2);
       expect(result.preview?.[0]).toEqual({
         type: "text",
-        content: "Will apply 1 edit to /tmp/test-multi-edit-file.txt:",
+        content: `Will apply 1 edit to ${testFilePath}:`,
       });
       expect(result.preview?.[1]).toEqual({
         type: "diff",
@@ -242,10 +242,8 @@ describe("multiEditTool CLI specific", () => {
       expect(result.args.file_path).toBe(absolutePath);
     });
 
-    it("should handle relative paths with ../ patterns", async () => {
+    it("should reject relative paths that leave the workspace", async () => {
       const relativePath = "../test-file.txt";
-      const absolutePath = path.resolve(process.cwd(), relativePath);
-      markFileAsRead(absolutePath);
 
       const args = {
         file_path: relativePath,
@@ -257,13 +255,13 @@ describe("multiEditTool CLI specific", () => {
         ],
       };
 
-      const result = await multiEditTool.preprocess!(args);
-
-      expect(result.args.file_path).toBe(absolutePath);
+      await expect(multiEditTool.preprocess!(args)).rejects.toMatchObject({
+        reason: ContinueErrorReason.FileIsSecurityConcern,
+      });
     });
 
-    it("should leave absolute paths unchanged", async () => {
-      const absolutePath = "/tmp/absolute-file.txt";
+    it("should leave absolute paths inside the workspace unchanged", async () => {
+      const absolutePath = path.resolve(process.cwd(), "absolute-file.txt");
       markFileAsRead(absolutePath);
 
       const args = {

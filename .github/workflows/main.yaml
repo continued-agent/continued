@@ -19,8 +19,10 @@ jobs:
     steps:
       - id: check
         working-directory: .
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          if [[ "${{ github.event.release.tag_name }}" == v1.2.*-vscode ]]; then
+          if [[ "$RELEASE_TAG" == v1.2.*-vscode ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
             echo "should_run=false" >> $GITHUB_OUTPUT
@@ -35,7 +37,7 @@ jobs:
           fetch-depth: 0 # This ensures all tags are fetched
 
       - name: Checkout tag
-        run: git checkout ${GITHUB_REF#refs/tags/}
+        run: git checkout -- "${GITHUB_REF#refs/tags/}"
 
       - name: Make sure version isn't odd
         run: |
@@ -105,6 +107,7 @@ jobs:
           path: "extensions/vscode/*.vsix"
 
   release:
+    if: github.event_name == 'release'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -139,7 +142,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - build
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.publish_build == 'true'
+    if: github.event_name == 'release' && github.event.inputs.publish_build != 'false'
     permissions:
       contents: write
     steps:
@@ -153,7 +156,9 @@ jobs:
           git config --local user.name "GitHub Action"
 
       - name: Pull latest changes from release
-        run: git fetch origin ${{ github.ref }} && git checkout ${{ github.ref }}
+        env:
+          RELEASE_REF: ${{ github.ref }}
+        run: git fetch origin "$RELEASE_REF" && git checkout -- "$RELEASE_REF"
 
       # 1. Download the artifacts
       - uses: actions/download-artifact@v8
@@ -172,7 +177,6 @@ jobs:
 
       # 3. Publish the extension to Open VSX Registry
       - name: Publish (Open VSX Registry)
-        continue-on-error: true
         run: |
           cd extensions/vscode
           npx ovsx publish -p ${{ secrets.VSX_REGISTRY_TOKEN }} --packagePath ../../vsix-artifacts/*.vsix

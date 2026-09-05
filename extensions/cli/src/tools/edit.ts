@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import path from "path";
 
 import { validateSingleEdit } from "core/edit/searchAndReplace/findAndReplaceUtils.js";
 import { executeFindAndReplace } from "core/edit/searchAndReplace/performReplace.js";
@@ -11,7 +10,7 @@ import {
   calculateLinesOfCodeDiff,
   getLanguageFromFilePath,
 } from "../telemetry/utils.js";
-import { getWorkspaceDirectory } from "../util/workspace.js";
+import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { EditOperation } from "./multiEdit.js";
 import { readFilesSet, readFileTool } from "./readFile.js";
@@ -31,11 +30,7 @@ export function validateAndResolveFilePath(args: any): {
     );
   }
 
-  const absolutePath = path.isAbsolute(file_path)
-    ? file_path
-    : path.resolve(getWorkspaceDirectory(), file_path);
-
-  const resolvedPath = fs.realpathSync(absolutePath);
+  const resolvedPath = resolvePathInWorkspace(file_path);
 
   throwIfFileIsSecurityConcern(resolvedPath);
 
@@ -151,14 +146,15 @@ WARNINGS:
     oldContent: string;
   }) => {
     try {
-      fs.writeFileSync(args.resolvedPath, args.newContent, "utf-8");
+      const resolvedPath = resolvePathInWorkspace(args.resolvedPath);
+      fs.writeFileSync(resolvedPath, args.newContent, "utf-8");
 
       // Get lines for telemetry
       const { added, removed } = calculateLinesOfCodeDiff(
         args.oldContent,
         args.newContent,
       );
-      const language = getLanguageFromFilePath(args.resolvedPath);
+      const language = getLanguageFromFilePath(resolvedPath);
 
       if (added > 0) {
         telemetryService.recordLinesOfCodeModified("added", added, language);
@@ -172,13 +168,9 @@ WARNINGS:
       }
 
       // Generate diff for result display
-      const diff = generateDiff(
-        args.oldContent,
-        args.newContent,
-        args.resolvedPath,
-      );
+      const diff = generateDiff(args.oldContent, args.newContent, resolvedPath);
 
-      return `Successfully edited ${args.resolvedPath}\nDiff:\n${diff}`;
+      return `Successfully edited ${resolvedPath}\nDiff:\n${diff}`;
     } catch (error) {
       if (error instanceof ContinueError) {
         throw error;

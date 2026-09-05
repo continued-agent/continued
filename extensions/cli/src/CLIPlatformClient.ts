@@ -11,6 +11,7 @@ import { DefaultApiInterface } from "@continuedev/sdk/dist/api";
 import * as dotenv from "dotenv";
 
 import { env } from "./env.js";
+import { getWorkspaceDirectory } from "./util/workspace.js";
 
 export class CLIPlatformClient implements PlatformClient {
   constructor(
@@ -62,7 +63,7 @@ export class CLIPlatformClient implements PlatformClient {
     }
 
     // Then check in priority order: ~/.continue/.env, <workspace>/.continue/.env, <workspace>/.env
-    const workspaceDir = process.cwd();
+    const workspaceDir = getWorkspaceDirectory();
     const envPaths = [
       path.join(env.continueHome, ".env"),
       path.join(workspaceDir, ".continue", ".env"),

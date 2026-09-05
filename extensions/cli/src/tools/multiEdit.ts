@@ -9,6 +9,7 @@ import {
   calculateLinesOfCodeDiff,
   getLanguageFromFilePath,
 } from "../telemetry/utils.js";
+import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { editTool, validateAndResolveFilePath } from "./edit.js";
 import { readFileTool } from "./readFile.js";
@@ -139,14 +140,15 @@ WARNINGS:
     editCount: number;
   }) => {
     try {
-      fs.writeFileSync(args.file_path, args.newContent, "utf-8");
+      const filePath = resolvePathInWorkspace(args.file_path);
+      fs.writeFileSync(filePath, args.newContent, "utf-8");
 
       // Get lines for telemetry
       const { added, removed } = calculateLinesOfCodeDiff(
         args.originalContent,
         args.newContent,
       );
-      const language = getLanguageFromFilePath(args.file_path);
+      const language = getLanguageFromFilePath(filePath);
 
       if (added > 0) {
         telemetryService.recordLinesOfCodeModified("added", added, language);
@@ -163,10 +165,10 @@ WARNINGS:
       const diff = generateDiff(
         args.originalContent,
         args.newContent,
-        args.file_path,
+        filePath,
       );
 
-      return `Successfully edited ${args.file_path} with ${args.editCount} edit${args.editCount === 1 ? "" : "s"}\nDiff:\n${diff}`;
+      return `Successfully edited ${filePath} with ${args.editCount} edit${args.editCount === 1 ? "" : "s"}\nDiff:\n${diff}`;
     } catch (error) {
       if (error instanceof ContinueError) {
         throw error;

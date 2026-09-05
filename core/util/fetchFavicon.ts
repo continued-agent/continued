@@ -1,10 +1,18 @@
 import { JSDOM } from "jsdom";
+import type { FetchFunction } from "../index.js";
+import { isBlockedUrl } from "./urlSecurity";
 
-export async function findFaviconPath(url: URL): Promise<string | undefined> {
-  const baseUrl = `${url.protocol}//${url.hostname}`;
+export async function findFaviconPath(
+  url: URL,
+  fetchFn: FetchFunction = fetch,
+): Promise<string | undefined> {
+  if (isBlockedUrl(url)) {
+    return undefined;
+  }
+  const baseUrl = `${url.protocol}//${url.host}`;
 
   try {
-    const response = await fetch(baseUrl);
+    const response = await fetchFn(baseUrl);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
@@ -32,9 +40,13 @@ export async function findFaviconPath(url: URL): Promise<string | undefined> {
 
 export async function getFaviconBase64(
   faviconUrl: string,
+  fetchFn: FetchFunction = fetch,
 ): Promise<string | undefined> {
   try {
-    const response = await fetch(faviconUrl);
+    if (isBlockedUrl(new URL(faviconUrl))) {
+      return undefined;
+    }
+    const response = await fetchFn(faviconUrl);
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -56,10 +68,13 @@ export async function getFaviconBase64(
   }
 }
 
-export async function fetchFavicon(url: URL): Promise<string | undefined> {
-  const faviconPath = await findFaviconPath(url);
+export async function fetchFavicon(
+  url: URL,
+  fetchFn: FetchFunction = fetch,
+): Promise<string | undefined> {
+  const faviconPath = await findFaviconPath(url, fetchFn);
   if (faviconPath) {
-    return getFaviconBase64(faviconPath);
+    return getFaviconBase64(faviconPath, fetchFn);
   }
   return undefined;
 }

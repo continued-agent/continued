@@ -7,6 +7,7 @@
 
 import { BaseService } from "../services/BaseService.js";
 import { logger } from "../util/logger.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 import { loadHooksConfig } from "./hookConfig.js";
 import { runHooks } from "./hookRunner.js";
@@ -84,7 +85,11 @@ export class HookService extends BaseService<HookServiceState> {
     }
 
     try {
-      const result = await runHooks(this.currentState.config, input, this.cwd);
+      const result = await runHooks(
+        this.currentState.config,
+        input,
+        getWorkspaceDirectory(),
+      );
       return result;
     } catch (error) {
       logger.warn(`Hook event ${input.hook_event_name} failed:`, error);

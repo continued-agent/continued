@@ -17,6 +17,8 @@ jobs:
       
       - name: Check if author is in tier list
         id: check-author
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           USERS=(
             "TyDunn"
@@ -30,7 +32,6 @@ jobs:
             "Patrick-Erichsen"
           )
           
-          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
           SHOULD_LABEL="false"
           
           for user in "${USERS[@]}"; do

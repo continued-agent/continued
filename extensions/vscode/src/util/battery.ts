@@ -43,7 +43,6 @@ export class Battery implements Disposable {
   }
 
   public isACConnected(): boolean {
-    return false;
     return this.acConnected;
   }
 

@@ -26,5 +26,9 @@
   },
   "dependencies": {
     "@ai-sdk/deepseek": "^2.0.20"
+  },
+  "overrides": {
+    "shell-quote": "^1.10.0",
+    "tar": "^7.5.22"
   }
 }

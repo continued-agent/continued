@@ -3,6 +3,8 @@ import { EventEmitter } from "events";
 import type { InputHistory } from "../util/inputHistory.js";
 import { logger } from "../util/logger.js";
 
+export const MAX_QUEUED_MESSAGES = 100;
+
 export interface QueuedMessage {
   message: string;
   imageMap?: Map<string, Buffer>;
@@ -29,6 +31,13 @@ class MessageQueue extends EventEmitter {
     imageMap?: Map<string, Buffer>,
     history?: InputHistory,
   ): Promise<boolean> {
+    if (this.queue.length >= MAX_QUEUED_MESSAGES) {
+      logger.warn("MessageQueue: queue limit reached", {
+        queueLength: this.queue.length,
+      });
+      return false;
+    }
+
     const queuedMessage: QueuedMessage = {
       message,
       imageMap,

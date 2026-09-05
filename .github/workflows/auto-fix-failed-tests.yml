@@ -103,23 +103,28 @@ jobs:
 
       - name: Install Continue CLI globally
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
-        run: npm i -g @continuedev/cli
+        run: npm i -g @continuedev/cli@1.5.47
 
       - name: Start remote session to fix failed tests
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
         id: remote-session
         env:
           CONTINUE_API_KEY: ${{ secrets.CONTINUE_API_KEY }}
+          HEAD_BRANCH: ${{ steps.workflow-details.outputs.head_branch }}
+          WORKFLOW_NAME: ${{ steps.workflow-details.outputs.workflow_name }}
+          WORKFLOW_RUN_ID: ${{ steps.workflow-details.outputs.workflow_run_id }}
+          FAILED_JOBS: ${{ steps.workflow-details.outputs.failed_jobs }}
+          HEAD_SHA: ${{ steps.workflow-details.outputs.head_sha }}
         run: |
           # Create a detailed prompt for fixing the failed tests
           cat > /tmp/fix_tests_prompt.txt << 'PROMPT_EOF'
           🔧 **Auto Test Fix Request**
 
-          The following tests failed in workflow "${{ steps.workflow-details.outputs.workflow_name }}" (Run ID: ${{ steps.workflow-details.outputs.workflow_run_id }}):
+          The following tests failed in workflow "$WORKFLOW_NAME" (Run ID: $WORKFLOW_RUN_ID):
 
-          **Failed Jobs:** ${{ steps.workflow-details.outputs.failed_jobs }}
-          **Branch:** ${{ steps.workflow-details.outputs.head_branch }}
-          **Commit:** ${{ steps.workflow-details.outputs.head_sha }}
+          **Failed Jobs:** $FAILED_JOBS
+          **Branch:** $HEAD_BRANCH
+          **Commit:** $HEAD_SHA
 
           **Your Task:**
           1. Analyze the test failure logs and error messages
@@ -145,7 +150,7 @@ jobs:
           cat /tmp/fix_tests_prompt.txt
 
           # Start remote session and capture JSON output
-          SESSION_OUTPUT=$(cat /tmp/fix_tests_prompt.txt | cn remote -s --branch ${{ steps.workflow-details.outputs.head_branch }})
+          SESSION_OUTPUT=$(cat /tmp/fix_tests_prompt.txt | cn remote -s --branch "$HEAD_BRANCH")
           echo "Raw session output: $SESSION_OUTPUT"
 
           # Extract URL from JSON output
@@ -161,10 +166,16 @@ jobs:
 
       - name: Log session details
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
+        env:
+          WORKFLOW_NAME: ${{ steps.workflow-details.outputs.workflow_name }}
+          WORKFLOW_RUN_ID: ${{ steps.workflow-details.outputs.workflow_run_id }}
+          HEAD_BRANCH: ${{ steps.workflow-details.outputs.head_branch }}
+          SESSION_URL: ${{ steps.remote-session.outputs.session_url }}
+          FAILED_JOBS: ${{ steps.workflow-details.outputs.failed_jobs }}
         run: |
           echo "✅ Successfully started auto-fix session for failed tests"
-          echo "Workflow: ${{ steps.workflow-details.outputs.workflow_name }}"
-          echo "Run ID: ${{ steps.workflow-details.outputs.workflow_run_id }}"
-          echo "Branch: ${{ steps.workflow-details.outputs.head_branch }}"
-          echo "Session URL: ${{ steps.remote-session.outputs.session_url }}"
-          echo "Failed jobs: ${{ steps.workflow-details.outputs.failed_jobs }}"
+          echo "Workflow: $WORKFLOW_NAME"
+          echo "Run ID: $WORKFLOW_RUN_ID"
+          echo "Branch: $HEAD_BRANCH"
+          echo "Session URL: $SESSION_URL"
+          echo "Failed jobs: $FAILED_JOBS"

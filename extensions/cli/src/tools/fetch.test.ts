@@ -2,6 +2,8 @@ import type { ContextItem } from "core/index.js";
 import { fetchUrlContentImpl } from "core/tools/implementations/fetchUrlContent.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { safeFetch } from "../util/network.js";
+
 import { fetchTool } from "./fetch.js";
 
 // Mock the core fetchUrlContent implementation
@@ -44,7 +46,7 @@ describe("fetchTool", () => {
     );
     expect(mockFetchUrlContentImpl).toHaveBeenCalledWith(
       { url: "https://example.com" },
-      { fetch },
+      { fetch: safeFetch },
     );
   });
 
@@ -112,6 +114,18 @@ describe("fetchTool", () => {
     );
   });
 
+  it("should restore console.error when fetching fails", async () => {
+    const error = new Error("Network error");
+    const expectedConsoleError = console.error;
+    mockFetchUrlContentImpl.mockRejectedValue(error);
+
+    await expect(fetchTool.run({ url: "https://example.com" })).rejects.toThrow(
+      "Error: Network error",
+    );
+
+    expect(console.error).toBe(expectedConsoleError);
+  });
+
   it("should call fetchUrlContentImpl with correct arguments", async () => {
     const mockContextItems: ContextItem[] = [
       {
@@ -128,7 +142,7 @@ describe("fetchTool", () => {
 
     expect(mockFetchUrlContentImpl).toHaveBeenCalledWith(
       { url: "https://example.com" },
-      { fetch },
+      { fetch: safeFetch },
     );
   });
 

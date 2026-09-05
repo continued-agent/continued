@@ -50,6 +50,32 @@ interface ServeOptions extends ExtendedCommandOptions {
   id?: string;
 }
 
+export const SERVE_HOST = "127.0.0.1";
+const MAX_MESSAGE_LENGTH = 100_000;
+
+function addAssistantErrorMessage(
+  state: ServerState,
+  errorMessage: string,
+): void {
+  try {
+    services.chatHistory.addAssistantMessage(errorMessage);
+  } catch {
+    state.session.history.push({
+      message: { role: "assistant", content: errorMessage },
+      contextItems: [],
+    });
+  }
+}
+
+async function reportAgentFailure(errorMessage: string): Promise<void> {
+  try {
+    await reportFailureTool.run({ errorMessage });
+  } catch (reportError) {
+    logger.error(`Failed to report agent failure: ${formatError(reportError)}`);
+    // Don't block on reporting failure
+  }
+}
+
 /**
  * Decide whether to enqueue the initial prompt on server startup.
  * We only want to send it when starting a brand-new session; if any non-system
@@ -209,7 +235,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   telemetryService.startActiveTime();
 
   const app = express();
-  app.use(express.json());
+  app.use(express.json({ limit: "100kb" }));
 
   // GET /state - Return the current state
   app.get("/state", (_req: Request, res: Response) => {
@@ -228,13 +254,22 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   app.post("/message", async (req: Request, res: Response) => {
     state.lastActivity = Date.now();
 
-    const { message } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "Message field is required" });
+    const message =
+      req.body && typeof req.body === "object" ? req.body.message : undefined;
+    if (typeof message !== "string" || message.length === 0) {
+      return res
+        .status(400)
+        .json({ error: "Message field must be a non-empty string" });
+    }
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return res.status(413).json({ error: "Message is too large" });
     }
 
     // Queue the message
-    await messageQueue.enqueueMessage(message);
+    const queued = await messageQueue.enqueueMessage(message);
+    if (!queued) {
+      return res.status(429).json({ error: "Message queue is full" });
+    }
 
     res.json({
       queued: true,
@@ -251,7 +286,16 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   app.post("/permission", async (req: Request, res: Response) => {
     state.lastActivity = Date.now();
 
-    const { requestId, approved } = req.body;
+    const requestId =
+      req.body && typeof req.body === "object" ? req.body.requestId : undefined;
+    const approved =
+      req.body && typeof req.body === "object" ? req.body.approved : undefined;
+
+    if (typeof requestId !== "string" || typeof approved !== "boolean") {
+      return res
+        .status(400)
+        .json({ error: "requestId and approved fields are required" });
+    }
 
     if (!state.pendingPermission) {
       return res.status(400).json({ error: "No pending permission request" });
@@ -296,9 +340,6 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     if (state.currentAbortController) {
       state.currentAbortController.abort();
     }
-
-    // Set isProcessing to false
-    state.isProcessing = false;
 
     res.json({
       success: true,
@@ -385,7 +426,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     setTimeout(handleExitResponse, 100);
   });
 
-  const server = app.listen(port, async () => {
+  const server = app.listen(port, SERVE_HOST, async () => {
     console.log(chalk.green(`Server started on http://localhost:${port}`));
     console.log(chalk.dim("Endpoints:"));
     console.log(chalk.dim("  GET  /state      - Get current agent state"));
@@ -446,100 +487,94 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   });
 
   async function processMessages(state: ServerState, llmApi: any) {
-    let processedMessage = false;
-    while (state.serverRunning) {
-      const queuedMessage = messageQueue.getNextMessage();
-      if (!queuedMessage) {
-        break;
-      }
-
-      const userMessage = queuedMessage.message;
-      state.isProcessing = true;
-      state.lastActivity = Date.now();
-      processedMessage = true;
-
-      // Add user message via ChatHistoryService (single source of truth)
-      try {
-        services.chatHistory.addUserMessage(userMessage);
-      } catch {
-        // Fallback to local array if service unavailable
-        state.session.history.push({
-          message: { role: "user", content: userMessage },
-          contextItems: [],
-        });
-      }
-
-      try {
-        // Create new abort controller for this response
-        state.currentAbortController = new AbortController();
-
-        // Stream the response with interruption support
-        await streamChatResponseWithInterruption(
-          state,
-          llmApi,
-          state.currentAbortController,
-          () => false,
-        );
-
-        // No direct persistence here; ChatHistoryService handles persistence when appropriate
-
-        state.lastActivity = Date.now();
-
-        // Update metadata after successful agent turn
-        try {
-          const history = services.chatHistory?.getHistory();
-          await updateAgentMetadata({
-            history,
-            isComplete: checkAgentComplete(history),
-          });
-        } catch (metadataErr) {
-          logger.debug(
-            "Failed to update metadata after turn (non-critical)",
-            metadataErr as any,
-          );
-        }
-      } catch (e: any) {
-        if (e.name === "AbortError") {
-          logger.debug("Response interrupted");
-          removePartialAssistantMessage(state.session.history);
-        } else {
-          logger.error(`Error: ${formatError(e)}`);
-
-          // Add error message via ChatHistoryService
-          const errorMessage = `Error: ${formatError(e)}`;
-          try {
-            services.chatHistory.addAssistantMessage(errorMessage);
-          } catch {
-            state.session.history.push({
-              message: { role: "assistant", content: errorMessage },
-              contextItems: [],
-            });
-          }
-
-          // Report failure to control plane (retries exhausted or non-retryable error)
-          try {
-            await reportFailureTool.run({
-              errorMessage: formatError(e),
-            });
-          } catch (reportError) {
-            logger.error(
-              `Failed to report agent failure: ${formatError(reportError)}`,
-            );
-            // Don't block on reporting failure
-          }
-        }
-      } finally {
-        state.currentAbortController = null;
-        state.isProcessing = false;
-      }
+    // Keep the processing lock held for the entire drain, including metadata
+    // persistence. This prevents a second request from starting a concurrent
+    // run in the gap between two queued messages.
+    if (state.isProcessing) {
+      return;
     }
+    state.isProcessing = true;
 
-    if (
-      processedMessage &&
-      state.serverRunning &&
-      messageQueue.getQueueLength() === 0
-    ) {
-      await storageSyncService.markAgentStatusUnread();
+    let processedMessage = false;
+    try {
+      while (state.serverRunning) {
+        const queuedMessage = messageQueue.getNextMessage();
+        if (!queuedMessage) {
+          break;
+        }
+
+        const userMessage = queuedMessage.message;
+        state.lastActivity = Date.now();
+        processedMessage = true;
+
+        // Add user message via ChatHistoryService (single source of truth)
+        try {
+          services.chatHistory.addUserMessage(userMessage);
+        } catch {
+          // Fallback to local array if service unavailable
+          state.session.history.push({
+            message: { role: "user", content: userMessage },
+            contextItems: [],
+          });
+        }
+
+        try {
+          // Create new abort controller for this response
+          state.currentAbortController = new AbortController();
+
+          // Stream the response with interruption support
+          await streamChatResponseWithInterruption(
+            state,
+            llmApi,
+            state.currentAbortController,
+            () => false,
+          );
+
+          // No direct persistence here; ChatHistoryService handles persistence when appropriate
+
+          state.lastActivity = Date.now();
+
+          // Update metadata after successful agent turn
+          try {
+            const history = services.chatHistory?.getHistory();
+            await updateAgentMetadata({
+              history,
+              isComplete: checkAgentComplete(history),
+            });
+          } catch (metadataErr) {
+            logger.debug(
+              "Failed to update metadata after turn (non-critical)",
+              metadataErr as any,
+            );
+          }
+        } catch (e: any) {
+          if (e.name === "AbortError") {
+            logger.debug("Response interrupted");
+            removePartialAssistantMessage(state.session.history);
+          } else {
+            logger.error(`Error: ${formatError(e)}`);
+
+            const errorMessage = `Error: ${formatError(e)}`;
+            addAssistantErrorMessage(state, errorMessage);
+
+            // Report failure to control plane (retries exhausted or non-retryable error)
+            await reportAgentFailure(formatError(e));
+          }
+        } finally {
+          state.currentAbortController = null;
+        }
+      }
+
+      if (
+        processedMessage &&
+        state.serverRunning &&
+        messageQueue.getQueueLength() === 0
+      ) {
+        await storageSyncService.markAgentStatusUnread();
+      }
+    } finally {
+      state.currentAbortController = null;
+      state.isProcessing = false;
     }
   }
 

@@ -9,7 +9,7 @@ import {
   calculateLinesOfCodeDiff,
   getLanguageFromFilePath,
 } from "../telemetry/utils.js";
-import { getWorkspaceDirectory } from "../util/workspace.js";
+import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { Tool, ToolCallPreview } from "./types.js";
 
@@ -54,9 +54,7 @@ export const writeFileTool: Tool = {
     if (typeof inputPath !== "string") {
       throw new Error("Filepath must be a string");
     }
-    const filepath = path.isAbsolute(inputPath)
-      ? inputPath
-      : path.resolve(getWorkspaceDirectory(), inputPath);
+    const filepath = resolvePathInWorkspace(inputPath);
     const content = args?.content ?? "";
     if (typeof content !== "string") {
       throw new Error("New file content must be a string");
@@ -123,19 +121,20 @@ export const writeFileTool: Tool = {
   },
   run: async (args: { filepath: string; content: string }): Promise<string> => {
     try {
-      const dirPath = path.dirname(args.filepath);
+      const filepath = resolvePathInWorkspace(args.filepath);
+      const dirPath = path.dirname(filepath);
       if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
       }
 
       // Read existing file content if it exists
       let oldContent = "";
-      if (fs.existsSync(args.filepath)) {
-        oldContent = fs.readFileSync(args.filepath, "utf-8");
+      if (fs.existsSync(filepath)) {
+        oldContent = fs.readFileSync(filepath, "utf-8");
       }
 
       // Write new content
-      fs.writeFileSync(args.filepath, args.content, "utf-8");
+      fs.writeFileSync(filepath, args.content, "utf-8");
 
       // Track lines of code changes if file existed before
       if (oldContent) {
@@ -143,7 +142,7 @@ export const writeFileTool: Tool = {
           oldContent,
           args.content,
         );
-        const language = getLanguageFromFilePath(args.filepath);
+        const language = getLanguageFromFilePath(filepath);
 
         if (added > 0) {
           telemetryService.recordLinesOfCodeModified("added", added, language);
@@ -157,13 +156,13 @@ export const writeFileTool: Tool = {
         }
 
         // Generate diff for result display
-        const diff = generateDiff(oldContent, args.content, args.filepath);
+        const diff = generateDiff(oldContent, args.content, filepath);
 
-        return `Successfully wrote to file: ${args.filepath}\nDiff:\n${diff}`;
+        return `Successfully wrote to file: ${filepath}\nDiff:\n${diff}`;
       } else {
         // New file creation - count all lines as added
         const lineCount = args.content.split("\n").length;
-        const language = getLanguageFromFilePath(args.filepath);
+        const language = getLanguageFromFilePath(filepath);
 
         telemetryService.recordLinesOfCodeModified(
           "added",
@@ -171,7 +170,7 @@ export const writeFileTool: Tool = {
           language,
         );
 
-        return `Successfully created file: ${args.filepath}`;
+        return `Successfully created file: ${filepath}`;
       }
     } catch (error) {
       if (error instanceof ContinueError) {

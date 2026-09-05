@@ -9,6 +9,7 @@ const execAsync = promisify(exec);
 
 import { formatError } from "../util/formatError.js";
 import { logger } from "../util/logger.js";
+import { getWorkspaceDirectory } from "../util/workspace.js";
 
 interface EnvironmentConfig {
   install?: string;
@@ -23,7 +24,7 @@ const ENVIRONMENT_SEARCH_PATHS = [".continue"];
 function findEnvironmentFile(): EnvironmentConfig | null {
   for (const searchPath of ENVIRONMENT_SEARCH_PATHS) {
     const environmentPath = path.join(
-      process.cwd(),
+      getWorkspaceDirectory(),
       searchPath,
       ENVIRONMENT_FILE_NAME,
     );
@@ -68,7 +69,7 @@ export async function runEnvironmentInstall(): Promise<void> {
 
   try {
     await execAsync(installScript, {
-      cwd: process.cwd(),
+      cwd: getWorkspaceDirectory(),
       encoding: "utf-8",
     });
 
