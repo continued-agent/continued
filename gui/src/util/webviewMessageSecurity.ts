@@ -1,8 +1,8 @@
 /**
  * Accept messages only from this webview's own origin and top-level window.
- * VS Code's host bridge can deliver messages with a non-page origin and no
- * source window. Nested MCP iframes still have a different WindowProxy and
- * are rejected below.
+ * VS Code's host bridge can deliver messages with a non-page origin and a
+ * parent-frame source. Nested MCP iframes still have a different WindowProxy
+ * and are rejected below.
  */
 export function isTrustedWebviewMessageEvent(
   event: Pick<MessageEvent, "origin" | "source">,
@@ -12,12 +12,17 @@ export function isTrustedWebviewMessageEvent(
   }
 
   const expectedOrigin = window.location.origin;
-  const isTopLevelSource = event.source == null || event.source === window;
+  const isParentFrameSource =
+    window.parent !== window && event.source === window.parent;
+  const isTopLevelSource =
+    event.source == null || event.source === window || isParentFrameSource;
   // VS Code's webview.postMessage bridge does not expose a browser source
-  // window, so its event origin is not stable across VS Code versions. A
-  // nested frame always supplies its own WindowProxy and is rejected below.
+  // window, so its event origin is not stable across VS Code versions. The
+  // parent frame is the trusted VS Code container; a nested frame always
+  // supplies a different WindowProxy and is rejected below.
   const isHostBridgeMessage =
     event.source == null ||
+    isParentFrameSource ||
     (isTopLevelSource && (event.origin === "" || event.origin === "null"));
   if (
     !expectedOrigin ||

@@ -28,6 +28,29 @@ describe("webview message trust boundary", () => {
     ).toBe(true);
   });
 
+  it("accepts messages from the trusted parent webview frame", () => {
+    const originalParent = window.parent;
+    const parentFrame = {} as Window;
+    Object.defineProperty(window, "parent", {
+      configurable: true,
+      value: parentFrame,
+    });
+
+    try {
+      expect(
+        isTrustedWebviewMessageEvent({
+          origin: "vscode-webview://host",
+          source: parentFrame,
+        }),
+      ).toBe(true);
+    } finally {
+      Object.defineProperty(window, "parent", {
+        configurable: true,
+        value: originalParent,
+      });
+    }
+  });
+
   it("rejects messages from another origin", () => {
     expect(
       isTrustedWebviewMessageEvent({
