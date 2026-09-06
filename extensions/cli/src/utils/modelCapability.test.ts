@@ -96,7 +96,7 @@ describe("isModelCapable", () => {
     });
   });
 
-  describe("Continued Proxy models", () => {
+  describe("Continue Proxy models", () => {
     test("should consider continue-proxy models as not capable", () => {
       expect(isModelCapable("continue-proxy", "any-model")).toBe(false);
     });

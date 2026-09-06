@@ -39,7 +39,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
 
   const text = useMemo(() => {
     if (!services.update?.message) {
-      return "Continued CLI";
+      return "Continue CLI";
     }
 
     return services.update.message;

@@ -176,7 +176,7 @@ const program = new Command();
 program
   .name("cn")
   .description(
-    "Continued CLI - AI-powered development assistant. Starts an interactive session by default, use -p/--print for non-interactive output.",
+    "Continue CLI - AI-powered development assistant. Starts an interactive session by default, use -p/--print for non-interactive output.",
   )
   .version(getVersion(), "-v, --version", "Display version number");
 
@@ -330,7 +330,7 @@ program
   )
   .option(
     "--id <storageId>",
-    "Upload session snapshots to Continued-managed storage using the provided identifier",
+    "Upload session snapshots to Continue-managed storage using the provided identifier",
   )
   .option(
     "--beta-upload-artifact-tool",
@@ -352,7 +352,7 @@ program
 // startup path so ACP mode can claim stdout before those dependencies load.
 const acpCommand = program
   .command("acp")
-  .description("Run Continued as an Agent Client Protocol (ACP) agent");
+  .description("Run Continue as an Agent Client Protocol (ACP) agent");
 addCommonOptions(acpCommand).action(async (options) => {
   configureAcpMode(true);
   const mergedOptions = mergeParentOptions(program, options);

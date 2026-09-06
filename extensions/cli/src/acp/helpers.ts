@@ -67,7 +67,7 @@ export function toPromptText(prompt: ContentBlock[]): string {
   for (const block of prompt) {
     if (block.type !== "text") {
       throw new Error(
-        `Unsupported ACP content block type '${block.type}'. Continued currently supports text prompts only.`,
+        `Unsupported ACP content block type '${block.type}'. Continue currently supports text prompts only.`,
       );
     }
     text.push(block.text);

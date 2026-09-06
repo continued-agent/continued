@@ -7,7 +7,7 @@ import { ApiClientServiceState } from "./types.js";
 
 /**
  * Service for managing API client state
- * Provides access to the Continued SDK API client
+ * Provides access to the Continue SDK API client
  */
 export class ApiClientService
   extends BaseService<ApiClientServiceState>

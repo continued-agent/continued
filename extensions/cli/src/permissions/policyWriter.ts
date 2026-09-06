@@ -57,8 +57,8 @@ export async function addPolicyToYaml(policyRule: string): Promise<void> {
       const yamlContent = YAML.stringify(config);
 
       // Add header comment
-      const finalContent = `# Continued CLI Permissions Configuration
-# This file is managed by the Continued CLI and should not be edited manually.
+      const finalContent = `# Continue CLI Permissions Configuration
+# This file is managed by the Continue CLI and should not be edited manually.
 # Use the TUI to modify permissions interactively.
 
 ${yamlContent}`;

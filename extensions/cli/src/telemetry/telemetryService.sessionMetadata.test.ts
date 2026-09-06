@@ -184,7 +184,7 @@ describe("TelemetryService - Session Metadata", () => {
     });
 
     it("should include is_continue_remote_agent=true when in remote agent mode", () => {
-      // Set Continued remote agent environment
+      // Set Continue remote agent environment
       process.env.CONTINUE_REMOTE = "true";
 
       const mockAdd = vi.fn();

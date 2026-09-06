@@ -232,7 +232,7 @@ class TelemetryService {
     });
 
     this.costCounter = this.meter.createCounter("continue_cli_cost_usage", {
-      description: "Cost of the Continued CLI session",
+      description: "Cost of the Continue CLI session",
       unit: "USD",
     });
 
@@ -257,7 +257,7 @@ class TelemetryService {
       },
     );
 
-    // Additional Continued CLI specific metrics
+    // Additional Continue CLI specific metrics
     this.authAttemptsCounter = this.meter.createCounter(
       "continue_cli_auth_attempts",
       {

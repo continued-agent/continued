@@ -201,7 +201,7 @@ models:
       });
 
       expect(helpResult.exitCode).toBe(0);
-      expect(helpResult.stdout).toContain("Continued CLI");
+      expect(helpResult.stdout).toContain("Continue CLI");
 
       const versionResult = await runCLI(context, {
         args: ["--version"],

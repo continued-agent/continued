@@ -1,5 +1,5 @@
 /**
- * Claude Code-compatible hooks system for Continued CLI.
+ * Claude Code-compatible hooks system for Continue CLI.
  *
  * These types match the exact schemas from Claude Code so that any hook
  * written for `claude` works with `cn` out of the box.

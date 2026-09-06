@@ -91,7 +91,7 @@ describe("StorageSyncService", () => {
 
     expect(result).toBe(false);
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining("no Continued API key"),
+      expect.stringContaining("no Continue API key"),
     );
     warnSpy.mockRestore();
   });

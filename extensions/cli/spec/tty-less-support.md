@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Continued CLI supports running in TTY-less environments (environments without a terminal/TTY), which is essential for:
+The Continue CLI supports running in TTY-less environments (environments without a terminal/TTY), which is essential for:
 
 - VSCode and IntelliJ extensions using the `run_terminal_command` tool
 - Docker containers without TTY allocation
@@ -121,7 +121,7 @@ docker run --rm my-image cn -p "Generate a README"
 ### From CI/CD Pipeline
 
 ```yaml
-- name: Run Continued CLI
+- name: Run Continue CLI
   run: |
     cn -p "Review code changes" --format json
 ```

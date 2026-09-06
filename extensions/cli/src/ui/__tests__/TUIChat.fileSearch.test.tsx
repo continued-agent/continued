@@ -22,7 +22,7 @@ describe("TUIChat - @ File Search Tests", () => {
 
     // Local mode specific UI expectations
     expect(frame).not.toContain("Remote Mode");
-    expect(frame).toContain("Continued CLI");
+    expect(frame).toContain("Continue CLI");
   });
 
   testSingleMode(
@@ -73,7 +73,7 @@ describe("TUIChat - @ File Search Tests", () => {
     expect(frame).toContain("@@test");
 
     // Local mode specific UI elements
-    expect(frame).toContain("Continued CLI");
+    expect(frame).toContain("Continue CLI");
   });
 
   testSingleMode(

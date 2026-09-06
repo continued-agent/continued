@@ -98,14 +98,14 @@ describe("ACP runtime", () => {
     vi.clearAllMocks();
   });
 
-  it("negotiates ACP v1 and identifies Continued without loadSession", async () => {
+  it("negotiates ACP v1 and identifies Continue without loadSession", async () => {
     const runtime = await makeRuntime();
     const response = runtime.initializeRequest(1);
 
     expect(response.protocolVersion).toBe(1);
     expect(response.agentInfo).toEqual({
       name: "continue",
-      title: "Continued",
+      title: "Continue",
       version: "0.0.0-test",
     });
     expect(response.agentCapabilities).not.toHaveProperty("loadSession");
@@ -240,7 +240,7 @@ describe("ACP runtime", () => {
     ["allow_once", true],
     ["reject_once", false],
   ] as const)(
-    "maps %s permission to the Continued manager",
+    "maps %s permission to the Continue manager",
     async (optionId, approved) => {
       harness.stream.mockImplementation(
         async (_history, _model, _api, _abort, callbacks) => {

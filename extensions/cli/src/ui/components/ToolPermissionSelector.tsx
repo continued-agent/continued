@@ -46,7 +46,7 @@ const getPermissionOptions = (): PermissionOption[] => {
     },
     {
       id: "deny_stop",
-      name: "No, and tell Continued what to do differently",
+      name: "No, and tell Continue what to do differently",
       color: "yellow",
       approved: false,
       stopStream: true,

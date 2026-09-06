@@ -35,7 +35,7 @@ export const SYSTEM_SLASH_COMMANDS: SystemCommand[] = [
   },
   {
     name: "update",
-    description: "Update the Continued CLI",
+    description: "Update the Continue CLI",
     category: "system",
   },
   {

@@ -1,10 +1,10 @@
-# Continued CLI Terminal UI spec
+# Continue CLI Terminal UI spec
 
 This spec is incomplete.
 
 ## Stack
 
-The Continued CLI uses Ink as a react TUI library.
+The Continue CLI uses Ink as a react TUI library.
 
 ## cwd/git display
 

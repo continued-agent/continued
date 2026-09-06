@@ -1,6 +1,6 @@
-# End-to-End Testing for Continued CLI
+# End-to-End Testing for Continue CLI
 
-This document describes the principles, practices, and patterns for writing end-to-end (E2E) tests for the Continued CLI.
+This document describes the principles, practices, and patterns for writing end-to-end (E2E) tests for the Continue CLI.
 
 ## Overview
 
@@ -61,7 +61,7 @@ const result = await runCLI(context, {
 
 // Verify output and exit code
 expect(result.exitCode).toBe(0);
-expect(result.stdout).toContain("Continued CLI");
+expect(result.stdout).toContain("Continue CLI");
 ```
 
 ### Testing with Input

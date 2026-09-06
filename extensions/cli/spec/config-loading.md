@@ -25,7 +25,7 @@ This document specifies the behavior of the CLI's configuration loading system, 
 1. **CLI `--config` Flag** (highest priority)
 
    - File path (starts with `.`, `/`, `~`): Loads local YAML file
-   - Assistant slug (`owner/package`): Fetches from Continued platform
+   - Assistant slug (`owner/package`): Fetches from Continue platform
    - Overrides any saved preferences
 
 2. **Saved Config URI** (if no `--config` flag)

@@ -22,7 +22,7 @@ describe("TUIChat - Slash Commands Tests", () => {
       expect(frame).toContain("Remote Mode");
     } else {
       expect(frame).not.toContain("Remote Mode");
-      expect(frame).toContain("Continued CLI");
+      expect(frame).toContain("Continue CLI");
     }
   });
 
@@ -47,7 +47,7 @@ describe("TUIChat - Slash Commands Tests", () => {
       expect(frame).toContain("Remote Mode");
     } else {
       expect(frame).not.toContain("Remote Mode");
-      expect(frame).toContain("Continued CLI");
+      expect(frame).toContain("Continue CLI");
     }
   });
 
@@ -108,7 +108,7 @@ describe("TUIChat - Slash Commands Tests", () => {
       expect(hasSlash).toBe(true);
     } else {
       // In local mode, the / is shown in the input
-      expect(frame).toContain("Continued CLI");
+      expect(frame).toContain("Continue CLI");
       // The slash should be visible somewhere in the frame
       // It might be in the input area or in a command palette
       const hasSlash = frame ? frame.includes("/") : false;
@@ -161,7 +161,7 @@ describe("TUIChat - Slash Commands Tests", () => {
         expect(frameAfterArgs).toContain("Remote Mode");
         // In remote mode, /title might not be available, so just check the UI is working
       } else {
-        expect(frameAfterArgs).toContain("Continued CLI");
+        expect(frameAfterArgs).toContain("Continue CLI");
         // In local mode, we should see the /title command
         expect(frameAfterArgs).toContain("/title");
       }
@@ -202,7 +202,7 @@ describe("TUIChat - Slash Commands Tests", () => {
       if (mode === "remote") {
         expect(frameAfterEnter).toContain("Remote Mode");
       } else {
-        expect(frameAfterEnter).toContain("Continued CLI");
+        expect(frameAfterEnter).toContain("Continue CLI");
       }
     },
   );
