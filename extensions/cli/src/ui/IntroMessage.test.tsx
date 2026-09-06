@@ -1,15 +1,8 @@
-import { Text } from "ink";
 import { render } from "ink-testing-library";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { IntroMessage } from "./IntroMessage.js";
-
-// Mock the TipsDisplay module
-vi.mock("./TipsDisplay.js", () => ({
-  TipsDisplay: () => React.createElement(Text, null, "Mocked TipsDisplay"),
-  shouldShowTip: vi.fn(),
-}));
 
 // Mock other dependencies
 vi.mock("../asciiArt.js", () => ({
@@ -41,24 +34,6 @@ describe("IntroMessage", () => {
     expect(lastFrame()?.split("\n")[0]).toContain("MOCK ASCII ART");
   });
 
-  it("shows tips when shouldShowTip returns true", async () => {
-    const { shouldShowTip } = await import("./TipsDisplay.js");
-    vi.mocked(shouldShowTip).mockReturnValue(true);
-
-    const { lastFrame } = render(<IntroMessage />);
-
-    expect(lastFrame()).toContain("Mocked TipsDisplay");
-  });
-
-  it("does not show tips when shouldShowTip returns false", async () => {
-    const { shouldShowTip } = await import("./TipsDisplay.js");
-    vi.mocked(shouldShowTip).mockReturnValue(false);
-
-    const { lastFrame } = render(<IntroMessage />);
-
-    expect(lastFrame()).not.toContain("Mocked TipsDisplay");
-  });
-
   it("renders config name when config is provided", () => {
     const config = { name: "Test Agent", version: "1.0.0", rules: [] };
 
@@ -79,6 +54,25 @@ describe("IntroMessage", () => {
 
     expect(lastFrame()).toContain("Model:");
     expect(lastFrame()).toContain("model-name");
+  });
+
+  it("keeps the reference layout compact between the logo and model", () => {
+    const config = { name: "Main Config", version: "1.0.0", rules: [] };
+    const model = {
+      name: "Google Gemini",
+      provider: "gemini",
+      model: "gemini-2.5-flash",
+    };
+
+    const { lastFrame } = render(
+      <IntroMessage config={config} model={model} />,
+    );
+
+    expect(lastFrame()).toBe(
+      ["MOCK ASCII ART", "Config: Main Config", "Model: Google Gemini"].join(
+        "\n",
+      ),
+    );
   });
 
   it("shows loading state when model is not provided", () => {
