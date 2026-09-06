@@ -1179,6 +1179,8 @@ export class Core {
       llm: config.selectedModelByRole.chat,
       fetch: (url, init) =>
         fetchwithRequestOptions(url, init, config.requestOptions),
+      fetchPublic: (url, init) =>
+        fetchPublicUrl(url, init, config.requestOptions),
       tool,
       toolCallId: toolCall.id,
       onPartialOutput,

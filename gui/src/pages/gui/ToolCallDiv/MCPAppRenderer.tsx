@@ -6,7 +6,7 @@ import {
 
 import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { ToolPolicy } from "@continuedev/terminal-security";
-import { ToolCallState } from "core";
+import type { Tool, ToolCallState } from "core";
 import { getToolNameFromMCPServer } from "core/tools/mcpToolName";
 import { generateOpenAIToolCallId } from "core/tools/systemMessageTools/systemToolUtils";
 import { renderContextItems } from "core/util/messageContent";
@@ -112,6 +112,23 @@ function escapeHtmlAttribute(value: string): string {
 }
 
 /**
+ * MCP UI content must be authorized against the tool it actually requests,
+ * rather than the tool that happened to render the UI resource.
+ */
+export function resolveMcpAppToolPolicy(
+  toolName: string,
+  configuredPolicies: Record<string, ToolPolicy>,
+  availableTools: Tool[],
+): ToolPolicy {
+  return (
+    configuredPolicies[toolName] ??
+    availableTools.find((tool) => tool.function.name === toolName)
+      ?.defaultToolPolicy ??
+    "allowedWithPermission"
+  );
+}
+
+/**
  * MCP App renderer using AppBridge with srcdoc iframe.
  * VS Code webviews have restrictive CSP that blocks iframe src URLs,
  * so we embed HTML directly via srcdoc and use AppBridge for the protocol.
@@ -141,13 +158,16 @@ export function McpAppRenderer({
   const uiMeta = toolCallState.mcpUiState?.content._meta?.ui;
   const toolInput = toolCallState.parsedArgs;
   const toolResult = toolCallState.output;
-  const configuredToolPolicy = useAppSelector(
-    (state) => state.ui.toolSettings[toolCallState.toolCall.function.name],
+  const configuredToolPolicies = useAppSelector(
+    (state) => state.ui.toolSettings,
   );
+  const availableTools = useAppSelector((state) => state.config.config.tools);
   const toolCallStateRef = useRef(toolCallState);
   toolCallStateRef.current = toolCallState;
-  const configuredToolPolicyRef = useRef(configuredToolPolicy);
-  configuredToolPolicyRef.current = configuredToolPolicy;
+  const configuredToolPoliciesRef = useRef(configuredToolPolicies);
+  configuredToolPoliciesRef.current = configuredToolPolicies;
+  const availableToolsRef = useRef(availableTools);
+  availableToolsRef.current = availableTools;
 
   // Extract metadata from the MCP UI resource
   const csp: McpUiResourceCsp | undefined = uiMeta?.csp;
@@ -281,10 +301,11 @@ export function McpAppRenderer({
         !Array.isArray(params.arguments)
           ? params.arguments
           : {};
-      const basePolicy: ToolPolicy =
-        configuredToolPolicyRef.current ??
-        currentToolCallState.tool?.defaultToolPolicy ??
-        "allowedWithPermission";
+      const basePolicy = resolveMcpAppToolPolicy(
+        toolName,
+        configuredToolPoliciesRef.current,
+        availableToolsRef.current,
+      );
       const policyResult = await ideMessenger.request("tools/evaluatePolicy", {
         toolName,
         basePolicy,

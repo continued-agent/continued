@@ -1114,6 +1114,8 @@ export interface ToolExtras {
   ide: IDE;
   llm: ILLM;
   fetch: FetchFunction;
+  /** Public-only fetch for tools that retrieve an arbitrary URL. */
+  fetchPublic?: FetchFunction;
   tool: Tool;
   toolCallId?: string;
   onPartialOutput?: (params: {

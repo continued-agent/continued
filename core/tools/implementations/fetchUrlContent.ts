@@ -7,7 +7,11 @@ const DEFAULT_FETCH_URL_CHAR_LIMIT = 20000;
 export const fetchUrlContentImpl: ToolImpl = async (args, extras) => {
   const url = getStringArg(args, "url");
 
-  const contextItems = await getUrlContextItems(url, extras.fetch);
+  const contextItems = await getUrlContextItems(
+    url,
+    extras.fetch,
+    extras.fetchPublic ?? extras.fetch,
+  );
 
   // Track truncated content
   const truncatedUrls: string[] = [];
