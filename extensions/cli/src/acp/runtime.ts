@@ -64,7 +64,7 @@ interface AcpSession {
 }
 
 /**
- * Serializes access to Continue's process-wide services. The current CLI
+ * Serializes access to Continued's process-wide services. The current CLI
  * stream and permission services are singletons, so ACP sessions may exist at
  * the same time but their turns are deliberately processed one at a time.
  */
@@ -108,14 +108,14 @@ export class AcpRuntime {
     });
     const modelState = services.model.getState() as ModelServiceState;
     if (!modelState.model || !modelState.llmApi) {
-      throw new Error("Continue model service is not initialized");
+      throw new Error("Continued model service is not initialized");
     }
   }
 
   initializeRequest(protocolVersion: number): InitializeResponse {
     if (protocolVersion !== PROTOCOL_VERSION) {
       throw new Error(
-        `Unsupported ACP protocol version ${protocolVersion}; Continue supports ACP v${PROTOCOL_VERSION}`,
+        `Unsupported ACP protocol version ${protocolVersion}; Continued supports ACP v${PROTOCOL_VERSION}`,
       );
     }
 
@@ -123,7 +123,7 @@ export class AcpRuntime {
       protocolVersion: PROTOCOL_VERSION,
       agentInfo: {
         name: "continue",
-        title: "Continue",
+        title: "Continued",
         version: this.version(),
       },
       // Baseline ACP capabilities (session/new, session/prompt, and
@@ -151,12 +151,12 @@ export class AcpRuntime {
           await validateDirectory(directory, `additionalDirectories[${index}]`);
         }
         throw new Error(
-          "Continue ACP does not support additionalDirectories yet; omit them or use cwd",
+          "Continued ACP does not support additionalDirectories yet; omit them or use cwd",
         );
       }
       if (params.mcpServers.length) {
         throw new Error(
-          "Continue ACP does not support client-provided MCP servers yet; pass mcpServers: []",
+          "Continued ACP does not support client-provided MCP servers yet; pass mcpServers: []",
         );
       }
 
@@ -178,7 +178,7 @@ export class AcpRuntime {
       ];
       const modelState = services.model.getState() as ModelServiceState;
       if (!modelState.model || !modelState.llmApi) {
-        throw new Error("Continue model service is not initialized");
+        throw new Error("Continued model service is not initialized");
       }
 
       this.sessions.set(sessionId, {
@@ -245,7 +245,7 @@ export class AcpRuntime {
         return { stopReason: "cancelled" };
       }
       logger.error("ACP prompt failed", error as Error);
-      throw new Error("Continue failed to process the ACP prompt");
+      throw new Error("Continued failed to process the ACP prompt");
     } finally {
       session.pendingPermission = null;
       session.abortController = null;

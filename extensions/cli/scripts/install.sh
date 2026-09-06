@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Continue CLI Installer - Unix (macOS, Linux, WSL, Git Bash)
+# Continued CLI Installer - Unix (macOS, Linux, WSL, Git Bash)
 # curl -fsSL https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.sh | bash
 
 REQUIRED_NODE_VERSION="20.20.1"
@@ -423,7 +423,7 @@ verify_checksum() {
 finalize() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    success "Continue CLI installation complete!"
+    success "Continued CLI installation complete!"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
@@ -439,7 +439,7 @@ finalize() {
 main() {
     echo ""
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    printf "%s           Continue CLI Installer%s\n" "$BOLD" "$NC"
+    printf "%s           Continued CLI Installer%s\n" "$BOLD" "$NC"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
 
