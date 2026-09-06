@@ -20,7 +20,6 @@ import {
 } from "../services/types.js";
 import { getTotalSessionCost } from "../session.js";
 import { bashToolEvents } from "../util/cli.js";
-import { logger } from "../util/logger.js";
 
 import { ActionStatus } from "./components/ActionStatus.js";
 import { BottomStatusBar } from "./components/BottomStatusBar.js";
@@ -45,43 +44,6 @@ interface TUIChatProps {
   fork?: string;
   additionalRules?: string[];
   additionalPrompts?: string[];
-}
-
-// Helper function to load and set session
-async function loadAndSetSession(
-  sessionId: string,
-  closeCurrentScreen: () => void,
-  setChatHistory: (history: any) => void,
-  setShowIntroMessage: (show: boolean) => void,
-) {
-  try {
-    // Close the session selector
-    closeCurrentScreen();
-
-    // Import session functions
-    const { loadSessionById } = await import("../session.js");
-
-    // Load the session
-    const session = loadSessionById(sessionId);
-    if (!session) {
-      logger.error(`Session ${sessionId} could not be loaded.`);
-      return;
-    }
-
-    // Set the session ID so future operations use this session
-    process.env.CONTINUE_CLI_TEST_SESSION_ID = sessionId.replace(
-      "continue-cli-",
-      "",
-    );
-
-    // Set the chat history from the session
-    setChatHistory(session.history);
-
-    // Clear the intro message since we're now showing a resumed session
-    setShowIntroMessage(false);
-  } catch (error) {
-    console.error("Error loading session:", error);
-  }
 }
 
 // Custom hook to manage services
@@ -172,6 +134,30 @@ const TUIChat: React.FC<TUIChatProps> = ({
     isScreenActive,
   } = useNavigation();
 
+  // Session/config selectors replace the chat screen. Clear the previous
+  // dynamic/static output before switching screens so Ink does not leave the
+  // old transcript behind while the replacement is rendered.
+  const clearScreenForNavigation = useCallback(() => {
+    process.stdout.write("\x1b[2J\x1b[H");
+  }, []);
+
+  const navigateToScreen = useCallback(
+    (screen: Parameters<typeof navigateTo>[0], data?: any) => {
+      if (screen !== navState.currentScreen) {
+        clearScreenForNavigation();
+      }
+      navigateTo(screen, data);
+    },
+    [clearScreenForNavigation, navigateTo, navState.currentScreen],
+  );
+
+  const closeScreen = useCallback(() => {
+    if (navState.currentScreen !== "chat") {
+      clearScreenForNavigation();
+    }
+    closeCurrentScreen();
+  }, [clearScreenForNavigation, closeCurrentScreen, navState.currentScreen]);
+
   // Use intro message hook
   const [showIntroMessage, setShowIntroMessage] = useIntroMessage(
     isRemoteMode,
@@ -198,9 +184,9 @@ const TUIChat: React.FC<TUIChatProps> = ({
   const handleShowDiff = useCallback(
     (content: string) => {
       setDiffContent(content);
-      navigateTo("diff");
+      navigateToScreen("diff");
     },
-    [navigateTo],
+    [navigateToScreen],
   );
 
   // Handler to show temporary status message
@@ -231,6 +217,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
     handleEditMessage,
     handleToolPermissionResponse,
     handleQuizAnswer,
+    loadSelectedSession,
   } = useChat({
     assistant: services.config?.config || undefined,
     model: services.model?.model || undefined,
@@ -240,13 +227,13 @@ const TUIChat: React.FC<TUIChatProps> = ({
     fork,
     additionalRules,
     additionalPrompts,
-    onShowConfigSelector: () => navigateTo("config"),
-    onShowModelSelector: () => navigateTo("model"),
-    onShowMCPSelector: () => navigateTo("mcp"),
-    onShowUpdateSelector: () => navigateTo("update"),
-    onShowSessionSelector: () => navigateTo("session"),
-    onShowJobsSelector: () => navigateTo("jobs"),
-    onShowExportSelector: () => navigateTo("export"),
+    onShowConfigSelector: () => navigateToScreen("config"),
+    onShowModelSelector: () => navigateToScreen("model"),
+    onShowMCPSelector: () => navigateToScreen("mcp"),
+    onShowUpdateSelector: () => navigateToScreen("update"),
+    onShowSessionSelector: () => navigateToScreen("session"),
+    onShowJobsSelector: () => navigateToScreen("jobs"),
+    onShowExportSelector: () => navigateToScreen("export"),
     onReload: handleReload,
     onClear: handleClear,
     onRefreshStatic: () => setStaticRefreshTrigger((prev) => prev + 1),
@@ -283,14 +270,13 @@ const TUIChat: React.FC<TUIChatProps> = ({
   // Session selection handler
   const handleSessionSelect = useCallback(
     async (sessionId: string) => {
-      await loadAndSetSession(
-        sessionId,
-        closeCurrentScreen,
-        setChatHistory,
-        setShowIntroMessage,
-      );
+      const loaded = await loadSelectedSession(sessionId);
+      if (loaded) {
+        setShowIntroMessage(false);
+        closeScreen();
+      }
     },
-    [closeCurrentScreen, setChatHistory, setShowIntroMessage],
+    [closeScreen, loadSelectedSession, setShowIntroMessage],
   );
 
   // Export session handler
@@ -313,7 +299,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
               contextItems: [],
             },
           ]);
-          closeCurrentScreen();
+          closeScreen();
           return;
         }
 
@@ -340,7 +326,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
             contextItems: [],
           },
         ]);
-        closeCurrentScreen();
+        closeScreen();
       } catch (error: any) {
         setChatHistory((prev) => [
           ...prev,
@@ -352,10 +338,10 @@ const TUIChat: React.FC<TUIChatProps> = ({
             contextItems: [],
           },
         ]);
-        closeCurrentScreen();
+        closeScreen();
       }
     },
-    [closeCurrentScreen, setChatHistory],
+    [closeScreen, setChatHistory],
   );
 
   // Determine if input should be disabled
@@ -390,115 +376,114 @@ const TUIChat: React.FC<TUIChatProps> = ({
     };
   }, []);
 
+  const screenContent = (
+    <ScreenContent
+      isScreenActive={isScreenActive}
+      services={services}
+      handleConfigSelect={handleConfigSelect}
+      handleModelSelect={handleModelSelect}
+      handleSessionSelect={handleSessionSelect}
+      handleExportSession={handleExportSession}
+      handleReload={handleReload}
+      closeCurrentScreen={closeScreen}
+      activePermissionRequest={activePermissionRequest}
+      activeQuizQuestion={activeQuizQuestion}
+      handleToolPermissionResponse={handleToolPermissionResponse}
+      handleQuizAnswer={handleQuizAnswer}
+      handleUserMessage={handleUserMessage}
+      isWaitingForResponse={isWaitingForResponse}
+      isCompacting={isCompacting}
+      inputMode={inputMode}
+      handleInterrupt={handleInterrupt}
+      handleFileAttached={handleFileAttached}
+      isInputDisabled={isInputDisabled}
+      wasInterrupted={wasInterrupted}
+      isRemoteMode={isRemoteMode}
+      onImageInClipboardChange={setHasImageInClipboard}
+      diffContent={diffContent}
+      chatHistory={chatHistory}
+      handleEditMessage={handleEditMessage}
+      onShowEditSelector={() => navigateToScreen("edit")}
+    />
+  );
+
+  const isChatScreen = navState.currentScreen === "chat";
+
   return (
     <Box flexDirection="column" height="100%" paddingX={1}>
-      {/* Chat history - takes up all available space above input */}
+      {/* Main content area: transcript in chat, selector/overlay otherwise */}
       <Box flexDirection="column" flexGrow={1} overflow="hidden">
-        {/* Debug component - comment out when not needed */}
-        {/* {!isRemoteMode && (
-          <ServiceDebugger
-            services={services}
-            loading={servicesLoading}
-            error={servicesError}
-            allReady={allServicesReady}
-            servicesLoading={servicesLoading}
-            servicesError={servicesError}
+        {isChatScreen ? (
+          <StaticChatContent
+            showIntroMessage={showIntroMessage && !isRemoteMode}
+            config={services.config?.config || undefined}
+            model={services.model?.model || undefined}
+            mcpService={services.mcp?.mcpService || undefined}
+            organizationName={organizationName}
+            chatHistory={chatHistory}
+            queuedMessages={queuedMessages}
+            renderMessage={renderMessage}
+            refreshTrigger={staticRefreshTrigger}
           />
-        )} */}
-
-        {/* Chat content with intro message and messages in static container */}
-        <StaticChatContent
-          showIntroMessage={showIntroMessage && !isRemoteMode}
-          config={services.config?.config || undefined}
-          model={services.model?.model || undefined}
-          mcpService={services.mcp?.mcpService || undefined}
-          organizationName={organizationName}
-          chatHistory={chatHistory}
-          queuedMessages={queuedMessages}
-          renderMessage={renderMessage}
-          refreshTrigger={staticRefreshTrigger}
-        />
+        ) : (
+          screenContent
+        )}
       </Box>
 
-      {/* Fixed bottom section */}
-      <Box flexDirection="column" flexShrink={0}>
-        {/* Status */}
-        <ActionStatus
-          visible={isWaitingForResponse && !!responseStartTime}
-          startTime={responseStartTime || 0}
-          message=""
-          showSpinner={true}
-          additionalHint={
-            isBashToolRunning ? "ctrl+b to background" : undefined
-          }
-        />
+      {/* Chat controls stay fixed below the transcript */}
+      {isChatScreen && (
+        <Box flexDirection="column" flexShrink={0}>
+          {/* Status */}
+          <ActionStatus
+            visible={isWaitingForResponse && !!responseStartTime}
+            startTime={responseStartTime || 0}
+            message=""
+            showSpinner={true}
+            additionalHint={
+              isBashToolRunning ? "ctrl+b to background" : undefined
+            }
+          />
 
-        {/* Compaction Status */}
-        <ActionStatus
-          visible={isCompacting && !!compactionStartTime}
-          startTime={compactionStartTime || 0}
-          message="Compacting history"
-          showSpinner={true}
-          loadingColor="grey"
-        />
+          {/* Compaction Status */}
+          <ActionStatus
+            visible={isCompacting && !!compactionStartTime}
+            startTime={compactionStartTime || 0}
+            message="Compacting history"
+            showSpinner={true}
+            loadingColor="grey"
+          />
 
-        {/* Temporary status message */}
-        {statusMessage && (
-          <Box paddingX={1} paddingY={0}>
-            <Text color="green">{statusMessage}</Text>
-          </Box>
-        )}
+          {/* Temporary status message */}
+          {statusMessage && (
+            <Box paddingX={1} paddingY={0}>
+              <Text color="green">{statusMessage}</Text>
+            </Box>
+          )}
 
-        {/* All screen-specific content */}
-        <ScreenContent
-          isScreenActive={isScreenActive}
-          services={services}
-          handleConfigSelect={handleConfigSelect}
-          handleModelSelect={handleModelSelect}
-          handleSessionSelect={handleSessionSelect}
-          handleExportSession={handleExportSession}
-          handleReload={handleReload}
-          closeCurrentScreen={closeCurrentScreen}
-          activePermissionRequest={activePermissionRequest}
-          activeQuizQuestion={activeQuizQuestion}
-          handleToolPermissionResponse={handleToolPermissionResponse}
-          handleQuizAnswer={handleQuizAnswer}
-          handleUserMessage={handleUserMessage}
-          isWaitingForResponse={isWaitingForResponse}
-          isCompacting={isCompacting}
-          inputMode={inputMode}
-          handleInterrupt={handleInterrupt}
-          handleFileAttached={handleFileAttached}
-          isInputDisabled={isInputDisabled}
-          wasInterrupted={wasInterrupted}
-          isRemoteMode={isRemoteMode}
-          onImageInClipboardChange={setHasImageInClipboard}
-          diffContent={diffContent}
-          chatHistory={chatHistory}
-          handleEditMessage={handleEditMessage}
-          onShowEditSelector={() => navigateTo("edit")}
-        />
+          {/* Chat-screen input and permission content */}
+          {screenContent}
 
-        {/* Resource debug bar - only in verbose mode */}
-        {isVerboseMode && !isRemoteMode && (
-          <ResourceDebugBar visible={navState.currentScreen === "chat"} />
-        )}
+          {/* Resource debug bar - only in verbose mode */}
+          {isVerboseMode && !isRemoteMode && (
+            <ResourceDebugBar visible={navState.currentScreen === "chat"} />
+          )}
 
-        {/* Bottom status bar */}
-        <BottomStatusBar
-          currentMode={services?.toolPermissions?.currentMode ?? "normal"}
-          remoteUrl={remoteUrl}
-          isRemoteMode={isRemoteMode}
-          services={services}
-          navState={navState}
-          navigateTo={navigateTo}
-          closeCurrentScreen={closeCurrentScreen}
-          contextPercentage={contextData?.percentage}
-          hasImageInClipboard={hasImageInClipboard}
-          isVerboseMode={isVerboseMode}
-          totalCost={getTotalSessionCost()}
-        />
-      </Box>
+          {/* Bottom status bar */}
+          <BottomStatusBar
+            currentMode={services?.toolPermissions?.currentMode ?? "normal"}
+            remoteUrl={remoteUrl}
+            isRemoteMode={isRemoteMode}
+            services={services}
+            navState={navState}
+            navigateTo={navigateToScreen}
+            closeCurrentScreen={closeScreen}
+            contextPercentage={contextData?.percentage}
+            hasImageInClipboard={hasImageInClipboard}
+            isVerboseMode={isVerboseMode}
+            totalCost={getTotalSessionCost()}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

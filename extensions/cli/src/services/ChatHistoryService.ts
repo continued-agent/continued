@@ -1,7 +1,11 @@
 import type { ChatHistoryItem, ToolStatus } from "core/index.js";
 import { createHistoryItem } from "core/util/messageConversion.js";
 
-import { loadSessionById, updateSessionHistory } from "../session.js";
+import {
+  loadSessionById,
+  setCurrentSession,
+  updateSessionHistory,
+} from "../session.js";
 import { logger } from "../util/logger.js";
 
 import { BaseService } from "./BaseService.js";
@@ -387,6 +391,7 @@ export class ChatHistoryService extends BaseService<ChatHistoryState> {
   async loadSession(sessionId: string): Promise<void> {
     const session = loadSessionById(sessionId);
     if (session) {
+      setCurrentSession(session);
       // Load new history without recording undo; set sessionId separately
       this.setHistoryInternal(session.history, { recordUndo: false });
       this.setState({ sessionId: session.sessionId });

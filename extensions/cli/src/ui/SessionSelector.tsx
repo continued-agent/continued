@@ -16,6 +16,10 @@ interface SessionSelectorProps {
 }
 
 function formatTimestamp(date: Date): string {
+  if (Number.isNaN(date.getTime())) {
+    return "unknown date";
+  }
+
   if (isToday(date)) {
     return format(date, "h:mm a");
   } else if (isYesterday(date)) {
@@ -120,20 +124,25 @@ export function SessionSelector({
 
   // Determine if we should show preview (only if terminal is wide enough)
   const showPreview = terminalWidth > 100;
-  const listWidth = showPreview
-    ? Math.floor(terminalWidth * 0.3)
-    : terminalWidth;
+  const listWidth = showPreview ? "30%" : "100%";
 
   return (
-    <Box flexDirection="row" width={terminalWidth}>
+    <Box flexDirection="row" width="100%" minWidth={0}>
       {/* Left side: Session list */}
-      <Box {...defaultBoxStyles("blue")} width={listWidth}>
+      <Box
+        {...defaultBoxStyles("blue")}
+        width={listWidth}
+        minWidth={0}
+        flexShrink={1}
+      >
         <Text color="blue" bold>
           Recent Sessions{" "}
           {sessions.length > displaySessions.length &&
             `(${selectedIndex + 1}/${sessions.length})`}
         </Text>
-        <Text color="gray">↑/↓ to navigate, Enter to select, Esc to exit</Text>
+        <Text color="gray" wrap="truncate-end">
+          ↑/↓ to navigate, Enter to select, Esc to exit
+        </Text>
         <Text> </Text>
 
         {hasMoreAbove && (
@@ -150,7 +159,7 @@ export function SessionSelector({
 
           return (
             <Box key={session.sessionId} flexDirection="column">
-              <Box paddingRight={3}>
+              <Box paddingRight={1}>
                 <Text bold={isSelected} color={color} wrap="truncate-end">
                   {indicator}
                   {formatMessage(session.title)}
@@ -179,7 +188,7 @@ export function SessionSelector({
 
       {/* Right side: Preview panel */}
       {showPreview && (
-        <Box marginLeft={1} flexGrow={1} width="100%">
+        <Box marginLeft={1} flexGrow={1} flexShrink={1} minWidth={0}>
           {previewSession ? (
             <SessionPreview
               chatHistory={previewSession.history}

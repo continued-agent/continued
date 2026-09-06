@@ -1,12 +1,16 @@
 import type { ChatHistoryItem } from "core/index.js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import * as sessionModule from "../session.js";
+
 import { ChatHistoryService } from "./ChatHistoryService.js";
 
 // Mock the dependencies
 vi.mock("../session.js", () => ({
   updateSessionHistory: vi.fn(),
   loadSession: vi.fn(),
+  loadSessionById: vi.fn(),
+  setCurrentSession: vi.fn(),
   createSession: vi.fn((history) => ({
     sessionId: "test-session-id",
     history: history || [],
@@ -154,6 +158,34 @@ describe("ChatHistoryService", () => {
       service.addUserMessage("Remote message");
 
       expect(updateSessionHistory).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("loadSession", () => {
+    it("loads the selected session and updates the active session", async () => {
+      const mockHistory: ChatHistoryItem[] = [
+        {
+          message: { role: "user", content: "Loaded message" },
+          contextItems: [],
+        },
+      ];
+      const mockSession = {
+        sessionId: "selected-session",
+        history: mockHistory,
+        title: "Selected session",
+        workspaceDirectory: "/selected",
+      };
+
+      vi.mocked(sessionModule.loadSessionById).mockReturnValue(mockSession);
+
+      await service.initialize();
+      await service.loadSession("selected-session");
+
+      expect(sessionModule.setCurrentSession).toHaveBeenCalledWith(mockSession);
+      expect(service.getState()).toMatchObject({
+        sessionId: "selected-session",
+        history: mockHistory,
+      });
     });
   });
 

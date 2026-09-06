@@ -7,6 +7,14 @@ import type { BaseSessionMetadata } from "../session.js";
 
 import { SessionSelector } from "./SessionSelector.js";
 
+vi.mock("../session.js", () => ({
+  loadSessionById: vi.fn(),
+}));
+
+vi.mock("./hooks/useTerminalSize.js", () => ({
+  useTerminalSize: vi.fn(() => ({ rows: 24, columns: 120 })),
+}));
+
 describe("SessionSelector", () => {
   const mockOnSelect = vi.fn();
   const mockOnExit = vi.fn();
@@ -111,5 +119,52 @@ describe("SessionSelector", () => {
     );
 
     expect(lastFrame()).toContain("Empty session");
+  });
+
+  it("keeps the preview panel within the terminal width", () => {
+    const sessions = [
+      {
+        sessionId: "remote-session",
+        workspaceDirectory: "/test",
+        dateCreated: new Date().toISOString(),
+        title: "Remote session",
+        isRemote: true,
+      },
+    ];
+
+    const { lastFrame } = render(
+      <SessionSelector
+        sessions={sessions}
+        onSelect={mockOnSelect}
+        onExit={mockOnExit}
+      />,
+    );
+
+    const frame = lastFrame() ?? "";
+    const widestRow = Math.max(...frame.split("\n").map((line) => line.length));
+
+    expect(frame).toContain("Preview");
+    expect(widestRow).toBeLessThanOrEqual(120);
+  });
+
+  it("does not crash when a session has an invalid date", () => {
+    const sessions: BaseSessionMetadata[] = [
+      {
+        sessionId: "invalid-date",
+        workspaceDirectory: "/test",
+        dateCreated: "not-a-date",
+        title: "Broken metadata",
+      },
+    ];
+
+    const { lastFrame } = render(
+      <SessionSelector
+        sessions={sessions}
+        onSelect={mockOnSelect}
+        onExit={mockOnExit}
+      />,
+    );
+
+    expect(lastFrame()).toContain("unknown date");
   });
 });

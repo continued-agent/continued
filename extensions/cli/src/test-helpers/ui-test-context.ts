@@ -91,6 +91,7 @@ export function createUITestContext(
     handleInterrupt: vi.fn(),
     handleFileAttached: vi.fn(),
     resetChatHistory: vi.fn(),
+    loadSelectedSession: vi.fn().mockResolvedValue(true),
   });
 
   // Mock service container
