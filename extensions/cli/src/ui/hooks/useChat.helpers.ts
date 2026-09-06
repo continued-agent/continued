@@ -44,6 +44,7 @@ interface ProcessSlashCommandResultOptions {
   chatHistory: ChatHistoryItem[];
   setChatHistory: React.Dispatch<React.SetStateAction<ChatHistoryItem[]>>;
   onShowConfigSelector: () => void;
+  onShowProviderSelector?: () => void;
   onShowModelSelector?: () => void;
   onShowUpdateSelector?: () => void;
   onShowMCPSelector?: () => void;
@@ -61,6 +62,7 @@ export function processSlashCommandResult({
   chatHistory,
   setChatHistory,
   onShowConfigSelector,
+  onShowProviderSelector,
   onShowUpdateSelector,
   onShowModelSelector,
   onShowMCPSelector,
@@ -85,6 +87,11 @@ export function processSlashCommandResult({
 
   if (result.openConfigSelector) {
     onShowConfigSelector();
+    return null;
+  }
+
+  if (result.openProviderSelector && onShowProviderSelector) {
+    onShowProviderSelector();
     return null;
   }
 

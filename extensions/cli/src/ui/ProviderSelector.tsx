@@ -76,18 +76,18 @@ export function ProviderSelector({
 
   if (options.length === 0) {
     return (
-      <Box flexDirection="column" paddingX={1}>
+      <Box flexDirection="column" paddingX={1} width="100%" minWidth={0}>
         <Text color="red">No model providers are available.</Text>
       </Box>
     );
   }
 
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Text bold color="blue">
+    <Box flexDirection="column" paddingX={1} width="100%" minWidth={0}>
+      <Text bold color="blue" wrap="truncate-end">
         Choose a model provider
       </Text>
-      <Text color="gray">
+      <Text color="gray" wrap="truncate-end">
         ↑/↓ to navigate, Enter to select, Esc to cancel ({selectedIndex + 1}/
         {options.length})
       </Text>
@@ -102,7 +102,11 @@ export function ProviderSelector({
         const isSelected = index + offset === selectedIndex;
         return (
           <Box key={option.id}>
-            <Text color={isSelected ? "blue" : "white"} bold={isSelected}>
+            <Text
+              color={isSelected ? "blue" : "white"}
+              bold={isSelected}
+              wrap="truncate-end"
+            >
               {isSelected ? "➤ " : "  "}
               {option.label}
             </Text>

@@ -54,6 +54,11 @@ export const SYSTEM_SLASH_COMMANDS: SystemCommand[] = [
     category: "system",
   },
   {
+    name: "connect",
+    description: "Connect a model provider",
+    category: "system",
+  },
+  {
     name: "mcp",
     description: "Manage MCP server connections",
     category: "system",

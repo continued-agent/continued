@@ -219,6 +219,30 @@ describe("ModelService", () => {
         index: 2,
       });
     });
+
+    test("should use the model identifier when a display name is absent", async () => {
+      const assistantWithoutDisplayName = {
+        ...mockAssistant,
+        models: [
+          {
+            provider: "openai",
+            model: "gpt-4.1-mini",
+            roles: ["chat"],
+          } as ModelConfig,
+        ],
+      };
+
+      vi.mocked(config.getLlmApi).mockReturnValue([
+        mockLlmApi as any,
+        assistantWithoutDisplayName.models![0] as ModelConfig,
+      ]);
+      await service.initialize(assistantWithoutDisplayName, mockAuthConfig);
+
+      expect(service.getAvailableChatModels()).toEqual([
+        { provider: "openai", name: "gpt-4.1-mini", index: 0 },
+      ]);
+      expect(service.getCurrentModelIndex()).toBe(0);
+    });
   });
 
   describe("getCurrentModelIndex()", () => {

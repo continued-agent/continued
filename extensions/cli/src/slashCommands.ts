@@ -265,6 +265,7 @@ const commandHandlers: Record<string, CommandHandler> = {
   config: () => {
     return { openConfigSelector: true };
   },
+  connect: () => ({ openProviderSelector: true }),
   info: handleInfoSlashCommand,
   model: () => ({ openModelSelector: true }),
   compact: () => {
