@@ -1,13 +1,12 @@
-import { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
+import type { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
 import { Box, Text } from "ink";
 import React, { useMemo } from "react";
 
 import { getDisplayableAsciiArt } from "../asciiArt.js";
-import { MCPService } from "../services/MCPService.js";
+import type { MCPService } from "../services/MCPService.js";
 import { isModelCapable } from "../utils/modelCapability.js";
 
 import { ModelCapabilityWarning } from "./ModelCapabilityWarning.js";
-import { TipsDisplay, shouldShowTip } from "./TipsDisplay.js";
 
 interface IntroMessageProps {
   config?: AssistantUnrolled;
@@ -31,9 +30,6 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
 }) => {
   // Get MCP prompts directly (not memoized since they can change after first render)
   const mcpPrompts = mcpService?.getState().prompts ?? [];
-
-  // Determine if we should show a tip (1 in 5 chance) - computed once on mount
-  const showTip = useMemo(() => shouldShowTip(), []);
 
   // Memoize expensive operations to avoid running on every resize
   const { allRules, modelCapable } = useMemo(() => {
@@ -92,13 +88,9 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
     ) : null;
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column">
       {/* ASCII Art */}
       <Text>{getDisplayableAsciiArt()}</Text>
-      <Text> </Text>
-
-      {/* Tips Display - shown randomly 1 in 5 times */}
-      {showTip && <TipsDisplay />}
 
       {/* Organization name */}
       {organizationName && (
@@ -125,8 +117,6 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
           <Text bold>Model:</Text> <Text color="dim">Loading...</Text>
         </Text>
       )}
-
-      <Text> </Text>
 
       {/* Model capability warning */}
       {model && !modelCapable && (

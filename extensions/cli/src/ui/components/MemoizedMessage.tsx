@@ -164,7 +164,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     const isStreaming = isAssistant && !message.content && !toolCallStates;
 
     return (
-      <Box key={index} marginBottom={1} paddingX={1}>
+      <Box key={index} paddingX={2}>
         <Text color={isUser ? "blue" : "white"}>{hideBullet ? " " : "●"}</Text>
         <Text> </Text>
         {isUser ? (

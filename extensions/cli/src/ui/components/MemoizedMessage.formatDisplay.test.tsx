@@ -1,13 +1,20 @@
 import { Box } from "ink";
 import { render } from "ink-testing-library";
 import React from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type {
   ChatHistoryItem,
   MessageContent,
   MessagePart,
 } from "../../../../../core/index.js";
+
+vi.mock("src/tools/ToolCallTitle.js", () => ({
+  ToolCallTitle: () => null,
+}));
+vi.mock("../ToolResultSummary.js", () => ({
+  ToolResultSummary: () => null,
+}));
 
 import { MemoizedMessage } from "./MemoizedMessage.js";
 
@@ -35,10 +42,37 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     const historyItem = createTestHistoryItem("Padded message");
 
     const { lastFrame } = render(
-      <MemoizedMessage item={historyItem} index={1} />,
+      <Box flexDirection="column" marginX={1}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
     );
 
-    expect(lastFrame()).toMatch(/^ /);
+    expect(lastFrame()).toMatch(/^ {3}● Padded message$/);
+  });
+
+  it("keeps consecutive chat messages on adjoining rows", () => {
+    const { lastFrame } = render(
+      <Box flexDirection="column" marginX={1}>
+        <MemoizedMessage item={createTestHistoryItem("salut")} index={0} />
+        <MemoizedMessage
+          item={{
+            message: {
+              role: "assistant",
+              content: "Salut! Comment puis-je vous aider aujourd'hui ?",
+            },
+            contextItems: [],
+          }}
+          index={1}
+        />
+      </Box>,
+    );
+
+    expect(lastFrame()).toBe(
+      [
+        "   ● salut",
+        "   ● Salut! Comment puis-je vous aider aujourd'hui ?",
+      ].join("\n"),
+    );
   });
 
   it("should wrap long messages inside the padded content width", () => {
