@@ -3,6 +3,7 @@ import React from "react";
 import { UpdateServiceState } from "src/services/types.js";
 
 import type { ChatHistoryItem } from "../../../../../core/index.js";
+import type { ProviderSetup } from "../../onboarding.js";
 import { ConfigSelector } from "../ConfigSelector.js";
 import type { NavigationScreen } from "../context/NavigationContext.js";
 import { DiffViewer } from "../DiffViewer.js";
@@ -14,6 +15,7 @@ import type {
 import { JobsSelector } from "../JobsSelector.js";
 import { MCPSelector } from "../MCPSelector.js";
 import { ModelSelector } from "../ModelSelector.js";
+import { ProviderConnectionScreen } from "../ProviderConnectionScreen.js";
 import type { ConfigOption, ModelOption } from "../types/selectorTypes.js";
 import { UpdateSelector } from "../UpdateSelector.js";
 
@@ -24,6 +26,7 @@ interface ScreenContentProps {
   isScreenActive: (screen: NavigationScreen) => boolean;
   services: any;
   handleConfigSelect: (config: ConfigOption) => Promise<void>;
+  handleProviderConnect: (setup: ProviderSetup) => Promise<void>;
   handleModelSelect: (model: ModelOption) => Promise<void>;
   handleSessionSelect: (sessionId: string) => Promise<void>;
   handleExportSession: (sessionId: string) => Promise<void>;
@@ -66,6 +69,7 @@ export const ScreenContent: React.FC<ScreenContentProps> = ({
   isScreenActive,
   services,
   handleConfigSelect,
+  handleProviderConnect,
   handleModelSelect,
   handleSessionSelect,
   handleExportSession,
@@ -95,6 +99,15 @@ export const ScreenContent: React.FC<ScreenContentProps> = ({
   }
 
   // Config selector
+  if (isScreenActive("provider")) {
+    return (
+      <ProviderConnectionScreen
+        onConnect={handleProviderConnect}
+        onCancel={closeCurrentScreen}
+      />
+    );
+  }
+
   if (isScreenActive("config")) {
     return (
       <ConfigSelector

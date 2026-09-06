@@ -25,6 +25,21 @@ describe("useChat clear command", () => {
     mockOnClear = vi.fn();
   });
 
+  it("opens the provider connection flow", () => {
+    const onShowProviderSelector = vi.fn();
+
+    processSlashCommandResult({
+      result: { openProviderSelector: true },
+      chatHistory: [],
+      setChatHistory: mockSetChatHistory,
+      onShowConfigSelector: vi.fn(),
+      onShowProviderSelector,
+    });
+
+    expect(onShowProviderSelector).toHaveBeenCalledOnce();
+    expect(mockSetChatHistory).not.toHaveBeenCalled();
+  });
+
   it("should call onClear callback when processing clear command", () => {
     const legacyHistory: ChatCompletionMessageParam[] = [
       { role: "system", content: "You are a helpful assistant" },

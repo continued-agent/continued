@@ -30,6 +30,7 @@ import { useNavigation } from "./context/NavigationContext.js";
 import { useChat } from "./hooks/useChat.js";
 import { useContextPercentage } from "./hooks/useContextPercentage.js";
 import { useMessageRenderer } from "./hooks/useMessageRenderer.js";
+import { useProviderConnection } from "./hooks/useProviderConnection.js";
 import { useIntroMessage, useSelectors } from "./hooks/useTUIChatHooks.js";
 
 interface TUIChatProps {
@@ -228,6 +229,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
     additionalRules,
     additionalPrompts,
     onShowConfigSelector: () => navigateToScreen("config"),
+    onShowProviderSelector: () => navigateToScreen("provider"),
     onShowModelSelector: () => navigateToScreen("model"),
     onShowMCPSelector: () => navigateToScreen("mcp"),
     onShowUpdateSelector: () => navigateToScreen("update"),
@@ -266,6 +268,20 @@ const TUIChat: React.FC<TUIChatProps> = ({
     handleClear,
     setStaticRefreshTrigger,
   );
+
+  const { handleProviderConnect } = useProviderConnection({
+    handleClear,
+    onClose: closeScreen,
+    onMessage: (message) => {
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          message: { role: "system", content: message.content },
+          contextItems: [],
+        },
+      ]);
+    },
+  });
 
   // Session selection handler
   const handleSessionSelect = useCallback(
@@ -381,6 +397,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
       isScreenActive={isScreenActive}
       services={services}
       handleConfigSelect={handleConfigSelect}
+      handleProviderConnect={handleProviderConnect}
       handleModelSelect={handleModelSelect}
       handleSessionSelect={handleSessionSelect}
       handleExportSession={handleExportSession}

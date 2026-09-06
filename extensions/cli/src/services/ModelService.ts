@@ -35,6 +35,13 @@ export class ModelService
     return ["auth", "config", "agentFile"];
   }
 
+  private getChatModels(assistant: AssistantUnrolled | null): ModelConfig[] {
+    return (assistant?.models?.filter(
+      (model) =>
+        model && (model.roles?.includes("chat") || model.roles === undefined),
+    ) || []) as ModelConfig[];
+  }
+
   /**
    * Initialize the model service
    */
@@ -51,10 +58,7 @@ export class ModelService
 
     this.assistant = assistant;
     this.authConfig = authConfig;
-    this.availableModels = (assistant.models?.filter(
-      (model) =>
-        model && (model.roles?.includes("chat") || model.roles === undefined),
-    ) || []) as ModelConfig[];
+    this.availableModels = this.getChatModels(assistant);
 
     let preferredModelName: string | null | undefined = null;
     let modelSource = "default";
@@ -144,7 +148,10 @@ export class ModelService
 
     return {
       provider: this.currentState.model.provider,
-      name: (this.currentState.model as any).name || "unnamed",
+      name:
+        (this.currentState.model as any).name ||
+        (this.currentState.model as any).model ||
+        "unnamed",
     };
   }
 
@@ -158,15 +165,13 @@ export class ModelService
   }> {
     // Get assistant from state to ensure we have the latest data
     const { assistant } = this.getState();
-    if (!assistant || !assistant.models) {
+    const chatModels =
+      this.availableModels.length > 0
+        ? this.availableModels
+        : this.getChatModels(assistant);
+    if (chatModels.length === 0) {
       return [];
     }
-
-    // Filter for chat models
-    const chatModels = (assistant.models.filter(
-      (model) =>
-        model && (model.roles?.includes("chat") || model.roles === undefined),
-    ) || []) as ModelConfig[];
 
     return chatModels.map((model, index) => ({
       provider: model.provider,
@@ -212,10 +217,7 @@ export class ModelService
     }
 
     // Get available models from assistant in state
-    const availableModels = (assistant.models?.filter(
-      (model) =>
-        model && (model.roles?.includes("chat") || model.roles === undefined),
-    ) || []) as ModelConfig[];
+    const availableModels = this.getChatModels(assistant);
 
     if (modelIndex < 0 || modelIndex >= availableModels.length) {
       throw new Error(
@@ -267,15 +269,20 @@ export class ModelService
     }
 
     // Get available models from state
-    const availableModels = (state.assistant.models?.filter(
-      (model) =>
-        model && (model.roles?.includes("chat") || model.roles === undefined),
-    ) || []) as ModelConfig[];
+    const availableModels =
+      this.availableModels.length > 0
+        ? this.availableModels
+        : this.getChatModels(state.assistant);
+
+    if (availableModels.length === 0) {
+      return -1;
+    }
 
     return availableModels.findIndex(
       (model) =>
         model.provider === state.model?.provider &&
-        (model as any).name === (state.model as any).name,
+        ((model as any).name || (model as any).model) ===
+          ((state.model as any).name || (state.model as any).model),
     );
   }
 
@@ -289,14 +296,14 @@ export class ModelService
     }
 
     // Get available models from state
-    const availableModels = (state.assistant.models?.filter(
-      (model) =>
-        model && (model.roles?.includes("chat") || model.roles === undefined),
-    ) || []) as ModelConfig[];
+    const availableModels =
+      this.availableModels.length > 0
+        ? this.availableModels
+        : this.getChatModels(state.assistant);
 
     return availableModels.findIndex((model) => {
-      const name = (model as any).name || (model as any).model;
-      const nameMatches = name === modelName;
+      const names = [(model as any).name, (model as any).model];
+      const nameMatches = names.includes(modelName);
 
       if (provider) {
         return nameMatches && model.provider === provider;

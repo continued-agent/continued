@@ -122,6 +122,12 @@ describe("slashCommands", () => {
       expect(result?.exit).toBeUndefined();
     });
 
+    it("should open the provider connection flow", async () => {
+      const result = await handleSlashCommands("/connect", mockAssistant);
+
+      expect(result).toEqual({ openProviderSelector: true });
+    });
+
     it("should handle /info command and show config info", async () => {
       const { services } = await import("./services/index.js");
 

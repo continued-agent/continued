@@ -115,6 +115,8 @@ interface UserInputProps {
   onShowEditSelector?: () => void;
 }
 
+const INPUT_CONTINUATION_INDENT = "  ";
+
 const UserInput: React.FC<UserInputProps> = ({
   onSubmit,
   isWaitingForResponse,
@@ -829,6 +831,8 @@ const UserInput: React.FC<UserInputProps> = ({
       return (
         <Box flexDirection="column">
           {lines.map((line, lineIndex) => {
+            const lineIndent = lineIndex > 0 ? INPUT_CONTINUATION_INDENT : "";
+
             if (lineIndex === cursorLine) {
               // Line with cursor
               const beforeCursor = line.slice(0, cursorCol);
@@ -837,6 +841,7 @@ const UserInput: React.FC<UserInputProps> = ({
 
               return (
                 <Text key={lineIndex}>
+                  {lineIndent}
                   {beforeCursor}
                   <Text inverse>{atCursor || " "}</Text>
                   {afterCursor}
@@ -844,7 +849,12 @@ const UserInput: React.FC<UserInputProps> = ({
               );
             } else {
               // Regular line - ensure empty lines still render
-              return <Text key={lineIndex}>{line || " "}</Text>;
+              return (
+                <Text key={lineIndex}>
+                  {lineIndent}
+                  {line || " "}
+                </Text>
+              );
             }
           })}
         </Box>
@@ -854,7 +864,10 @@ const UserInput: React.FC<UserInputProps> = ({
       return (
         <Box flexDirection="column">
           {inputText.split("\n").map((line, index) => (
-            <Text key={index}>{line || " "}</Text>
+            <Text key={index}>
+              {index > 0 ? INPUT_CONTINUATION_INDENT : ""}
+              {line || " "}
+            </Text>
           ))}
         </Box>
       );

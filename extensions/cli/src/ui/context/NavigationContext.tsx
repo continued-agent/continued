@@ -12,6 +12,7 @@ import React, {
  */
 export type NavigationScreen =
   | "chat" // Normal chat interface
+  | "provider" // Provider connection flow
   | "config" // Config selector
   | "model" // Model selector
   | "mcp" // MCP selector

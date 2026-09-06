@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from "react";
 
-import { services } from "../services/index.js";
+import {
+  SERVICE_NAMES,
+  serviceContainer,
+  services,
+} from "../services/index.js";
 
 import { Selector, SelectorOption } from "./Selector.js";
 
@@ -25,8 +29,21 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [currentModelIndex, setCurrentModelIndex] = useState<number>(-1);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadModels = async () => {
       try {
+        // The selector can be opened while the dependency graph is still
+        // settling. Wait for the model service instead of permanently
+        // displaying an empty list.
+        if (!services.model.isReady()) {
+          await serviceContainer.get(SERVICE_NAMES.MODEL);
+        }
+
+        if (cancelled) {
+          return;
+        }
+
         const availableModels = services.model.getAvailableChatModels();
         const currentIndex = services.model.getCurrentModelIndex();
 
@@ -38,22 +55,33 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
 
         const modelOptions: ModelOption[] = availableModels.map((model) => ({
           id: `${model.provider}-${model.name}-${model.index}`,
-          name: model.name,
+          name: `${model.provider}/${model.name}`,
           index: model.index,
           provider: model.provider,
         }));
 
+        const selectedIndex =
+          currentIndex >= 0 && currentIndex < modelOptions.length
+            ? currentIndex
+            : 0;
         setModels(modelOptions);
         setCurrentModelIndex(currentIndex);
-        setSelectedIndex(Math.max(0, currentIndex));
+        setSelectedIndex(selectedIndex);
         setLoading(false);
       } catch (err: any) {
+        if (cancelled) {
+          return;
+        }
         setError(err.message || "Failed to load models");
         setLoading(false);
       }
     };
 
-    loadModels();
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -65,9 +93,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       error={error}
       loadingMessage="Loading available models..."
       currentId={
-        currentModelIndex >= 0 && models[currentModelIndex]
-          ? models[currentModelIndex].id
-          : null
+        models.find((model) => model.index === currentModelIndex)?.id ?? null
       }
       onSelect={onSelect}
       onCancel={onCancel}

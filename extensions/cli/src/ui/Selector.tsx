@@ -76,12 +76,12 @@ export function Selector<T extends SelectorOption>({
 
   if (loading) {
     return (
-      <Box {...defaultBoxStyles("blue")}>
-        <Text color="blue" bold>
+      <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
+        <Text color="blue" bold wrap="truncate-end">
           {title}
         </Text>
         <Text> </Text>
-        <Text italic color="gray">
+        <Text italic color="gray" wrap="truncate-end">
           {loadingMessage}
         </Text>
       </Box>
@@ -90,11 +90,13 @@ export function Selector<T extends SelectorOption>({
 
   if (error) {
     return (
-      <Box {...defaultBoxStyles("blue")}>
+      <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
         <Text color="red" bold>
           Error
         </Text>
-        <Text color="red">{error}</Text>
+        <Text color="red" wrap="truncate-end">
+          {error}
+        </Text>
         <Text color="gray" dimColor>
           Press Esc to cancel
         </Text>
@@ -125,23 +127,25 @@ export function Selector<T extends SelectorOption>({
   );
 
   return (
-    <Box {...defaultBoxStyles("blue")}>
-      <Text color="blue" bold>
+    <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
+      <Text color="blue" bold wrap="truncate-end">
         {title}
       </Text>
-      <Box flexDirection="column" marginTop={1}>
+      <Box flexDirection="column" marginTop={1} width="100%" minWidth={0}>
         {options.map((option, index) => {
           const isSelected = index === selectedIndex;
           const isCurrent = currentId === option.id;
           const render = renderOption || defaultRenderOption;
 
           return (
-            <Box key={option.id}>{render(option, isSelected, isCurrent)}</Box>
+            <Box key={option.id} width="100%" minWidth={0}>
+              {render(option, isSelected, isCurrent)}
+            </Box>
           );
         })}
       </Box>
-      <Box marginTop={1}>
-        <Text color="gray" dimColor>
+      <Box marginTop={1} width="100%" minWidth={0}>
+        <Text color="gray" dimColor wrap="truncate-end">
           ↑/↓ to navigate, Enter to select, Esc to cancel
         </Text>
       </Box>
