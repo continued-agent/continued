@@ -487,7 +487,7 @@ async function loadConfigYaml(
 }
 
 /**
- * Loads an assistant by slug from the Continue platform
+ * Loads an assistant by slug from the Continued platform
  */
 async function loadAssistantSlug(
   slug: string,

@@ -410,9 +410,9 @@ const TUIChat: React.FC<TUIChatProps> = ({
   const isChatScreen = navState.currentScreen === "chat";
 
   return (
-    <Box flexDirection="column" height="100%" paddingX={1}>
+    <Box flexDirection="column" height="100%">
       {/* Main content area: transcript in chat, selector/overlay otherwise */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
+      <Box flexDirection="column" flexGrow={1} overflow="hidden" marginX={1}>
         {isChatScreen ? (
           <StaticChatContent
             showIntroMessage={showIntroMessage && !isRemoteMode}
@@ -432,7 +432,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
 
       {/* Chat controls stay fixed below the transcript */}
       {isChatScreen && (
-        <Box flexDirection="column" flexShrink={0}>
+        <Box flexDirection="column" flexShrink={0} marginX={1}>
           {/* Status */}
           <ActionStatus
             visible={isWaitingForResponse && !!responseStartTime}
@@ -455,7 +455,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
 
           {/* Temporary status message */}
           {statusMessage && (
-            <Box paddingX={1} paddingY={0}>
+            <Box paddingY={0}>
               <Text color="green">{statusMessage}</Text>
             </Box>
           )}

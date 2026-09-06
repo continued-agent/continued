@@ -36,7 +36,7 @@ export interface UpdateProviderModelOptions {
   prepend?: boolean;
 }
 
-// These model definitions are inlined copies of the corresponding Continue Hub
+// These model definitions are inlined copies of the corresponding Continued Hub
 // blocks (e.g. anthropic/claude-sonnet-4-6) that onboarding previously resolved
 // via `uses:` slugs. Since Hub/slug resolution has been removed, we reproduce
 // the exact block contents here, with `apiKey` substituted for the block's
@@ -81,7 +81,7 @@ function isManagedAnthropicModel(model: any): boolean {
 }
 
 /**
- * Adds or replaces one model in a Continue YAML configuration.
+ * Adds or replaces one model in a Continued YAML configuration.
  *
  * The updater deliberately stores the API-key reference, not the secret value.
  * Local secrets are resolved later from ~/.continue/.env or process.env.

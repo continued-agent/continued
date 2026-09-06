@@ -13,7 +13,7 @@ This file provides guidance to AI coding agents when working with code in this r
 
 ## Architecture Overview
 
-This is a CLI tool for Continue Dev that provides an interactive AI-assisted development experience. The architecture consists of:
+This is a CLI tool for Continued that provides an interactive AI-assisted development experience. The architecture consists of:
 
 ### Core Components
 
@@ -28,7 +28,7 @@ This is a CLI tool for Continue Dev that provides an interactive AI-assisted dev
    - `ensureAuth.ts`: Handles authentication flow
    - `workos.ts`: WorkOS configuration and token management
 
-3. **Continue SDK Integration** (`src/continueSDK.ts`): Initializes the Continue SDK client with:
+3. **Continued SDK Integration** (`src/continueSDK.ts`): Initializes the Continued SDK client with:
 
    - API key authentication
    - Assistant configuration (slug-based)

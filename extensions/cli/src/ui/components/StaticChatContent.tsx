@@ -149,8 +149,8 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
         key={staticKey}
         items={staticItems}
         style={{
-          // TUIChat reserves one column on each side. Keep static and pending
-          // message content at the same width so wrapping is consistent.
+          // The TUI content region reserves one column on each side. Keep
+          // static and pending message content at the same width.
           width: Math.max(columns - 2, 1),
           textWrap: "wrap",
         }}

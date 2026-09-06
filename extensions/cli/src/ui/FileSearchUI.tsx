@@ -46,7 +46,7 @@ const HighlightedText: React.FC<{ text: string; positions?: Set<number> }> = ({
 const FileSearchContainer: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => (
-  <Box paddingX={1} marginX={1} marginBottom={1} flexDirection="column">
+  <Box paddingX={1} marginBottom={1} flexDirection="column">
     <Box marginTop={1}>{children}</Box>
   </Box>
 );
@@ -157,7 +157,7 @@ const FileSearchUI: React.FC<FileSearchUIProps> = ({
   }
 
   return (
-    <Box paddingX={1} marginX={1} marginBottom={1} flexDirection="column">
+    <Box paddingX={1} marginBottom={1} flexDirection="column">
       {files.map((file, index) => {
         const isSelected = index === selectedIndex;
 

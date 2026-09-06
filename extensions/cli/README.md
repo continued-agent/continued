@@ -1,8 +1,8 @@
-# Continue CLI
+# Continued CLI
 
-The Continue CLI (`cn`) is a customizable command line coding agent.
+The Continued CLI (`cn`) is a customizable command line coding agent.
 
-![Continue CLI Demo](./media/demo.gif)
+![Continued CLI Demo](./media/demo.gif)
 
 ## Installation
 
@@ -59,7 +59,7 @@ credential chain and respects `AWS_REGION`, `AWS_DEFAULT_REGION`, and
 
 ### Startup artwork
 
-The interactive startup screen displays a compact, color-gradient Continue mark
+The interactive startup screen displays a compact, color-gradient Continued mark
 that fits comfortably in a standard 80-column terminal. On narrower terminals,
 it falls back to the version number to avoid wrapping the artwork.
 
@@ -96,7 +96,7 @@ cn -p "Write a README" --silent
 
 ### ACP Agent Mode
 
-`cn acp` runs Continue as an [Agent Client Protocol (ACP)](https://agentclientprotocol.com/)
+`cn acp` runs Continued as an [Agent Client Protocol (ACP)](https://agentclientprotocol.com/)
 Agent. An external editor or application acts as the ACP Client and sends
 `session/new`, `session/prompt`, and `session/cancel` messages over stdin. The
 transport is stdio with newline-delimited JSON (NDJSON): stdout contains only
@@ -113,14 +113,14 @@ ACP messages, while diagnostics are sent to stderr.
 }
 ```
 
-ACP is distinct from MCP: ACP connects an external client to Continue, while
-MCP connects Continue to tools and data sources. Continue currently accepts an
-empty `mcpServers` list from ACP clients; configured Continue MCP servers can
+ACP is distinct from MCP: ACP connects an external client to Continued, while
+MCP connects Continued to tools and data sources. Continued currently accepts an
+empty `mcpServers` list from ACP clients; configured Continued MCP servers can
 still be supplied with the existing `--mcp` option. Remote network access is
 not exposed by `cn acp`; use a runner, SSH, or an authenticated gateway.
 
 ACP sessions require an existing absolute `cwd`. Each session has isolated
-history, and turns are serialized because some Continue services are currently
+history, and turns are serialized because some Continued services are currently
 process-wide singletons. `additionalDirectories` and client-provided MCP
 servers are rejected explicitly until they can be supported without weakening
 workspace and permission controls. Tool policies (`--allow`, `--ask`,
@@ -151,7 +151,7 @@ cn ls --json
 
 ## Environment Variables
 
-- `CONTINUE_CLI_DISABLE_COMMIT_SIGNATURE`: Disable adding the Continue commit signature to generated commit messages
+- `CONTINUE_CLI_DISABLE_COMMIT_SIGNATURE`: Disable adding the Continued commit signature to generated commit messages
 - `CONTINUE_USE_BEDROCK=1`: Use a one-shot AWS Bedrock configuration without replacing the saved config
 - `FORCE_NO_TTY`: Force TTY-less mode, prevents stdin reading (useful for testing and automation)
 
@@ -159,11 +159,11 @@ cn ls --json
 
 - `cn`: Start an interactive chat session
 - `cn ls`: List recent sessions with TUI selector to choose one to resume
-- `cn login`: Authenticate with Continue
+- `cn login`: Authenticate with Continued
 - `cn logout`: Sign out of current session
 - `cn remote`: Launch a remote instance
 - `cn serve`: Start HTTP server mode
-- `cn acp`: Run Continue as an ACP Agent over stdio
+- `cn acp`: Run Continued as an ACP Agent over stdio
 
 ### Session Listing (`cn ls`)
 

@@ -42,7 +42,7 @@ describe("TUIChat - Tool Permission Tests", () => {
     expect(frame).toContain("Would you like to continue?");
     expect(frame).toContain("Continue");
     expect(frame).toContain("Continue + don't ask again");
-    expect(frame).toContain("No, and tell Continue what to do differently");
+    expect(frame).toContain("No, and tell Continued what to do differently");
     expect(frame).toContain("(tab)");
     expect(frame).toContain("(shift+tab)");
     expect(frame).toContain("(esc)");
@@ -200,7 +200,7 @@ describe("TUIChat - Tool Permission Tests", () => {
     );
   });
 
-  it("shows the new 'No, and tell Continue what to do differently' option in the UI", async () => {
+  it("shows the new 'No, and tell Continued what to do differently' option in the UI", async () => {
     const handleResponse = vi.fn();
 
     const { lastFrame } = render(
@@ -220,12 +220,12 @@ describe("TUIChat - Tool Permission Tests", () => {
 
     // Verify the new option exists in the rendered output
     const frame = lastFrame();
-    expect(frame).toContain("No, and tell Continue what to do differently");
+    expect(frame).toContain("No, and tell Continued what to do differently");
 
     // Verify all 3 options are present
     expect(frame).toContain("Continue");
     expect(frame).toContain("Continue + don't ask again");
-    expect(frame).toContain("No, and tell Continue what to do differently");
+    expect(frame).toContain("No, and tell Continued what to do differently");
     // Verify old Cancel option is not shown
     expect(frame).not.toContain("Cancel");
   });
@@ -249,7 +249,7 @@ describe("TUIChat - Tool Permission Tests", () => {
 
     await vi.advanceTimersByTimeAsync(50);
 
-    // Press escape key to trigger the "No, and tell Continue what to do differently" option
+    // Press escape key to trigger the "No, and tell Continued what to do differently" option
     stdin.write("\x1b"); // ESC key
 
     await vi.advanceTimersByTimeAsync(50);
@@ -281,7 +281,7 @@ describe("TUIChat - Tool Permission Tests", () => {
 
     await vi.advanceTimersByTimeAsync(50);
 
-    // Press 'n' key to trigger the "No, and tell Continue what to do differently" option
+    // Press 'n' key to trigger the "No, and tell Continued what to do differently" option
     stdin.write("n");
 
     await vi.advanceTimersByTimeAsync(50);

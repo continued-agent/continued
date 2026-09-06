@@ -92,7 +92,7 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
     ) : null;
 
   return (
-    <Box flexDirection="column" paddingX={1} paddingY={1}>
+    <Box flexDirection="column" marginBottom={1}>
       {/* ASCII Art */}
       <Text>{getDisplayableAsciiArt()}</Text>
       <Text> </Text>

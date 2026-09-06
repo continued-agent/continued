@@ -15,7 +15,7 @@ const CONTINUE_API_KEY = process.env.CONTINUE_API_KEY;
 const SMOKE_PROXY_MODEL = process.env.SMOKE_PROXY_MODEL;
 
 describe.skipIf(!CONTINUE_API_KEY || !SMOKE_PROXY_MODEL)(
-  "Smoke: Headless → real Continue proxy",
+  "Smoke: Headless → real Continued proxy",
   () => {
     let ctx: SmokeTestContext;
 
