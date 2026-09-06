@@ -59,7 +59,7 @@ class URLContextProvider extends BaseContextProvider {
     query: string,
     extras: ContextProviderExtras,
   ): Promise<ContextItem[]> {
-    return await getUrlContextItems(query, extras.fetch);
+    return await getUrlContextItems(query, extras.fetch, extras.fetchPublic);
   }
 }
 
@@ -68,6 +68,7 @@ export default URLContextProvider;
 export async function getUrlContextItems(
   query: string,
   fetchFn: FetchFunction,
+  publicFetchFn: FetchFunction = fetchFn,
 ): Promise<ContextItem[]> {
   const url = new URL(query);
   if (isBlockedUrl(url)) {
@@ -77,9 +78,9 @@ export async function getUrlContextItems(
   }
 
   const safeFetchFn: FetchFunction = (input, init) =>
-    fetchPublicUrl(fetchFn, input, init);
+    fetchPublicUrl(publicFetchFn, input, init);
   const icon = await fetchFavicon(url, safeFetchFn);
-  const resp = await fetchPublicUrl(fetchFn, url);
+  const resp = await fetchPublicUrl(publicFetchFn, url);
 
   // Check if the response is not OK
   if (!resp.ok) {

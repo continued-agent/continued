@@ -27,6 +27,8 @@ export interface UseChatProps {
   // Remote mode props
   isRemoteMode?: boolean;
   remoteUrl?: string;
+  /** Explicit bearer token for a non-loopback `cn serve` endpoint. */
+  remoteToken?: string;
   onShowDiff?: (diffContent: string) => void;
   onShowStatusMessage?: (message: string) => void;
 }

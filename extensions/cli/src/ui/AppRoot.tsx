@@ -5,6 +5,7 @@ import { TUIChat } from "./TUIChat.js";
 
 interface AppRootProps {
   remoteUrl?: string;
+  remoteToken?: string;
   configPath?: string;
   initialPrompt?: string;
   resume?: boolean;

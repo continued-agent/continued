@@ -167,5 +167,9 @@ Messages in the chat history can have different types:
 ## Security Considerations
 
 - Server binds to `127.0.0.1` (localhost only)
-- No authentication implemented (local use only)
+- Every endpoint requires `Authorization: Bearer <token>`; use `--token` or
+  `CONTINUE_SERVE_TOKEN`, or read the generated per-process token from stderr
+- Remote clients must send the same token in the header; never put it in the URL
+- Project environment install scripts are disabled unless
+  `--allow-environment-install` is explicitly supplied
 - File system access through tool execution

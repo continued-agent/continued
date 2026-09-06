@@ -1,12 +1,12 @@
-import { exec, execSync } from "child_process";
 import * as fs from "fs";
+import { execFile, execFileSync } from "node:child_process";
 import * as os from "os";
 import * as path from "path";
 import { promisify } from "util";
 
 import { logger } from "../../util/logger.js";
 
-const execAsync = promisify(exec);
+const execAsync = promisify(execFile);
 
 /**
  * Create a git worktree that mirrors the user's current working tree state.
@@ -17,17 +17,17 @@ export async function createWorktree(index: number): Promise<string> {
   const worktreePath = path.join(tmpDir, `cn-review-${Date.now()}-${index}`);
 
   // Create the worktree at HEAD (detached)
-  await execAsync(`git worktree add "${worktreePath}" HEAD --detach`);
+  await execAsync("git", ["worktree", "add", worktreePath, "HEAD", "--detach"]);
 
   // Apply uncommitted changes (staged + unstaged) to the worktree
   try {
-    const { stdout: diff } = await execAsync("git diff HEAD", {
+    const { stdout: diff } = await execAsync("git", ["diff", "HEAD"], {
       maxBuffer: 10 * 1024 * 1024,
     });
     if (diff.trim()) {
       // execAsync (promisified exec) doesn't support `input`, use execSync for apply.
       // This is fine: the apply targets the isolated worktree, so it won't contend.
-      execSync(`git -C "${worktreePath}" apply --allow-empty -`, {
+      execFileSync("git", ["-C", worktreePath, "apply", "--allow-empty", "-"], {
         input: diff,
         stdio: ["pipe", "pipe", "pipe"],
       });
@@ -40,9 +40,11 @@ export async function createWorktree(index: number): Promise<string> {
 
   // Copy untracked files to the worktree
   try {
-    const { stdout: untrackedOutput } = await execAsync(
-      "git ls-files --others --exclude-standard",
-    );
+    const { stdout: untrackedOutput } = await execAsync("git", [
+      "ls-files",
+      "--others",
+      "--exclude-standard",
+    ]);
 
     if (untrackedOutput.trim()) {
       const untrackedFiles = untrackedOutput.trim().split("\n");
@@ -66,10 +68,16 @@ export async function createWorktree(index: number): Promise<string> {
   }
 
   // Commit the initial state so captureWorktreeDiff only captures agent changes
-  await execAsync(`git -C "${worktreePath}" add -A`);
-  await execAsync(
-    `git -C "${worktreePath}" commit -m "cn-review: user working tree state (staged + unstaged + untracked)" --allow-empty --no-verify`,
-  );
+  await execAsync("git", ["-C", worktreePath, "add", "-A"]);
+  await execAsync("git", [
+    "-C",
+    worktreePath,
+    "commit",
+    "-m",
+    "cn-review: user working tree state (staged + unstaged + untracked)",
+    "--allow-empty",
+    "--no-verify",
+  ]);
 
   return worktreePath;
 }
@@ -81,10 +89,10 @@ export async function createWorktree(index: number): Promise<string> {
 export function captureWorktreeDiff(worktreePath: string): string {
   try {
     // Add all new files so they show up in the diff
-    execSync(`git -C "${worktreePath}" add -A`, {
+    execFileSync("git", ["-C", worktreePath, "add", "-A"], {
       stdio: ["pipe", "pipe", "pipe"],
     });
-    return execSync(`git -C "${worktreePath}" diff --cached`, {
+    return execFileSync("git", ["-C", worktreePath, "diff", "--cached"], {
       encoding: "utf-8",
       maxBuffer: 10 * 1024 * 1024,
       stdio: ["pipe", "pipe", "pipe"],
@@ -99,7 +107,7 @@ export function captureWorktreeDiff(worktreePath: string): string {
  */
 export async function cleanupWorktree(worktreePath: string): Promise<void> {
   try {
-    await execAsync(`git worktree remove "${worktreePath}" --force`);
+    await execAsync("git", ["worktree", "remove", worktreePath, "--force"]);
   } catch (e) {
     logger.debug("Could not remove worktree, attempting manual cleanup", {
       worktreePath,
@@ -108,7 +116,7 @@ export async function cleanupWorktree(worktreePath: string): Promise<void> {
     // Manual cleanup as fallback
     try {
       fs.rmSync(worktreePath, { recursive: true, force: true });
-      await execAsync("git worktree prune");
+      await execAsync("git", ["worktree", "prune"]);
     } catch {
       // Best effort
     }

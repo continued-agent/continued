@@ -24,6 +24,8 @@ export interface ReviewOptions extends ExtendedCommandOptions {
   patch?: boolean;
   failFast?: boolean;
   reviewAgents?: string[];
+  /** Explicitly trust local review instruction files in the repository */
+  trustLocalReviews?: boolean;
 }
 
 /**
@@ -294,7 +296,9 @@ export async function review(options: ReviewOptions = {}): Promise<void> {
   rerender();
 
   // Step 2: Resolve reviews
-  const reviews = await resolveReviews(options.reviewAgents);
+  const reviews = await resolveReviews(options.reviewAgents, {
+    trustLocalReviews: options.trustLocalReviews,
+  });
 
   if (reviews.length === 0) {
     unmountUI();

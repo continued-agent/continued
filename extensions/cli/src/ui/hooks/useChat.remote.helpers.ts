@@ -2,6 +2,7 @@ import type { ChatHistoryItem } from "core/index.js";
 
 import { services } from "../../services/index.js";
 import { logger } from "../../util/logger.js";
+import { fetchServe } from "../../util/serveClient.js";
 
 import { RemoteServerState } from "./useChat.types.js";
 
@@ -18,9 +19,10 @@ function historiesEqual(a: ChatHistoryItem[], b: ChatHistoryItem[]): boolean {
  */
 async function pollRemoteServerState(
   remoteUrl: string,
+  remoteToken?: string,
 ): Promise<RemoteServerState | null> {
   try {
-    const response = await fetch(`${remoteUrl}/state`);
+    const response = await fetchServe(`${remoteUrl}/state`, {}, remoteToken);
     if (!response.ok) {
       throw new Error(`Failed to fetch state: ${response.statusText}`);
     }
@@ -33,6 +35,7 @@ async function pollRemoteServerState(
 
 interface SetupRemotePollingOptions {
   remoteUrl: string;
+  remoteToken?: string;
   setIsWaitingForResponse: React.Dispatch<React.SetStateAction<boolean>>;
   responseStartTime: number | null;
   setResponseStartTime: React.Dispatch<React.SetStateAction<number | null>>;
@@ -43,6 +46,7 @@ interface SetupRemotePollingOptions {
  */
 export function setupRemotePolling({
   remoteUrl,
+  remoteToken,
   setIsWaitingForResponse,
   responseStartTime,
   setResponseStartTime,
@@ -56,7 +60,7 @@ export function setupRemotePolling({
     isPolling = true;
 
     try {
-      const state = await pollRemoteServerState(remoteUrl);
+      const state = await pollRemoteServerState(remoteUrl, remoteToken);
       if (state && isMounted) {
         updateStateFromRemote({
           state,
@@ -133,11 +137,14 @@ function updateStateFromRemote({
 export async function handleRemoteExit(
   remoteUrl: string,
   exit: () => void,
+  remoteToken?: string,
 ): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/exit`, {
-      method: "POST",
-    });
+    const response = await fetchServe(
+      `${remoteUrl}/exit`,
+      { method: "POST" },
+      remoteToken,
+    );
 
     if (response.ok) {
       try {
@@ -170,6 +177,7 @@ export async function handleRemoteExit(
 interface HandleRemoteMessageOptions {
   remoteUrl: string;
   messageContent: string;
+  remoteToken?: string;
 }
 
 /**
@@ -178,15 +186,20 @@ interface HandleRemoteMessageOptions {
 export async function handleRemoteMessage({
   remoteUrl,
   messageContent,
+  remoteToken,
 }: HandleRemoteMessageOptions): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/message`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
+    const response = await fetchServe(
+      `${remoteUrl}/message`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: messageContent }),
       },
-      body: JSON.stringify({ message: messageContent }),
-    });
+      remoteToken,
+    );
 
     if (!response.ok) {
       const error = await response.json();
@@ -210,9 +223,12 @@ export async function handleRemoteMessage({
 /**
  * Handle /diff command in remote mode
  */
-export async function handleRemoteDiff(remoteUrl: string): Promise<void> {
+export async function handleRemoteDiff(
+  remoteUrl: string,
+  remoteToken?: string,
+): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/diff`);
+    const response = await fetchServe(`${remoteUrl}/diff`, {}, remoteToken);
     if (!response.ok) {
       throw new Error(`Failed to fetch diff: ${response.statusText}`);
     }
@@ -243,9 +259,12 @@ export async function handleRemoteDiff(remoteUrl: string): Promise<void> {
 /**
  * Handle /apply command in remote mode
  */
-export async function handleRemoteApply(remoteUrl: string): Promise<void> {
+export async function handleRemoteApply(
+  remoteUrl: string,
+  remoteToken?: string,
+): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/diff`);
+    const response = await fetchServe(`${remoteUrl}/diff`, {}, remoteToken);
     if (!response.ok) {
       throw new Error(`Failed to fetch diff: ${response.statusText}`);
     }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getDefaultToolPolicies } from "./defaultPolicies.js";
+import {
+  getDefaultToolPolicies,
+  REVIEW_MODE_POLICIES,
+} from "./defaultPolicies.js";
+import { checkToolPermission } from "./permissionChecker.js";
 const DEFAULT_TOOL_POLICIES = getDefaultToolPolicies();
 
 describe("defaultPolicies", () => {
@@ -61,5 +65,30 @@ describe("defaultPolicies", () => {
       (p) => p.tool === "*",
     );
     expect(catchAllIndex).toBe(DEFAULT_TOOL_POLICIES.length - 1);
+  });
+
+  it("should exclude command execution and external tools in review mode", () => {
+    expect(REVIEW_MODE_POLICIES).toContainEqual({
+      tool: "Read",
+      permission: "allow",
+    });
+    expect(
+      checkToolPermission(
+        { name: "Bash", arguments: {} },
+        { policies: REVIEW_MODE_POLICIES },
+      ).permission,
+    ).toBe("exclude");
+    expect(REVIEW_MODE_POLICIES).not.toContainEqual({
+      tool: "Status",
+      permission: "allow",
+    });
+    expect(REVIEW_MODE_POLICIES).not.toContainEqual({
+      tool: "CheckBackgroundJob",
+      permission: "allow",
+    });
+    expect(REVIEW_MODE_POLICIES.at(-1)).toEqual({
+      tool: "*",
+      permission: "exclude",
+    });
   });
 });

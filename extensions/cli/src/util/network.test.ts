@@ -1,3 +1,4 @@
+import { fetchPublicUrl } from "@continuedev/fetch";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -5,6 +6,17 @@ import {
   isPrivateNetworkAddress,
   safeFetch,
 } from "./network.js";
+
+vi.mock("@continuedev/fetch", async () => {
+  const actual =
+    await vi.importActual<typeof import("@continuedev/fetch")>(
+      "@continuedev/fetch",
+    );
+  return {
+    ...actual,
+    fetchPublicUrl: vi.fn(),
+  };
+});
 
 describe("network URL validation", () => {
   it.each([
@@ -23,15 +35,9 @@ describe("network URL validation", () => {
   });
 
   it("rejects local destinations before invoking fetch", async () => {
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValue({} as Response);
-
     await expect(
       assertSafeFetchUrl("http://127.0.0.1:8080/state"),
     ).rejects.toThrow("private or local");
-    expect(fetchMock).not.toHaveBeenCalled();
-    fetchMock.mockRestore();
   });
 
   it("rejects non-HTTP schemes", async () => {
@@ -41,15 +47,15 @@ describe("network URL validation", () => {
   });
 
   it("does not follow a redirect to a private address", async () => {
-    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+    const fetchMock = vi.mocked(fetchPublicUrl).mockResolvedValueOnce({
       status: 302,
       headers: new Headers({ location: "http://127.0.0.1/admin" }),
-    } as Response);
+    } as any);
 
     await expect(safeFetch("http://8.8.8.8/resource")).rejects.toThrow(
       "private or local",
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    fetchMock.mockRestore();
+    fetchMock.mockReset();
   });
 });

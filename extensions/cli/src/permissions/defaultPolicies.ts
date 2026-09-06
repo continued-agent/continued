@@ -69,3 +69,13 @@ export const PLAN_MODE_POLICIES: ToolPermissionPolicy[] = [
 export const AUTO_MODE_POLICIES: ToolPermissionPolicy[] = [
   { tool: "*", permission: "allow" },
 ];
+
+// Review mode: allow only read-only built-in tools. In particular, do not allow
+// Bash, network access, MCP tools, or writes from untrusted review instructions.
+export const REVIEW_MODE_POLICIES: ToolPermissionPolicy[] = [
+  { tool: "Read", permission: "allow" },
+  { tool: "List", permission: "allow" },
+  { tool: "Search", permission: "allow" },
+  { tool: "Diff", permission: "allow" },
+  { tool: "*", permission: "exclude" },
+];

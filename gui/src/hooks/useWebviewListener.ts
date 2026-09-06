@@ -2,6 +2,7 @@ import type { ToWebviewProtocol } from "core/protocol/index.js";
 import { Message } from "core/protocol/messenger";
 import { useContext, useEffect } from "react";
 import { IdeMessengerContext } from "../context/IdeMessenger";
+import { isTrustedWebviewMessageEvent } from "../util/webviewMessageSecurity";
 
 export function useWebviewListener<T extends keyof ToWebviewProtocol>(
   messageType: T,
@@ -13,13 +14,16 @@ export function useWebviewListener<T extends keyof ToWebviewProtocol>(
 
   useEffect(
     () => {
-      let listener: (event: {
-        data: Message<ToWebviewProtocol[T][0]>;
-      }) => Promise<void>;
+      let listener: (
+        event: MessageEvent<Message<ToWebviewProtocol[T][0]>>,
+      ) => Promise<void>;
 
       if (!skip) {
         listener = async (event) => {
-          if (event.data.messageType === messageType) {
+          if (
+            isTrustedWebviewMessageEvent(event) &&
+            event.data?.messageType === messageType
+          ) {
             const result = await handler(event.data.data);
             ideMessenger.respond(messageType, result, event.data.messageId);
           }

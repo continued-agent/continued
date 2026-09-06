@@ -7,10 +7,14 @@ import {
 
 import patchedFetch from "./node-fetch-patch.js";
 
-import { fetchwithRequestOptions } from "./fetch.js";
+import { fetchPublicUrl, fetchwithRequestOptions } from "./fetch.js";
+import { assertPublicUrl, isPrivateNetworkAddress } from "./networkSecurity.js";
 
 export {
   fetchwithRequestOptions,
+  fetchPublicUrl,
+  assertPublicUrl,
+  isPrivateNetworkAddress,
   patchedFetch,
   streamJSON,
   streamResponse,

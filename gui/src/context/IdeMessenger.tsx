@@ -16,6 +16,7 @@ import {
 import { createContext } from "react";
 import { v4 as uuidv4 } from "uuid";
 import { isJetBrains } from "../util";
+import { isTrustedWebviewMessageEvent } from "../util/webviewMessageSecurity";
 
 interface vscode {
   postMessage(message: any): vscode;
@@ -151,7 +152,10 @@ export class IdeMessenger implements IIdeMessenger {
 
     return new Promise((resolve) => {
       const handler = (event: any) => {
-        if (event.data.messageId === messageId) {
+        if (
+          isTrustedWebviewMessageEvent(event) &&
+          event.data?.messageId === messageId
+        ) {
           window.removeEventListener("message", handler);
           resolve(event.data.data as WebviewSingleMessage<T>);
         }
@@ -191,10 +195,13 @@ export class IdeMessenger implements IIdeMessenger {
 
     // This handler receieves individual WebviewMessengerResults
     // And pushes them to buffer
-    const handler = (event: {
-      data: Message<WebviewProtocolGeneratorMessage<T>>;
-    }) => {
-      if (event.data.messageId === messageId) {
+    const handler = (
+      event: MessageEvent<Message<WebviewProtocolGeneratorMessage<T>>>,
+    ) => {
+      if (
+        isTrustedWebviewMessageEvent(event) &&
+        event.data?.messageId === messageId
+      ) {
         const responseData = event.data.data;
         if ("error" in responseData) {
           error = responseData.error;

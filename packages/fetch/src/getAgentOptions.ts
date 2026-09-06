@@ -1,11 +1,13 @@
 import { RequestOptions } from "@continuedev/config-types";
 import { CertsCache, getCertificateContent } from "./certs.js";
+import { publicDnsLookup } from "./networkSecurity.js";
 
 /**
  * Prepares agent options based on request options and certificates
  */
 export async function getAgentOptions(
   requestOptions?: RequestOptions,
+  networkOptions?: { rejectPrivateNetworks?: boolean },
 ): Promise<{
   [key: string]: any;
 }> {
@@ -22,6 +24,10 @@ export async function getAgentOptions(
     sessionTimeout: timeout,
     keepAlive: true,
   };
+
+  if (networkOptions?.rejectPrivateNetworks) {
+    agentOptions.lookup = publicDnsLookup;
+  }
 
   // Handle ClientCertificateOptions
   if (requestOptions?.clientCertificate) {

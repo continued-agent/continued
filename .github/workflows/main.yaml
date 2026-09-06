@@ -11,6 +11,9 @@ on:
         required: true
         default: "false"
 
+permissions:
+  contents: read
+
 jobs:
   check_release_name:
     runs-on: ubuntu-latest
@@ -32,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0 # This ensures all tags are fetched
 
@@ -84,11 +87,11 @@ jobs:
             arch: arm64
             npm_config_arch: arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version-file: ".nvmrc"
 
@@ -98,10 +101,10 @@ jobs:
           arch: ${{ matrix.arch }}
           npm_config_arch: ${{ matrix.npm_config_arch }}
           pre-release: false
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
 
       - name: Upload .vsix artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-vsix
           path: "extensions/vscode/*.vsix"
@@ -115,7 +118,7 @@ jobs:
       - build
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Git
         run: |
@@ -123,19 +126,19 @@ jobs:
           git config --local user.name "GitHub Action"
 
       # Download the .vsix artifacts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: "*-vsix"
           path: vsix-artifacts
           merge-multiple: true
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ github.ref_name }}
           files: |
             vsix-artifacts/*.vsix
-          token: ${{ secrets.CI_GITHUB_TOKEN }}
+          token: ${{ github.token }}
           repository: continuedev/continue
 
   publish:
@@ -144,11 +147,11 @@ jobs:
       - build
     if: github.event_name == 'release' && github.event.inputs.publish_build != 'false'
     permissions:
-      contents: write
+      contents: read
     steps:
       # 0. Setup git
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Git
         run: |
@@ -161,7 +164,7 @@ jobs:
         run: git fetch origin "$RELEASE_REF" && git checkout -- "$RELEASE_REF"
 
       # 1. Download the artifacts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
           pattern: "*-vsix"
           path: vsix-artifacts

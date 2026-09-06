@@ -52,7 +52,9 @@ describe("resolveReviews local discovery", () => {
       return [];
     }) as typeof fs.readdirSync);
 
-    const reviews = await resolveReviews();
+    const reviews = await resolveReviews(undefined, {
+      trustLocalReviews: true,
+    });
     expect(reviews).toHaveLength(2);
     expect(reviews[0].name).toBe("security review");
     expect(reviews[0].sourceType).toBe("local");
@@ -70,7 +72,9 @@ describe("resolveReviews local discovery", () => {
       return [];
     }) as typeof fs.readdirSync);
 
-    const reviews = await resolveReviews();
+    const reviews = await resolveReviews(undefined, {
+      trustLocalReviews: true,
+    });
     expect(reviews).toHaveLength(1);
     expect(reviews[0].name).toBe("anti slop");
     expect(reviews[0].source).toContain("checks");
@@ -89,7 +93,9 @@ describe("resolveReviews local discovery", () => {
       return [];
     }) as typeof fs.readdirSync);
 
-    const reviews = await resolveReviews();
+    const reviews = await resolveReviews(undefined, {
+      trustLocalReviews: true,
+    });
     // agents/security-review.md, agents/shared.md, checks/anti-slop.md
     // checks/shared.md is skipped (duplicate filename, agents/ takes precedence)
     expect(reviews).toHaveLength(3);
@@ -105,7 +111,9 @@ describe("resolveReviews local discovery", () => {
 
   it("returns empty array when neither directory exists", async () => {
     vi.mocked(fs.existsSync).mockReturnValue(false);
-    const reviews = await resolveReviews();
+    const reviews = await resolveReviews(undefined, {
+      trustLocalReviews: true,
+    });
     expect(reviews).toHaveLength(0);
   });
 
@@ -115,7 +123,18 @@ describe("resolveReviews local discovery", () => {
       throw new Error("Permission denied");
     });
 
-    const reviews = await resolveReviews();
+    const reviews = await resolveReviews(undefined, {
+      trustLocalReviews: true,
+    });
     expect(reviews).toHaveLength(0);
+  });
+
+  it("does not discover repository review instructions by default", async () => {
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const reviews = await resolveReviews();
+
+    expect(reviews).toHaveLength(0);
+    expect(fs.readdirSync).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,4 @@
-import { fetchwithRequestOptions } from "@continuedev/fetch";
+import { fetchPublicUrl, fetchwithRequestOptions } from "@continuedev/fetch";
 import * as URI from "uri-js";
 import { v4 as uuidv4 } from "uuid";
 
@@ -1413,6 +1413,8 @@ export class Core {
           // Important note: context providers fetch uses global request options not LLM request options
           // Because LLM calls are handled separately
           fetchwithRequestOptions(url, init, config.requestOptions),
+        fetchPublic: (url, init) =>
+          fetchPublicUrl(url, init, config.requestOptions),
         isInAgentMode: msg.data.isInAgentMode,
       });
 

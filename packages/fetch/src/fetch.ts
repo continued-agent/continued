@@ -4,6 +4,7 @@ import { HttpProxyAgent } from "http-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { BodyInit, RequestInit, Response } from "node-fetch";
 import { getAgentOptions } from "./getAgentOptions.js";
+import { assertPublicUrl } from "./networkSecurity.js";
 import patchedFetch from "./node-fetch-patch.js";
 import { getProxy, shouldBypassProxy } from "./util.js";
 
@@ -83,16 +84,22 @@ export async function fetchwithRequestOptions(
   url_: URL | string,
   init?: RequestInit,
   requestOptions?: RequestOptions,
+  networkOptions?: {
+    rejectPrivateNetworks?: boolean;
+    disableProxy?: boolean;
+  },
 ): Promise<Response> {
   const url = typeof url_ === "string" ? new URL(url_) : url_;
   if (url.host === "localhost") {
     url.host = "127.0.0.1";
   }
 
-  const agentOptions = await getAgentOptions(requestOptions);
+  const agentOptions = await getAgentOptions(requestOptions, networkOptions);
 
   // Get proxy from options or environment variables
-  const proxy = getProxy(url.protocol, requestOptions);
+  const proxy = networkOptions?.disableProxy
+    ? undefined
+    : getProxy(url.protocol, requestOptions);
 
   // Check if should bypass proxy based on requestOptions or NO_PROXY env var
   const shouldBypass = shouldBypassProxy(url.hostname, requestOptions);
@@ -200,4 +207,22 @@ export async function fetchwithRequestOptions(
     }
     throw error;
   }
+}
+
+/**
+ * Fetch a public URL while validating its destination and pinning DNS lookups
+ * to the address used to establish the connection.
+ */
+export async function fetchPublicUrl(
+  url: URL | string,
+  init?: RequestInit,
+  requestOptions?: RequestOptions,
+): Promise<Response> {
+  const publicUrl = await assertPublicUrl(url);
+  return fetchwithRequestOptions(
+    publicUrl,
+    { ...init, redirect: "manual" },
+    requestOptions,
+    { rejectPrivateNetworks: true, disableProxy: true },
+  );
 }

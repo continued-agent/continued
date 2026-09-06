@@ -12,11 +12,11 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: ".nvmrc"
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: core/node_modules
         key: ${{ runner.os }}-core-node-modules-${{ hashFiles('core/package-lock.json') }}
@@ -36,40 +36,40 @@ runs:
         npm run build
 
     - name: Setup Java
-      uses: actions/setup-java@v4.5.0
+      uses: actions/setup-java@8df1039502a15bceb9433410b1a100fbe190c53b # v4.5.0
       with:
         distribution: zulu
         java-version: 17
 
     - name: Setup FFmpeg
-      uses: AnimMouse/setup-ffmpeg@v1
+      uses: AnimMouse/setup-ffmpeg@178e0b4a408f06ce40d896c3cd79f50fa6f8b0c3 # v1
       with:
         # The BtbN latest release no longer publishes the old 7.1 asset.
         version: 8.1
         token: ${{ inputs.github-token }}
 
     - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v3
+      uses: gradle/actions/setup-gradle@d9c87d481d55275bb5441eef3fe0e46805f9ef70 # v3.5.0
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.npm
         key: ${{ runner.os }}-npm-cache-jetbrains-${{ hashFiles('extensions/vscode/package-lock.json') }}
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       id: vscode-extension-cache
       with:
         path: extensions/vscode/node_modules
         key: ${{ runner.os }}-vscode-node-modules-${{ hashFiles('extensions/vscode/package-lock.json') }}
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       id: gui-cache
       with:
         path: gui/node_modules
         key: ${{ runner.os }}-gui-node-modules-${{ hashFiles('gui/package-lock.json') }}
 
     # Cache prepackaged extension build to share with other jobs
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       id: vscode-prepackage-cache
       with:
         path: extensions/vscode/build
@@ -89,7 +89,7 @@ runs:
         # https://github.com/microsoft/vscode-ripgrep/issues/9#issuecomment-643965333
         GITHUB_TOKEN: ${{ inputs.ci-github-token }}
 
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       id: binary-cache
       with:
         path: binary/node_modules
@@ -142,7 +142,7 @@ runs:
 
     - name: Save fails report
       if: ${{ failure() }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
       with:
         name: jb-failure-report
         path: |

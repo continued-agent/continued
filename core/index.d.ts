@@ -205,6 +205,8 @@ export interface ContextProviderExtras {
   ide: IDE;
   selectedCode: RangeInFile[];
   fetch: FetchFunction;
+  /** Public-only fetch with DNS rebinding protection for URL-based providers. */
+  fetchPublic?: FetchFunction;
   isInAgentMode: boolean;
 }
 
