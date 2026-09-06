@@ -19,6 +19,13 @@ describe("webview message trust boundary", () => {
         source: null,
       }),
     ).toBe(true);
+
+    expect(
+      isTrustedWebviewMessageEvent({
+        origin: "null",
+        source: window,
+      }),
+    ).toBe(true);
   });
 
   it("rejects messages from another origin", () => {
