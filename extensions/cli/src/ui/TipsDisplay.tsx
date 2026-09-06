@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import React, { useMemo } from "react";
 
-// Array of helpful tips for Continue CLI users
+// Array of helpful tips for Continued CLI users
 const CONTINUE_CLI_TIPS = [
   "Use `/help` to learn keyboard shortcuts",
   "Press escape to pause cn, and press enter to continue",

@@ -85,7 +85,7 @@ models:
 const SMOKE_PROXY_MODEL = process.env.SMOKE_PROXY_MODEL || "";
 
 /**
- * Writes a YAML config that uses the Continue proxy (CONTINUE_API_KEY).
+ * Writes a YAML config that uses the Continued proxy (CONTINUE_API_KEY).
  * Requires SMOKE_PROXY_MODEL to be set to a valid proxy model name.
  */
 export async function writeContinueProxyConfig(

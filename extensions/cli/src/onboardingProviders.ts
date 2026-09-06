@@ -1,8 +1,8 @@
 /**
  * Providers shown by the first-run CLI setup.
  *
- * Provider IDs intentionally match the IDs understood by Continue's model
- * adapters. Providers without a native Continue adapter use the generic
+ * Provider IDs intentionally match the IDs understood by Continued's model
+ * adapters. Providers without a native Continued adapter use the generic
  * OpenAI-compatible adapter and provide an explicit base URL where one is
  * known.
  */
