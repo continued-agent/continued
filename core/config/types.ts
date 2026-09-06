@@ -185,6 +185,8 @@ declare global {
     ide: IDE;
     selectedCode: RangeInFile[];
     fetch: FetchFunction;
+    /** Public-only fetch with DNS rebinding protection for URL-based providers. */
+    fetchPublic?: FetchFunction;
   }
   
   export interface LoadSubmenuItemsArgs {

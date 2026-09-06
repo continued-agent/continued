@@ -42,12 +42,19 @@ import {
   streamChatResponseWithInterruption,
   type ServerState,
 } from "./serve.helpers.js";
+import { isServeRequestAuthorized, resolveServeToken } from "./serveAuth.js";
+import { isEnvironmentInstallAllowed } from "./serveOptions.js";
+import { logServeStartup } from "./serveOutput.js";
 
-interface ServeOptions extends ExtendedCommandOptions {
+export interface ServeOptions extends ExtendedCommandOptions {
   timeout?: string;
   port?: string;
   /** Storage identifier for remote sync */
   id?: string;
+  /** Bearer token for the local control plane */
+  token?: string;
+  /** Explicitly allow the project-provided environment install script */
+  allowEnvironmentInstall?: boolean;
 }
 
 export const SERVE_HOST = "127.0.0.1";
@@ -235,9 +242,17 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   telemetryService.startActiveTime();
 
   const app = express();
+  const { token: serveToken, generated: generatedServeToken } =
+    resolveServeToken(options.token);
+  app.use((req: Request, res: Response, next) => {
+    if (!isServeRequestAuthorized(req.headers.authorization, serveToken)) {
+      res.setHeader("WWW-Authenticate", "Bearer");
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  });
   app.use(express.json({ limit: "100kb" }));
 
-  // GET /state - Return the current state
   app.get("/state", (_req: Request, res: Response) => {
     state.lastActivity = Date.now();
     syncSessionHistory();
@@ -324,11 +339,9 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     });
   });
 
-  // POST /pause - Pause the current agent run (like pressing escape in TUI)
   app.post("/pause", async (_req: Request, res: Response) => {
     state.lastActivity = Date.now();
 
-    // Check if there's anything to pause
     if (!state.isProcessing) {
       return res.json({
         success: false,
@@ -374,7 +387,6 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     }
   });
 
-  // Track intervals for cleanup
   let inactivityChecker: NodeJS.Timeout | null = null;
 
   // POST /exit - Gracefully shut down the server
@@ -427,34 +439,20 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
   });
 
   const server = app.listen(port, SERVE_HOST, async () => {
-    console.log(chalk.green(`Server started on http://localhost:${port}`));
-    console.log(chalk.dim("Endpoints:"));
-    console.log(chalk.dim("  GET  /state      - Get current agent state"));
-    console.log(
-      chalk.dim(
-        "  POST /message    - Send a message (body: { message: string })",
-      ),
-    );
-    console.log(
-      chalk.dim(
-        "  POST /permission - Approve/reject tool (body: { requestId, approved })",
-      ),
-    );
-    console.log(chalk.dim("  POST /pause      - Pause the current agent run"));
-    console.log(
-      chalk.dim("  GET  /diff       - Get git diff against main branch"),
-    );
-    console.log(
-      chalk.dim("  POST /exit       - Gracefully shut down the server"),
-    );
-    console.log(
-      chalk.dim(
-        `\nServer will shut down after ${timeoutSeconds} seconds of inactivity`,
-      ),
-    );
+    logServeStartup({
+      port,
+      timeoutSeconds,
+      token: serveToken,
+      generatedToken: generatedServeToken,
+    });
 
-    // Run environment install script after server startup
-    runEnvironmentInstallSafe();
+    if (isEnvironmentInstallAllowed(options)) {
+      runEnvironmentInstallSafe();
+    } else {
+      logger.debug(
+        "Skipping .continue/environment.json install script; pass --allow-environment-install to enable it",
+      );
+    }
 
     // If initial prompt provided, queue it for processing
     const initialPrompt = prependPrompt(

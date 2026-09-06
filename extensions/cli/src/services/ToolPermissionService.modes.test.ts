@@ -63,6 +63,40 @@ describe("ToolPermissionService - Mode Functionality", () => {
       });
     });
 
+    it("should initialize review mode with a read-only absolute override", () => {
+      const state = service.initializeSync({ mode: "review" });
+
+      expect(state.currentMode).toBe("review");
+      expect(state.permissions.policies).toContainEqual({
+        tool: "Read",
+        permission: "allow",
+      });
+      expect(state.permissions.policies).toContainEqual({
+        tool: "*",
+        permission: "exclude",
+      });
+    });
+
+    it("should ignore agent-file policies in review mode", () => {
+      const state = service.initializeSync({ mode: "review" }, {
+        agentFile: {} as any,
+        parsedTools: {
+          allBuiltIn: true,
+          mcpServers: [],
+          tools: [],
+        },
+      } as any);
+
+      expect(
+        state.permissions.policies.find((policy) => policy.tool === "*")
+          ?.permission,
+      ).toBe("exclude");
+      expect(
+        state.permissions.policies.find((policy) => policy.tool === "Bash")
+          ?.permission,
+      ).toBeUndefined();
+    });
+
     it("should have mode-specific policy positioning", () => {
       const normalState = service.initializeSync({ mode: "normal" });
       const planState = service.initializeSync({ mode: "plan" });

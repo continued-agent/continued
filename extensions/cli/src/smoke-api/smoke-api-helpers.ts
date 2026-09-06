@@ -4,6 +4,8 @@ import path from "path";
 
 import { execaNode, type Subprocess } from "execa";
 
+import { fetchServe } from "../util/serveClient.js";
+
 export interface SmokeTestContext {
   cliPath: string;
   testDir: string;
@@ -214,13 +216,14 @@ export async function pollUntilIdle(
   baseUrl: string,
   timeout = 60000,
   interval = 1000,
+  token?: string,
 ): Promise<any> {
   const deadline = Date.now() + timeout;
   let sawProcessing = false;
 
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${baseUrl}/state`);
+      const res = await fetchServe(`${baseUrl}/state`, {}, token);
       if (res.ok) {
         const state = await res.json();
 
@@ -258,9 +261,10 @@ export async function pollUntilIdle(
 export async function shutdownServe(
   proc: Subprocess,
   baseUrl: string,
+  token?: string,
 ): Promise<void> {
   try {
-    await fetch(`${baseUrl}/exit`, { method: "POST" });
+    await fetchServe(`${baseUrl}/exit`, { method: "POST" }, token);
   } catch {
     // server may already be gone
   }

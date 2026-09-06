@@ -36,6 +36,7 @@ import { useIntroMessage, useSelectors } from "./hooks/useTUIChatHooks.js";
 interface TUIChatProps {
   // Remote mode props
   remoteUrl?: string;
+  remoteToken?: string;
 
   // Local mode props - now optional since we'll get them from services
   configPath?: string;
@@ -151,6 +152,7 @@ function useChatHandlers(
 // eslint-disable-next-line complexity
 const TUIChat: React.FC<TUIChatProps> = ({
   remoteUrl,
+  remoteToken,
   configPath,
   initialPrompt,
   resume,
@@ -251,6 +253,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
     // Remote mode configuration
     isRemoteMode,
     remoteUrl,
+    remoteToken,
     onShowDiff: handleShowDiff,
     onShowStatusMessage: handleShowStatusMessage,
   });

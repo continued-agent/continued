@@ -9,6 +9,7 @@ import { ToolExtras } from "../..";
 import { getUrlContextItems } from "../../context/providers/URLContextProvider";
 const mockExtras = {
   fetch: vi.fn() as any,
+  fetchPublic: vi.fn() as any,
   ide: {} as any,
 } as unknown as ToolExtras;
 
@@ -31,6 +32,18 @@ test("fetchUrlContent should not truncate content under character limit", async 
 
   expect(result).toHaveLength(1);
   expect(result[0].content).toBe(shortContent);
+});
+
+test("fetchUrlContent uses the public-only fetch capability", async () => {
+  (getUrlContextItems as any).mockResolvedValue([]);
+
+  await fetchUrlContentImpl({ url: "https://example.com" }, mockExtras);
+
+  expect(getUrlContextItems).toHaveBeenLastCalledWith(
+    "https://example.com",
+    mockExtras.fetch,
+    mockExtras.fetchPublic,
+  );
 });
 
 test("fetchUrlContent should truncate content exceeding character limit", async () => {

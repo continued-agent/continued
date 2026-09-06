@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "node:child_process";
 
 import { logger } from "../../util/logger.js";
 
@@ -12,29 +12,39 @@ export interface DiffContext {
   truncated: boolean;
 }
 
+const GIT_COMMAND_OPTIONS = {
+  encoding: "utf-8" as const,
+  stdio: ["pipe", "pipe", "pipe"] as ["pipe", "pipe", "pipe"],
+};
+
 /**
  * Auto-detect the default branch (main/master) for the current repo.
  */
 function detectDefaultBranch(): string {
   try {
-    const ref = execSync("git symbolic-ref refs/remotes/origin/HEAD", {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const ref = execFileSync(
+      "git",
+      ["symbolic-ref", "refs/remotes/origin/HEAD"],
+      GIT_COMMAND_OPTIONS,
+    ).trim();
     // refs/remotes/origin/main -> main
     return ref.replace("refs/remotes/origin/", "");
   } catch {
     // Fallback: check if main or master exists
     try {
-      execSync("git rev-parse --verify main", {
-        stdio: ["pipe", "pipe", "pipe"],
-      });
+      execFileSync(
+        "git",
+        ["rev-parse", "--verify", "--end-of-options", "main"],
+        GIT_COMMAND_OPTIONS,
+      );
       return "main";
     } catch {
       try {
-        execSync("git rev-parse --verify master", {
-          stdio: ["pipe", "pipe", "pipe"],
-        });
+        execFileSync(
+          "git",
+          ["rev-parse", "--verify", "--end-of-options", "master"],
+          GIT_COMMAND_OPTIONS,
+        );
         return "master";
       } catch {
         return "main"; // Default fallback
@@ -50,13 +60,16 @@ function detectDefaultBranch(): string {
 export function computeDiffContext(baseBranch?: string): DiffContext {
   const base = baseBranch || detectDefaultBranch();
 
-  // Get the merge-base to handle diverged branches
+  // Get the merge-base to handle diverged branches. Revisions are passed as
+  // arguments (never interpolated into a shell command) and --end-of-options
+  // prevents a ref beginning with '-' from being parsed as a Git option.
   let mergeBase: string;
   try {
-    mergeBase = execSync(`git merge-base ${base} HEAD`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    mergeBase = execFileSync(
+      "git",
+      ["merge-base", "--end-of-options", base, "HEAD"],
+      GIT_COMMAND_OPTIONS,
+    ).trim();
   } catch {
     logger.warn(
       `Could not find merge-base with ${base}, falling back to direct diff`,
@@ -69,10 +82,9 @@ export function computeDiffContext(baseBranch?: string): DiffContext {
   let truncated = false;
   try {
     // Use diff against merge-base to include all branch changes + working tree
-    diff = execSync(`git diff ${mergeBase}`, {
-      encoding: "utf-8",
+    diff = execFileSync("git", ["diff", "--end-of-options", mergeBase], {
+      ...GIT_COMMAND_OPTIONS,
       maxBuffer: 10 * 1024 * 1024, // 10MB buffer
-      stdio: ["pipe", "pipe", "pipe"],
     });
   } catch {
     diff = "";
@@ -86,10 +98,11 @@ export function computeDiffContext(baseBranch?: string): DiffContext {
   // Get changed file list
   let changedFiles: string[] = [];
   try {
-    const fileList = execSync(`git diff --name-only ${mergeBase}`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    const fileList = execFileSync(
+      "git",
+      ["diff", "--name-only", "--end-of-options", mergeBase],
+      GIT_COMMAND_OPTIONS,
+    ).trim();
     changedFiles = fileList ? fileList.split("\n") : [];
   } catch {
     changedFiles = [];
@@ -98,10 +111,11 @@ export function computeDiffContext(baseBranch?: string): DiffContext {
   // Get diff stat
   let stat = "";
   try {
-    stat = execSync(`git diff --stat ${mergeBase}`, {
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    }).trim();
+    stat = execFileSync(
+      "git",
+      ["diff", "--stat", "--end-of-options", mergeBase],
+      GIT_COMMAND_OPTIONS,
+    ).trim();
   } catch {
     stat = "";
   }

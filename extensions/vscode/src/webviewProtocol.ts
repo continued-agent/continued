@@ -49,7 +49,12 @@ export class VsCodeWebviewProtocol
     this._webviewListener?.dispose();
 
     const handleMessage = async (msg: Message): Promise<void> => {
-      if (!("messageType" in msg) || !("messageId" in msg)) {
+      if (
+        !("messageType" in msg) ||
+        typeof msg.messageType !== "string" ||
+        !("messageId" in msg) ||
+        typeof msg.messageId !== "string"
+      ) {
         throw new Error(`Invalid webview protocol msg: ${JSON.stringify(msg)}`);
       }
 
@@ -158,7 +163,10 @@ export class VsCodeWebviewProtocol
       if (this.webview) {
         const disposable = this.webview.onDidReceiveMessage(
           (msg: Message<ToWebviewProtocol[T][1]>) => {
-            if (msg.messageId === messageId) {
+            if (
+              msg.messageType === messageType &&
+              msg.messageId === messageId
+            ) {
               resolve(msg.data);
               disposable?.dispose();
             }

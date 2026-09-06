@@ -18,6 +18,7 @@ export interface ResolvedReview {
  */
 export async function resolveReviews(
   agentFlags?: string[],
+  options: { trustLocalReviews?: boolean } = {},
 ): Promise<ResolvedReview[]> {
   // Source 1: CLI --agent flags
   if (agentFlags && agentFlags.length > 0) {
@@ -34,7 +35,12 @@ export async function resolveReviews(
     return hubReviews;
   }
 
-  // Source 3: Local .continue/agents/*.md and .continue/checks/*.md
+  // Source 3: Local .continue/agents/*.md and .continue/checks/*.md. These
+  // files are executable instructions, so discovery is opt-in rather than an
+  // implicit trust decision based on repository contents.
+  if (!options.trustLocalReviews) {
+    return [];
+  }
   const localReviews = resolveFromLocal();
   if (localReviews.length > 0) {
     return localReviews;

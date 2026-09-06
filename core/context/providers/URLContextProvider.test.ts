@@ -35,4 +35,19 @@ describe("getUrlContextItems URL validation", () => {
     ).rejects.toThrow("private, local, or non-HTTP");
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
+
+  it("uses the connection-pinned fetch for URL and favicon requests", async () => {
+    const normalFetch = jest.fn();
+    const publicFetch = jest.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      text: async () => "<html><body>Example</body></html>",
+      headers: new Headers(),
+    });
+
+    await getUrlContextItems("https://example.com", normalFetch, publicFetch);
+
+    expect(normalFetch).not.toHaveBeenCalled();
+    expect(publicFetch).toHaveBeenCalledTimes(2);
+  });
 });

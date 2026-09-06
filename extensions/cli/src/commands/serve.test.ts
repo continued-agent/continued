@@ -4,6 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createMinimalTestContext } from "../test-helpers/ui-test-context.js";
 
+import { isServeRequestAuthorized, resolveServeToken } from "./serveAuth.js";
+import { isEnvironmentInstallAllowed } from "./serveOptions.js";
+
+vi.mock("./serve.helpers.js", () => ({
+  checkAgentComplete: vi.fn(() => false),
+  removePartialAssistantMessage: vi.fn(),
+  streamChatResponseWithInterruption: vi.fn(),
+}));
+
+vi.mock("../index.js", () => ({
+  setAgentId: vi.fn(),
+}));
+
 describe("serve command", () => {
   let context: any;
   let originalProcessExit: typeof process.exit;
@@ -91,6 +104,34 @@ describe("serve command", () => {
     expect(true).toBe(true);
   });
 
+  it("requires the exact bearer token for control-plane requests", () => {
+    const token = "a".repeat(32);
+
+    expect(isServeRequestAuthorized(`Bearer ${token}`, token)).toBe(true);
+    expect(isServeRequestAuthorized("Bearer wrong", token)).toBe(false);
+    expect(isServeRequestAuthorized(undefined, token)).toBe(false);
+    expect(isServeRequestAuthorized(token, token)).toBe(false);
+  });
+
+  it("generates a fresh token when no token is configured", () => {
+    const first = resolveServeToken();
+    const second = resolveServeToken();
+
+    expect(first.generated).toBe(true);
+    expect(first.token).toHaveLength(64);
+    expect(second.token).not.toBe(first.token);
+  });
+
+  it("requires explicit opt-in for environment install scripts", () => {
+    expect(isEnvironmentInstallAllowed({})).toBe(false);
+    expect(
+      isEnvironmentInstallAllowed({ allowEnvironmentInstall: false }),
+    ).toBe(false);
+    expect(isEnvironmentInstallAllowed({ allowEnvironmentInstall: true })).toBe(
+      true,
+    );
+  });
+
   it("should pass the --org flag through to initializeServices", async () => {
     // Import the services module to spy on
     const servicesModule = await import("../services/index.js");
@@ -98,25 +139,7 @@ describe("serve command", () => {
     // Create spy on initializeServices
     const initializeServicesSpy = vi
       .spyOn(servicesModule, "initializeServices")
-      .mockResolvedValue({
-        config: { models: [] },
-        llmApi: { chat: vi.fn() },
-        model: { name: "test-model" },
-      } as any);
-
-    // Create spy on getService
-    const getServiceSpy = vi
-      .spyOn(servicesModule, "getService")
-      .mockResolvedValueOnce({
-        config: { name: "test" },
-        llmApi: { chat: vi.fn() },
-        model: { provider: "test", model: "test" },
-      } as any)
-      .mockResolvedValueOnce({
-        config: { name: "test" },
-        llmApi: { chat: vi.fn() },
-        model: { provider: "test", model: "test" },
-      } as any);
+      .mockRejectedValue(new Error("stop after checking initialization"));
 
     // Import serve after setting up spies
     const { serve } = await import("./serve.js");
@@ -146,6 +169,5 @@ describe("serve command", () => {
 
     // Clean up spies
     initializeServicesSpy.mockRestore();
-    getServiceSpy.mockRestore();
   });
 });

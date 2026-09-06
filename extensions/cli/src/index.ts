@@ -321,6 +321,14 @@ program
   )
   .option("--port <port>", "Port to run the server on (default: 8000)", "8000")
   .option(
+    "--token <token>",
+    "Bearer token for control-plane requests (also accepts CONTINUE_SERVE_TOKEN)",
+  )
+  .option(
+    "--allow-environment-install",
+    "Allow execution of .continue/environment.json install scripts",
+  )
+  .option(
     "--id <storageId>",
     "Upload session snapshots to Continue-managed storage using the provided identifier",
   )
@@ -394,6 +402,10 @@ program
   .option("--patch", "Show patches")
   .option("--fail-fast", "Stop on first failure")
   .option("--review-agents <agents...>", "Specific review agents to run")
+  .option(
+    "--trust-local-reviews",
+    "Allow review instructions from .continue/agents and .continue/checks",
+  )
   .option("--verbose", "Enable verbose logging")
   .action(async (options) => {
     await review(options);

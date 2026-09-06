@@ -17,6 +17,7 @@ import { messageQueue, QueuedMessage } from "../../stream/messageQueue.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
 import { formatError } from "../../util/formatError.js";
 import { logger } from "../../util/logger.js";
+import { fetchServe } from "../../util/serveClient.js";
 
 import {
   handleAutoCompaction,
@@ -65,6 +66,7 @@ export function useChat({
   onRefreshStatic,
   isRemoteMode = false,
   remoteUrl,
+  remoteToken,
   onShowDiff,
   onShowStatusMessage,
 }: UseChatProps) {
@@ -235,11 +237,12 @@ export function useChat({
 
     return setupRemotePolling({
       remoteUrl,
+      remoteToken,
       setIsWaitingForResponse,
       responseStartTime,
       setResponseStartTime,
     });
-  }, [isRemoteMode, remoteUrl, responseStartTime]);
+  }, [isRemoteMode, remoteUrl, remoteToken, responseStartTime]);
 
   useEffect(() => {
     // Skip initialization in remote mode or if already initialized
@@ -490,6 +493,7 @@ export function useChat({
       message,
       isRemoteMode,
       remoteUrl,
+      remoteToken,
       onShowConfigSelector,
       exit,
       onShowDiff,
@@ -522,6 +526,7 @@ export function useChat({
       await handleRemoteMessage({
         remoteUrl,
         messageContent: messageContentString,
+        remoteToken,
       });
       return;
     }
@@ -687,13 +692,17 @@ export function useChat({
     // In remote mode, send interrupt signal to server
     if (isRemoteMode && remoteUrl) {
       // Send a message to interrupt the remote server
-      fetch(`${remoteUrl}/message`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      fetchServe(
+        `${remoteUrl}/message`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ message: "" }), // Empty message triggers interrupt
         },
-        body: JSON.stringify({ message: "" }), // Empty message triggers interrupt
-      }).catch((error) => {
+        remoteToken,
+      ).catch((error) => {
         logger.error("Failed to send interrupt to remote server:", error);
       });
       return;

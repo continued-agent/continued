@@ -4,11 +4,9 @@ import {
   PostMessageTransport,
 } from "@modelcontextprotocol/ext-apps";
 
-import {
-  AppBridge,
-  buildAllowAttribute,
-} from "@modelcontextprotocol/ext-apps/app-bridge";
-import { ToolCallState } from "core";
+import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
+import type { ToolPolicy } from "@continuedev/terminal-security";
+import type { Tool, ToolCallState } from "core";
 import { getToolNameFromMCPServer } from "core/tools/mcpToolName";
 import { generateOpenAIToolCallId } from "core/tools/systemMessageTools/systemToolUtils";
 import { renderContextItems } from "core/util/messageContent";
@@ -21,7 +19,7 @@ import {
   useState,
 } from "react";
 import { IdeMessengerContext } from "../../../context/IdeMessenger";
-import { useAppDispatch } from "../../../redux/hooks";
+import { useAppDispatch, useAppSelector } from "../../../redux/hooks";
 import { streamResponseThunk } from "../../../redux/thunks/streamResponse";
 
 /**
@@ -32,31 +30,50 @@ function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
   const resourceDomains = csp?.resourceDomains ?? [];
   const connectDomains = csp?.connectDomains ?? [];
 
-  // Combine all external domains for resource loading
-  const allDomains = [...new Set([...resourceDomains, ...connectDomains])];
+  // Only accept origin-shaped HTTP(S) sources. Treating arbitrary metadata as
+  // CSP text would let a malicious MCP server break out of the policy tag.
+  const isValidOrigin = (domain: string) => {
+    try {
+      const parsed = new URL(domain);
+      return (
+        (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+        !parsed.username &&
+        !parsed.password &&
+        parsed.pathname === "/" &&
+        !parsed.search &&
+        !parsed.hash
+      );
+    } catch {
+      return false;
+    }
+  };
+  const validResourceDomains = resourceDomains.filter(isValidOrigin);
+  const validConnectDomains = connectDomains.filter(isValidOrigin);
 
-  const defaultSrc = [
-    "'self'",
-    "'unsafe-inline'",
-    "'unsafe-eval'",
-    "blob:",
-    "data:",
-    ...allDomains,
-  ].join(" ");
+  const defaultSrc = ["'self'", "blob:", "data:", ...validResourceDomains].join(
+    " ",
+  );
   const scriptSrc = [
     "'self'",
     "'unsafe-inline'",
-    "'unsafe-eval'",
     "blob:",
-    ...allDomains,
+    ...validResourceDomains,
   ].join(" ");
-  const styleSrc = ["'self'", "'unsafe-inline'", ...allDomains].join(" ");
-  const imgSrc = ["'self'", "blob:", "data:", ...allDomains].join(" ");
-  const fontSrc = ["'self'", "data:", ...allDomains].join(" ");
-  const connectSrc = ["'self'", "blob:", "data:", ...allDomains].join(" ");
-  const mediaSrc = ["'self'", "blob:", "data:", ...allDomains].join(" ");
-  const frameSrc = ["'self'", "blob:", "data:", ...allDomains].join(" ");
-  const workerSrc = ["'self'", "blob:", ...allDomains].join(" ");
+  const styleSrc = ["'self'", "'unsafe-inline'", ...validResourceDomains].join(
+    " ",
+  );
+  const imgSrc = ["'self'", "blob:", "data:", ...validResourceDomains].join(
+    " ",
+  );
+  const fontSrc = ["'self'", "data:", ...validResourceDomains].join(" ");
+  const connectSrc = ["'self'", "blob:", "data:", ...validConnectDomains].join(
+    " ",
+  );
+  const mediaSrc = ["'self'", "blob:", "data:", ...validResourceDomains].join(
+    " ",
+  );
+  const frameSrc = "'none'";
+  const workerSrc = ["'self'", "blob:", ...validResourceDomains].join(" ");
 
   const directives = [
     `default-src ${defaultSrc}`,
@@ -68,9 +85,47 @@ function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
     `media-src ${mediaSrc}`,
     `frame-src ${frameSrc}`,
     `worker-src ${workerSrc}`,
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
   ];
 
   return directives.join("; ");
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      default:
+        return "&#39;";
+    }
+  });
+}
+
+/**
+ * MCP UI content must be authorized against the tool it actually requests,
+ * rather than the tool that happened to render the UI resource.
+ */
+export function resolveMcpAppToolPolicy(
+  toolName: string,
+  configuredPolicies: Record<string, ToolPolicy>,
+  availableTools: Tool[],
+): ToolPolicy {
+  return (
+    configuredPolicies[toolName] ??
+    availableTools.find((tool) => tool.function.name === toolName)
+      ?.defaultToolPolicy ??
+    "allowedWithPermission"
+  );
 }
 
 /**
@@ -79,15 +134,12 @@ function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
  * so we embed HTML directly via srcdoc and use AppBridge for the protocol.
  *
  * Handles MCP UI resource metadata:
- * - `permissions`: Sets iframe `allow` attribute (camera, microphone, geolocation, clipboard-write)
+ * - `permissions`: Reports unsupported requested permissions without delegating
+ *   them to the sandboxed iframe
  * - `csp`: Passes CSP config to the app via sendSandboxResourceReady
  * - `prefersBorder`: Controls iframe border styling
  *
- * Note on permissions: We properly set the iframe's `allow` attribute based on
- * the MCP resource metadata. However, VS Code's webview runs in a sandboxed
- * Electron context with its own Permissions-Policy that doesn't allow delegating
- * sensitive permissions (microphone, camera, etc.) to nested iframes. This is a
- * VS Code/Electron security limitation that cannot be overridden from extensions.
+ * Sensitive permissions are intentionally not delegated to untrusted MCP HTML.
  */
 export function McpAppRenderer({
   toolCallState,
@@ -106,6 +158,16 @@ export function McpAppRenderer({
   const uiMeta = toolCallState.mcpUiState?.content._meta?.ui;
   const toolInput = toolCallState.parsedArgs;
   const toolResult = toolCallState.output;
+  const configuredToolPolicies = useAppSelector(
+    (state) => state.ui.toolSettings,
+  );
+  const availableTools = useAppSelector((state) => state.config.config.tools);
+  const toolCallStateRef = useRef(toolCallState);
+  toolCallStateRef.current = toolCallState;
+  const configuredToolPoliciesRef = useRef(configuredToolPolicies);
+  configuredToolPoliciesRef.current = configuredToolPolicies;
+  const availableToolsRef = useRef(availableTools);
+  availableToolsRef.current = availableTools;
 
   // Extract metadata from the MCP UI resource
   const csp: McpUiResourceCsp | undefined = uiMeta?.csp;
@@ -120,6 +182,7 @@ export function McpAppRenderer({
     if (permissions?.microphone) restricted.push("microphone");
     if (permissions?.camera) restricted.push("camera");
     if (permissions?.geolocation) restricted.push("geolocation");
+    if (permissions?.clipboardWrite) restricted.push("clipboard-write");
     return restricted;
   }, [permissions]);
 
@@ -132,15 +195,13 @@ export function McpAppRenderer({
     // PostMessageTransport works without same-origin access.
     const sandboxPermissions = [
       "allow-scripts", // Required for MCP app JavaScript execution
-      "allow-forms", // Allow form submissions within the iframe
     ];
     return sandboxPermissions.join(" ");
   }, []);
 
-  const allowAttribute = useMemo(() => {
-    const attr = buildAllowAttribute(permissions);
-    return attr || undefined;
-  }, [permissions]);
+  // Never delegate camera, microphone, geolocation, or clipboard privileges
+  // from an MCP server to sandboxed third-party HTML.
+  const allowAttribute = undefined;
 
   useEffect(() => {
     const bridge = new AppBridge(
@@ -166,8 +227,17 @@ export function McpAppRenderer({
     };
 
     bridge.onopenlink = async (params: { url: string }) => {
-      if (params.url) {
-        ideMessenger.post("openUrl", params.url);
+      try {
+        const url = new URL(params.url);
+        if (
+          (url.protocol === "http:" || url.protocol === "https:") &&
+          !url.username &&
+          !url.password
+        ) {
+          ideMessenger.post("openUrl", url.toString());
+        }
+      } catch {
+        console.warn("[McpAppRenderer] Refused to open an invalid URL");
       }
       return {};
     };
@@ -182,6 +252,17 @@ export function McpAppRenderer({
         console.warn(
           "[McpAppRenderer] onMessage received with no text content",
         );
+        return {};
+      }
+
+      // MCP UI content is untrusted. Require an explicit user gesture before
+      // it can inject a new prompt into the main conversation.
+      if (
+        typeof window.confirm !== "function" ||
+        !window.confirm(
+          `This MCP app wants to send a message to Continue:\n\n${text}`,
+        )
+      ) {
         return {};
       }
 
@@ -206,14 +287,42 @@ export function McpAppRenderer({
     };
 
     bridge.oncalltool = async (params: any) => {
+      const currentToolCallState = toolCallStateRef.current;
+      const serverName = currentToolCallState.tool?.group;
+      if (!serverName?.trim()) {
+        throw new Error(
+          "MCP App tool call denied: missing MCP server identity",
+        );
+      }
+      const toolName = getToolNameFromMCPServer(serverName, params.name);
+      const parsedArgs =
+        params.arguments &&
+        typeof params.arguments === "object" &&
+        !Array.isArray(params.arguments)
+          ? params.arguments
+          : {};
+      const basePolicy = resolveMcpAppToolPolicy(
+        toolName,
+        configuredToolPoliciesRef.current,
+        availableToolsRef.current,
+      );
+      const policyResult = await ideMessenger.request("tools/evaluatePolicy", {
+        toolName,
+        basePolicy,
+        parsedArgs,
+      });
+      if (
+        policyResult.status === "error" ||
+        policyResult.content.policy !== "allowedWithoutPermission"
+      ) {
+        throw new Error(`MCP App tool call denied by policy: ${toolName}`);
+      }
+
       const output = await ideMessenger.request("tools/call", {
         toolCall: {
           function: {
-            name: getToolNameFromMCPServer(
-              toolCallState.tool?.group ?? "",
-              params.name,
-            ),
-            arguments: JSON.stringify(params.arguments),
+            name: toolName,
+            arguments: JSON.stringify(parsedArgs),
           },
           id: generateOpenAIToolCallId(),
           type: "function",
@@ -335,7 +444,7 @@ export function McpAppRenderer({
     return null;
   }
 
-  const cspMetaContent = buildCspMetaContent(csp);
+  const cspMetaContent = escapeHtmlAttribute(buildCspMetaContent(csp));
 
   const srcdoc = `<!DOCTYPE html>
 <html>

@@ -9,6 +9,7 @@ import { logger } from "src/util/logger.js";
 import { DEFAULT_SESSION_TITLE } from "../../constants/session.js";
 import { loadSession, startNewSession } from "../../session.js";
 import { telemetryService } from "../../telemetry/telemetryService.js";
+import { fetchServe } from "../../util/serveClient.js";
 
 import { processImagePlaceholder } from "./useChat.imageProcessing.js";
 import { SlashCommandResult } from "./useChat.types.js";
@@ -242,6 +243,7 @@ interface HandleSpecialCommandsOptions {
   message: string;
   isRemoteMode: boolean;
   remoteUrl?: string;
+  remoteToken?: string;
   onShowConfigSelector: () => void;
   exit: () => void;
   onShowDiff?: (diffContent: string) => void;
@@ -254,9 +256,10 @@ interface HandleSpecialCommandsOptions {
 async function handleRemoteDiffCommand(
   remoteUrl: string,
   onShowDiff?: (diffContent: string) => void,
+  remoteToken?: string,
 ): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/diff`);
+    const response = await fetchServe(`${remoteUrl}/diff`, {}, remoteToken);
     if (!response.ok) {
       throw new Error(`Failed to fetch diff: ${response.statusText}`);
     }
@@ -281,9 +284,10 @@ async function handleRemoteDiffCommand(
 async function handleRemoteApplyCommand(
   remoteUrl: string,
   onShowStatusMessage?: (message: string) => void,
+  remoteToken?: string,
 ): Promise<void> {
   try {
-    const response = await fetch(`${remoteUrl}/diff`);
+    const response = await fetchServe(`${remoteUrl}/diff`, {}, remoteToken);
     if (!response.ok) {
       throw new Error(`Failed to fetch diff: ${response.statusText}`);
     }
@@ -332,6 +336,7 @@ export async function handleSpecialCommands({
   message,
   isRemoteMode,
   remoteUrl,
+  remoteToken,
   onShowConfigSelector,
   exit,
   onShowDiff,
@@ -348,7 +353,7 @@ export async function handleSpecialCommands({
   // Handle /exit command in remote mode
   if (isRemoteMode && remoteUrl && trimmedMessage === "/exit") {
     const { handleRemoteExit } = await import("./useChat.remote.helpers.js");
-    await handleRemoteExit(remoteUrl, exit);
+    await handleRemoteExit(remoteUrl, exit, remoteToken);
     return true;
   }
 
@@ -358,7 +363,7 @@ export async function handleSpecialCommands({
     remoteUrl &&
     (trimmedMessage === "/diff" || trimmedMessage.startsWith("/diff "))
   ) {
-    await handleRemoteDiffCommand(remoteUrl, onShowDiff);
+    await handleRemoteDiffCommand(remoteUrl, onShowDiff, remoteToken);
     return true;
   }
 
@@ -368,7 +373,7 @@ export async function handleSpecialCommands({
     remoteUrl &&
     (trimmedMessage === "/apply" || trimmedMessage.startsWith("/apply "))
   ) {
-    await handleRemoteApplyCommand(remoteUrl, onShowStatusMessage);
+    await handleRemoteApplyCommand(remoteUrl, onShowStatusMessage, remoteToken);
     return true;
   }
 

@@ -75,7 +75,7 @@ ${diffContext.diff || "(no diff available)"}
 ## Rules
 - You are in a temporary worktree. Dependencies (node_modules, etc.) are not installed.
 - ONLY flag issues that exist in the changed lines of the diff.
-- ONLY make edits to files listed in the changed files above, and only to fix violations of your specific review rules in the changed code.
+- Do not make edits: review workers run with read-only tool permissions.
 - Do NOT make general improvements, refactoring, documentation changes, or style fixes.
 - If there are no violations in the changed code, do NOT edit any files. State that no issues were found and exit.
 `;
@@ -116,7 +116,9 @@ export async function runReviewWorker(): Promise<void> {
       // Change working directory to the worktree
       process.chdir(config.worktreePath);
 
-      // Initialize services in auto mode (full tool access)
+      // Review instructions and repository contents are untrusted input. The
+      // worker can inspect the diff but cannot execute commands, call MCP
+      // tools, or modify its temporary worktree.
       await initializeServices({
         options: {
           config: config.options.config,
@@ -125,7 +127,7 @@ export async function runReviewWorker(): Promise<void> {
         },
         headless: true,
         toolPermissionOverrides: {
-          mode: "auto",
+          mode: "review",
         },
       });
 

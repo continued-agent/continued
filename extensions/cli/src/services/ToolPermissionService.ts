@@ -1,6 +1,7 @@
 import {
   AUTO_MODE_POLICIES,
   PLAN_MODE_POLICIES,
+  REVIEW_MODE_POLICIES,
 } from "src/permissions/defaultPolicies.js";
 
 import { ensurePermissionsYamlExists } from "../permissions/permissionsYamlLoader.js";
@@ -175,6 +176,8 @@ export class ToolPermissionService
         return [...PLAN_MODE_POLICIES];
       case "auto":
         return [...AUTO_MODE_POLICIES];
+      case "review":
+        return [...REVIEW_MODE_POLICIES];
       case "normal":
       default:
         // Normal mode uses the more nuanced policy loading
@@ -206,7 +209,10 @@ export class ToolPermissionService
     const modePolicies = this.generateModePolicies();
 
     let allPolicies: ToolPermissionPolicy[];
-    if (agentFileServiceState?.agentFile) {
+    if (this.currentState.currentMode === "review") {
+      // Review workers must not inherit repository-provided agent policies.
+      allPolicies = [...modePolicies];
+    } else if (agentFileServiceState?.agentFile) {
       // Agent file policies take full precedence on init
       allPolicies = this.generateAgentFilePolicies(
         agentFileServiceState,
@@ -310,10 +316,10 @@ export class ToolPermissionService
 
     const modePolicies = this.generateModePolicies();
 
-    // For plan and auto modes, use ONLY mode policies (absolute override)
+    // For plan, auto, and review modes, use ONLY mode policies (absolute override)
     // For normal mode, restore original policies if available
     let allPolicies: ToolPermissionPolicy[];
-    if (newMode === "plan" || newMode === "auto") {
+    if (newMode === "plan" || newMode === "auto" || newMode === "review") {
       // Absolute override: ignore all user configuration
       allPolicies = [...modePolicies];
     } else {

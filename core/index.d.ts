@@ -205,6 +205,8 @@ export interface ContextProviderExtras {
   ide: IDE;
   selectedCode: RangeInFile[];
   fetch: FetchFunction;
+  /** Public-only fetch with DNS rebinding protection for URL-based providers. */
+  fetchPublic?: FetchFunction;
   isInAgentMode: boolean;
 }
 
@@ -1112,6 +1114,8 @@ export interface ToolExtras {
   ide: IDE;
   llm: ILLM;
   fetch: FetchFunction;
+  /** Public-only fetch for tools that retrieve an arbitrary URL. */
+  fetchPublic?: FetchFunction;
   tool: Tool;
   toolCallId?: string;
   onPartialOutput?: (params: {
