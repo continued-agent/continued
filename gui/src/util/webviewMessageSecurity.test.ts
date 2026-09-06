@@ -15,7 +15,7 @@ describe("webview message trust boundary", () => {
   it("accepts host bridge messages with an opaque origin", () => {
     expect(
       isTrustedWebviewMessageEvent({
-        origin: "",
+        origin: "vscode-webview://extension-host",
         source: null,
       }),
     ).toBe(true);
