@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { isTrustedWebviewMessageEvent } from "./webviewMessageSecurity";
+import {
+  isTrustedWebviewMessageEvent,
+  rememberTrustedWebviewMessageSource,
+} from "./webviewMessageSecurity";
 
 describe("webview message trust boundary", () => {
   it("accepts messages from the current webview window", () => {
@@ -37,6 +40,7 @@ describe("webview message trust boundary", () => {
     });
 
     try {
+      rememberTrustedWebviewMessageSource({ source: parentFrame });
       expect(
         isTrustedWebviewMessageEvent({
           origin: "vscode-webview://host",
@@ -49,6 +53,18 @@ describe("webview message trust boundary", () => {
         value: originalParent,
       });
     }
+  });
+
+  it("accepts messages from a source learned through a correlated response", () => {
+    const bridgeSource = {} as Window;
+    rememberTrustedWebviewMessageSource({ source: bridgeSource });
+
+    expect(
+      isTrustedWebviewMessageEvent({
+        origin: "vscode-webview://host",
+        source: bridgeSource,
+      }),
+    ).toBe(true);
   });
 
   it("rejects messages from another origin", () => {
