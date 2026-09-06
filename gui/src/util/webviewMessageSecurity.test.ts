@@ -12,6 +12,15 @@ describe("webview message trust boundary", () => {
     ).toBe(true);
   });
 
+  it("accepts host bridge messages with an opaque origin", () => {
+    expect(
+      isTrustedWebviewMessageEvent({
+        origin: "",
+        source: null,
+      }),
+    ).toBe(true);
+  });
+
   it("rejects messages from another origin", () => {
     expect(
       isTrustedWebviewMessageEvent({

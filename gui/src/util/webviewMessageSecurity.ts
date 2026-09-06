@@ -1,7 +1,8 @@
 /**
  * Accept messages only from this webview's own origin and top-level window.
- * Sandboxed MCP iframes have an opaque `null` origin and therefore cannot
- * invoke privileged GUI handlers through the general webview protocol.
+ * VS Code's host bridge can deliver messages with an opaque origin and no
+ * source window; nested MCP iframes still have a non-null WindowProxy and are
+ * rejected below.
  */
 export function isTrustedWebviewMessageEvent(
   event: Pick<MessageEvent, "origin" | "source">,
@@ -11,10 +12,11 @@ export function isTrustedWebviewMessageEvent(
   }
 
   const expectedOrigin = window.location.origin;
+  const isHostBridgeMessage =
+    event.source == null && (event.origin === "" || event.origin === "null");
   if (
     !expectedOrigin ||
-    expectedOrigin === "null" ||
-    event.origin !== expectedOrigin
+    (!isHostBridgeMessage && event.origin !== expectedOrigin)
   ) {
     return false;
   }
