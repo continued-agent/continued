@@ -56,7 +56,7 @@ export function ResourceDebugBar({ visible }: ResourceDebugBarProps) {
 
   if (isError) {
     return (
-      <Box paddingX={1}>
+      <Box>
         <Text color="red">Resource monitoring error</Text>
       </Box>
     );
@@ -92,7 +92,7 @@ export function ResourceDebugBar({ visible }: ResourceDebugBarProps) {
   };
 
   return (
-    <Box paddingX={1}>
+    <Box>
       <Text color="gray">Debug: </Text>
 
       <Text color={getMemoryColor()}>

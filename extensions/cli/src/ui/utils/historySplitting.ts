@@ -154,7 +154,7 @@ function estimateContentHeight(content: string, terminalWidth: number): number {
       totalHeight += 1; // Empty line
     } else {
       // Account for line wrapping
-      // StaticChatContent is rendered inside TUIChat (paddingX=1) and each
+      // StaticChatContent is rendered inside an inset TUIChat region and each
       // message has its own paddingX=1, leaving terminalWidth - 4 columns.
       // Do not clamp this to 40: that underestimates wrapping on narrow TTYs.
       totalHeight += Math.ceil(line.length / Math.max(terminalWidth - 4, 1));

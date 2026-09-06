@@ -391,9 +391,9 @@ const TUIChat: React.FC<TUIChatProps> = ({
   }, []);
 
   return (
-    <Box flexDirection="column" height="100%" paddingX={1}>
+    <Box flexDirection="column" height="100%">
       {/* Chat history - takes up all available space above input */}
-      <Box flexDirection="column" flexGrow={1} overflow="hidden">
+      <Box flexDirection="column" flexGrow={1} overflow="hidden" marginX={1}>
         {/* Debug component - comment out when not needed */}
         {/* {!isRemoteMode && (
           <ServiceDebugger
@@ -421,7 +421,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
       </Box>
 
       {/* Fixed bottom section */}
-      <Box flexDirection="column" flexShrink={0}>
+      <Box flexDirection="column" flexShrink={0} marginX={1}>
         {/* Status */}
         <ActionStatus
           visible={isWaitingForResponse && !!responseStartTime}
@@ -444,7 +444,7 @@ const TUIChat: React.FC<TUIChatProps> = ({
 
         {/* Temporary status message */}
         {statusMessage && (
-          <Box paddingX={1} paddingY={0}>
+          <Box paddingY={0}>
             <Text color="green">{statusMessage}</Text>
           </Box>
         )}
