@@ -72,17 +72,19 @@ describe("ProviderConnectionForm", () => {
     );
 
     stdin.write("key");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(lastFrame()).toContain("•••"));
     stdin.write("\r");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(lastFrame()).toContain("● API base URL:"));
     stdin.write("https://localhost/v1");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() =>
+      expect(lastFrame()).toContain("https://localhost/v1"),
+    );
     stdin.write("\r");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(lastFrame()).toContain("● Model name:"));
     stdin.write("my-model");
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.waitFor(() => expect(lastFrame()).toContain("my-model"));
     stdin.write("\r");
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.waitFor(() => expect(onConnect).toHaveBeenCalledOnce());
 
     expect(onConnect).toHaveBeenCalledWith(
       expect.objectContaining({
