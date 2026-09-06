@@ -9,7 +9,9 @@ import { toolPermissionManager } from "../../permissions/permissionManager.js";
 import { services } from "../../services/index.js";
 import {
   createSession,
+  loadSessionById,
   loadSession,
+  setCurrentSession as setPersistedCurrentSession,
   updateSessionHistory,
 } from "../../session.js";
 import { handleSlashCommands } from "../../slashCommands.js";
@@ -759,6 +761,29 @@ export function useChat({
     setQueuedMessages([]);
   };
 
+  const loadSelectedSession = async (sessionId: string): Promise<boolean> => {
+    const session = loadSessionById(sessionId);
+    if (!session) {
+      logger.warn("Could not load selected session", { sessionId });
+      return false;
+    }
+
+    // Keep the React session, persistence manager, and history service in
+    // sync. Updating only the rendered history would make the next message
+    // continue saving into the session that was open before /resume.
+    setPersistedCurrentSession(session);
+    setCurrentSession(session);
+    await services.chatHistory.loadSession(sessionId);
+    setCompactionIndex(findCompactionIndex(session.history));
+    setWasInterrupted(false);
+    setQueuedMessages([]);
+    setAttachedFiles([]);
+    setInputMode(true);
+    setIsChatHistoryInitialized(true);
+
+    return true;
+  };
+
   const handleEditMessage = async (
     messageIndex: number,
     newContent: string,
@@ -886,5 +911,6 @@ export function useChat({
     handleEditMessage,
     handleToolPermissionResponse,
     handleQuizAnswer,
+    loadSelectedSession,
   };
 }
