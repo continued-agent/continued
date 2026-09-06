@@ -26,7 +26,7 @@ const ActionStatus: React.FC<ActionStatusProps> = ({
   if (!visible) return null;
 
   return (
-    <Box paddingX={1} flexDirection="row" gap={1}>
+    <Box flexDirection="row" gap={1}>
       {showSpinner && <LoadingAnimation color={loadingColor} visible={true} />}
       <Text color={color}>{message}</Text>
       <Text color="dim">(</Text>

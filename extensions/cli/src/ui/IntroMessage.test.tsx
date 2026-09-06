@@ -35,6 +35,12 @@ describe("IntroMessage", () => {
     expect(lastFrame()).toContain("MOCK ASCII ART");
   });
 
+  it("does not add an empty row before the intro", () => {
+    const { lastFrame } = render(<IntroMessage />);
+
+    expect(lastFrame()?.split("\n")[0]).toContain("MOCK ASCII ART");
+  });
+
   it("shows tips when shouldShowTip returns true", async () => {
     const { shouldShowTip } = await import("./TipsDisplay.js");
     vi.mocked(shouldShowTip).mockReturnValue(true);
