@@ -1,5 +1,5 @@
 #!/usr/bin/expect -f
-# Automated demo script for Continue TUI
+# Automated demo script for Continued TUI
 
 set timeout 30
 log_user 1

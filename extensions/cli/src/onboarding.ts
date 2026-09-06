@@ -53,7 +53,7 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Persist a secret in Continue's user-level .env file without exposing it in
+ * Persist a secret in Continued's user-level .env file without exposing it in
  * config.yaml or in terminal output.
  */
 export function writeSecretToEnvFile(
