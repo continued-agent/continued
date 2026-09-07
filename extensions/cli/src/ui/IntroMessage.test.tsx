@@ -56,7 +56,7 @@ describe("IntroMessage", () => {
     expect(lastFrame()).toContain("model-name");
   });
 
-  it("keeps the reference layout compact between the logo and model", () => {
+  it("separates and aligns the intro blocks with the input column", () => {
     const config = { name: "Main Config", version: "1.0.0", rules: [] };
     const model = {
       name: "Google Gemini",
@@ -68,10 +68,13 @@ describe("IntroMessage", () => {
       <IntroMessage config={config} model={model} />,
     );
 
-    expect(lastFrame()).toBe(
-      ["MOCK ASCII ART", "Config: Main Config", "Model: Google Gemini"].join(
-        "\n",
-      ),
+    expect(lastFrame()?.trimEnd()).toBe(
+      [
+        "MOCK ASCII ART",
+        "",
+        "   Config: Main Config",
+        "   Model: Google Gemini",
+      ].join("\n"),
     );
   });
 

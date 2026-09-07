@@ -15,7 +15,11 @@ vi.mock("readline", () => ({
   createInterface: vi.fn(),
 }));
 
-import { question, questionWithChoices } from "./prompt.js";
+import {
+  PromptCancelledError,
+  question,
+  questionWithChoices,
+} from "./prompt.js";
 
 describe("prompt utilities", () => {
   let mockInterface: any;
@@ -99,7 +103,7 @@ describe("prompt utilities", () => {
       expect(result).toBe(userInput);
     });
 
-    it.skip("should handle SIGINT (Ctrl+C) by exiting process", async () => {
+    it("reports SIGINT (Ctrl+C) without exiting the process", async () => {
       const promptText = "Enter something: ";
       let sigintHandler: (() => void) | null = null;
 
@@ -123,9 +127,11 @@ describe("prompt utilities", () => {
         }, 10);
       });
 
-      // The promise should reject when SIGINT is triggered
-      await expect(question(promptText)).rejects.toThrow("Process exit");
-      expect(processExitSpy).toHaveBeenCalledWith(0);
+      await expect(question(promptText)).rejects.toBeInstanceOf(
+        PromptCancelledError,
+      );
+      expect(mockInterface.close).toHaveBeenCalled();
+      expect(processExitSpy).not.toHaveBeenCalled();
     });
   });
 

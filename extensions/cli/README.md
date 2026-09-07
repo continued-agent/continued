@@ -21,7 +21,7 @@ irm https://raw.githubusercontent.com/continued-agent/continued/main/extensions/
 Or install with npm if you have Node.js 20.20.1 or newer:
 
 ```bash
-npm i -g @continuedev/cli
+npm i -g @continued/cli
 ```
 
 The curl and PowerShell installers download the latest prebuilt artifact from

@@ -66,7 +66,7 @@ export function ProviderSelector({
       return;
     }
 
-    if (key.return && options[selectedIndex]) {
+    if ((key.return || input === "\n") && options[selectedIndex]) {
       onSelect(options[selectedIndex]);
     }
   });
@@ -131,20 +131,41 @@ export function selectOnboardingProvider(
     return Promise.resolve(null);
   }
 
-  return new Promise((resolve) => {
-    const app = render(
-      React.createElement(ProviderSelector, {
-        options,
-        onSelect: (provider: OnboardingProvider) => {
-          app.unmount();
-          resolve(provider);
-        },
-        onCancel: () => {
-          app.unmount();
-          resolve(null);
-        },
-      }),
-      { exitOnCtrlC: false },
-    );
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let app: ReturnType<typeof render>;
+
+    const finish = (provider: OnboardingProvider | null) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+
+      try {
+        // Ink unmounts synchronously, but resolving on the next turn gives its
+        // raw-mode cleanup a chance to finish before the API-key prompt starts.
+        app.unmount();
+        setImmediate(() => resolve(provider));
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    try {
+      app = render(
+        React.createElement(ProviderSelector, {
+          options,
+          onSelect: (provider: OnboardingProvider) => {
+            finish(provider);
+          },
+          onCancel: () => {
+            finish(null);
+          },
+        }),
+        { exitOnCtrlC: false },
+      );
+    } catch (error) {
+      reject(error);
+    }
   });
 }

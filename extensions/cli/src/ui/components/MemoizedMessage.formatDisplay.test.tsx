@@ -38,7 +38,7 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     expect(lastFrame()).toContain("Just a simple text message");
   });
 
-  it("should keep message bullets away from the terminal edge", () => {
+  it("aligns message content with the input bullet column", () => {
     const historyItem = createTestHistoryItem("Padded message");
 
     const { lastFrame } = render(
@@ -47,18 +47,18 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
       </Box>,
     );
 
-    expect(lastFrame()).toMatch(/^ {3}● Padded message$/);
+    expect(lastFrame()?.trimEnd()).toBe(" ● Padded message");
   });
 
-  it("keeps consecutive chat messages on adjoining rows", () => {
+  it("separates consecutive chat messages while keeping their content aligned", () => {
     const { lastFrame } = render(
       <Box flexDirection="column" marginX={1}>
-        <MemoizedMessage item={createTestHistoryItem("salut")} index={0} />
+        <MemoizedMessage item={createTestHistoryItem("Hello")} index={0} />
         <MemoizedMessage
           item={{
             message: {
               role: "assistant",
-              content: "Salut! Comment puis-je vous aider aujourd'hui ?",
+              content: "Hello! How can I help you today?",
             },
             contextItems: [],
           }}
@@ -67,10 +67,11 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
       </Box>,
     );
 
-    expect(lastFrame()).toBe(
+    expect(lastFrame()?.trimEnd()).toBe(
       [
-        "   ● salut",
-        "   ● Salut! Comment puis-je vous aider aujourd'hui ?",
+        " ● Hello",
+        "",
+        " ● Hello! How can I help you today?",
       ].join("\n"),
     );
   });
