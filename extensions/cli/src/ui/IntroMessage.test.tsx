@@ -28,10 +28,11 @@ describe("IntroMessage", () => {
     expect(lastFrame()).toContain("MOCK ASCII ART");
   });
 
-  it("does not add an empty row before the intro", () => {
+  it("adds an empty row before the intro", () => {
     const { lastFrame } = render(<IntroMessage />);
 
-    expect(lastFrame()?.split("\n")[0]).toContain("MOCK ASCII ART");
+    expect(lastFrame()?.split("\n")[0]).toBe("");
+    expect(lastFrame()?.split("\n")[1]).toContain("MOCK ASCII ART");
   });
 
   it("renders config name when config is provided", () => {
@@ -70,6 +71,7 @@ describe("IntroMessage", () => {
 
     expect(lastFrame()?.trimEnd()).toBe(
       [
+        "",
         "MOCK ASCII ART",
         "",
         "   Config: Main Config",
