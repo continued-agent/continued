@@ -184,7 +184,9 @@ export class VertexAIApi implements BaseLlmApi {
     // TODO - support anthropic prompt caching with "anthropic-beta" header
 
     if (this.config.apiKey) {
-      // Express mode - no Authorization header needed, API key is in URL
+      // Express mode - send the API key via header instead of a query
+      // parameter so it never leaks into URLs, error messages, or logs.
+      headers["x-goog-api-key"] = this.config.apiKey;
       return headers;
     } else {
       // Standard mode - use OAuth token
@@ -204,9 +206,8 @@ export class VertexAIApi implements BaseLlmApi {
     const apiBase = this.getApiBase();
     const url = new URL(endpoint, apiBase);
 
-    if (this.config.apiKey) {
-      url.searchParams.set("key", this.config.apiKey);
-    }
+    // Note: the API key is intentionally NOT placed in the query string; it is
+    // sent via the x-goog-api-key header in getAuthHeaders().
 
     return url;
   }
