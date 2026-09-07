@@ -6,6 +6,7 @@ set -euo pipefail
 
 REQUIRED_NODE_VERSION="20.20.1"
 PACKAGE_NAME="@continued/cli"
+LEGACY_PACKAGE_NAME="@continuedev/cli"
 CLI_COMMAND="cn"
 NETWORK_TIMEOUT=60
 FNM_INSTALL_DIR="$HOME/.local/share/fnm"
@@ -350,6 +351,15 @@ check_npm_permissions() {
     fi
 }
 
+remove_legacy_cli() {
+    if npm list --global --depth=0 "$LEGACY_PACKAGE_NAME" >/dev/null 2>&1; then
+        info "Removing legacy $LEGACY_PACKAGE_NAME before installing $PACKAGE_NAME..."
+        if ! npm uninstall --global "$LEGACY_PACKAGE_NAME"; then
+            error "Failed to remove legacy $LEGACY_PACKAGE_NAME. Remove it manually and try again."
+        fi
+    fi
+}
+
 install_cli() {
     info "Installing $PACKAGE_NAME from the continued-agent/continued release..."
 
@@ -374,6 +384,7 @@ install_cli() {
     fi
 
     verify_checksum "$archive" "$checksum"
+    remove_legacy_cli
 
     local npm_output
     local npm_exit_code=0
