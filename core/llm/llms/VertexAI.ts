@@ -185,7 +185,10 @@ class VertexAI extends BaseLLM {
       "Content-Type": "application/json",
     };
     if (this.apiKey) {
-      url.searchParams.set("key", this.apiKey);
+      // Send the API key via header instead of a query parameter so it never
+      // leaks into URLs, error messages, logs, or proxy access logs.
+      // Google APIs accept `x-goog-api-key` for Express mode.
+      headers["x-goog-api-key"] = this.apiKey;
     } else {
       const client = await this.clientPromise;
       const result = await client?.getAccessToken();

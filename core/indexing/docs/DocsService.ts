@@ -37,6 +37,16 @@ import { runLanceMigrations, runSqliteMigrations } from "./migrations";
 import type * as LanceType from "vectordb";
 import { LLMError } from "../../llm";
 
+/**
+ * Escapes a value for use inside a single-quoted string literal in a LanceDB
+ * filter expression. `startUrl` comes from user/repo-supplied config and may
+ * contain quotes; without escaping it could break out of the literal and alter
+ * the filter (e.g. broaden a DELETE to all rows).
+ */
+function escapeLanceFilterValue(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
 // Purposefully lowercase because lancedb converts
 export interface LanceDbDocsRow {
   title: string;
@@ -805,7 +815,7 @@ export default class DocsService {
         startUrl,
       });
       const rows = (await table
-        .filter(`starturl = '${startUrl}'`)
+        .filter(`starturl = '${escapeLanceFilterValue(startUrl)}'`)
         .limit(1000)
         .execute()) as LanceDbDocsRow[];
 
@@ -844,7 +854,7 @@ export default class DocsService {
       docs = await table
         .search(vector)
         .limit(nRetrieve)
-        .where(`starturl = '${startUrl}'`)
+        .where(`starturl = '${escapeLanceFilterValue(startUrl)}'`)
         .execute();
     } catch (e: any) {
       console.warn("Error retrieving chunks from LanceDB", e);
@@ -861,7 +871,7 @@ export default class DocsService {
       });
 
       const rows = (await table
-        .filter(`starturl = '${startUrl}'`)
+        .filter(`starturl = '${escapeLanceFilterValue(startUrl)}'`)
         .select(["path"]) // Only select path to minimize data transfer
         .limit(99999999) // Default is 10, we want to show all
         .execute()) as { path: string }[];
@@ -1233,7 +1243,7 @@ export default class DocsService {
     for (const tableName of this.lanceTableNamesSet) {
       const conn = await lance.connect(getLanceDbPath());
       const table = await conn.openTable(tableName);
-      await table.delete(`starturl = '${startUrl}'`);
+      await table.delete(`starturl = '${escapeLanceFilterValue(startUrl)}'`);
     }
   }
 

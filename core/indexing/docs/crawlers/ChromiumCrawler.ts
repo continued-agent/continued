@@ -44,25 +44,28 @@ export class ChromiumCrawler {
     );
 
     const stats = await PCR(ChromiumInstaller.PCR_CONFIG);
-    const browser = await stats.puppeteer.launch({
-      args: [
-        "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
-      ],
-      executablePath: stats.executablePath,
-    });
-    const page = await browser.newPage();
-
+    let browser: any;
     try {
-      yield* this.crawlSitePages(page, this.startUrl, 0);
-    } catch (e) {
-      console.debug("Error getting links: ", e);
-      console.debug(
-        "Setting 'useChromiumForDocsCrawling' to 'false' in config.json",
-      );
+      browser = await stats.puppeteer.launch({
+        args: [
+          "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.150 Safari/537.36",
+        ],
+        executablePath: stats.executablePath,
+      });
+      const page = await browser.newPage();
 
-      ChromiumCrawler.setUseChromiumForDocsCrawling(false);
+      try {
+        yield* this.crawlSitePages(page, this.startUrl, 0);
+      } catch (e) {
+        console.debug("Error getting links: ", e);
+        console.debug(
+          "Setting 'useChromiumForDocsCrawling' to 'false' in config.json",
+        );
+
+        ChromiumCrawler.setUseChromiumForDocsCrawling(false);
+      }
     } finally {
-      await browser.close();
+      await browser?.close();
     }
   }
 
@@ -73,9 +76,12 @@ export class ChromiumCrawler {
    */
   private async gotoPageAndHandleRedirects(page: Page, url: string) {
     const MAX_PAGE_WAIT_MS = 5000;
+    // Bound the navigation itself so a page that never reaches network-idle
+    // cannot hang the crawl indefinitely.
+    const MAX_NAVIGATION_MS = 30_000;
 
     await page.goto(url, {
-      timeout: 0,
+      timeout: MAX_NAVIGATION_MS,
       waitUntil: "networkidle2",
     });
 

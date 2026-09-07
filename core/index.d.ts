@@ -1429,6 +1429,7 @@ export type InternalSseMcpOptions = BaseInternalMCPOptions & {
 export type InternalWebsocketMcpOptions = BaseInternalMCPOptions & {
   type: "websocket"; // websocket requires explicit type
   url: string;
+  apiKey?: string;
 };
 
 export type InternalMcpOptions =

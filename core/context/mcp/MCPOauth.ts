@@ -45,6 +45,12 @@ const createServerForOAuth = () =>
       const code = parsedUrl.query["code"] as string;
       const state = parsedUrl.query["state"] as string | undefined;
 
+      // Reject callbacks that do not carry the CSRF `state` parameter; the
+      // handler must never fall back to a single in-flight context.
+      if (!state) {
+        throw new Error("no state parameter found");
+      }
+
       void handleMCPOauthCode(code, state);
 
       const html = `
@@ -216,7 +222,9 @@ class MCPConnectionOauthProvider implements OAuthClientProvider {
       }
       if (!serverInstance.listening) {
         await new Promise<void>((resolve, reject) => {
-          serverInstance!.listen(PORT, () => {
+          // Bind to loopback only: this server exchanges OAuth codes/state and
+          // must not be reachable from other hosts or other local processes.
+          serverInstance!.listen(PORT, "127.0.0.1", () => {
             console.debug(
               `Server started for MCP Oauth process at http://localhost:${PORT}/`,
             );
@@ -277,6 +285,10 @@ async function handleMCPOauthCode(authorizationCode: string, state?: string) {
   let serverUrl: string | undefined;
   let context: MCPOauthContext | undefined;
 
+  // The `state` parameter is required to match the callback to the in-flight
+  // flow. Never fall back to "the only authenticating context": an attacker
+  // who can reach the callback (e.g. a local process or a malicious webpage
+  // on http://localhost:3000) could otherwise inject their own auth code.
   if (state) {
     // Use state parameter to find the correct server
     serverUrl = stateToServerUrl.get(state);
@@ -284,11 +296,8 @@ async function handleMCPOauthCode(authorizationCode: string, state?: string) {
       context = authenticatingContexts.get(serverUrl);
     }
   } else {
-    // Fallback: if no state or single context, use the first one
-    const contexts = Array.from(authenticatingContexts.entries());
-    if (contexts.length === 1) {
-      [serverUrl, context] = contexts[0];
-    }
+    console.error("No state parameter supplied for MCP OAuth callback");
+    return;
   }
 
   if (!context || !serverUrl) {

@@ -13,7 +13,7 @@ import {
   SharedConfigSchema,
 } from "../config/sharedConfig";
 
-import { getGlobalContextFilePath } from "./paths";
+import { getGlobalContextFilePath, setConfigFilePermissions } from "./paths";
 
 export type GlobalContextModelSelections = Partial<
   Record<ModelRole, string | null>
@@ -67,6 +67,7 @@ export class GlobalContext {
     const filepath = getGlobalContextFilePath();
     if (!fs.existsSync(filepath)) {
       fs.writeFileSync(filepath, JSON.stringify({ [key]: value }, null, 2));
+      setConfigFilePermissions(filepath);
     } else {
       const data = fs.readFileSync(filepath, "utf-8");
 
@@ -107,11 +108,13 @@ export class GlobalContext {
         const newData = { ...salvaged, [key]: value };
 
         fs.writeFileSync(filepath, JSON.stringify(newData, null, 2));
+        setConfigFilePermissions(filepath);
         return;
       }
 
       parsed[key] = value;
       fs.writeFileSync(filepath, JSON.stringify(parsed, null, 2));
+      setConfigFilePermissions(filepath);
     }
   }
 

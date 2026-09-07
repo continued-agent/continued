@@ -205,52 +205,92 @@ export class ChunkCodebaseIndex implements CodebaseIndex {
   ) {
     await new Promise<void>((resolve, reject) => {
       db.db.serialize(() => {
+        const chunksSQL =
+          "INSERT INTO chunks (cacheKey, path, idx, startLine, endLine, content) VALUES (?, ?, ?, ?, ?, ?)";
+        const chunkTagsSQL =
+          "INSERT INTO chunk_tags (chunkId, tag) VALUES (last_insert_rowid(), ?)";
+
         db.db.exec("BEGIN", (err: Error | null) => {
           if (err) {
             reject(new Error("error creating transaction", { cause: err }));
+            return;
           }
-        });
-        const chunksSQL =
-          "INSERT INTO chunks (cacheKey, path, idx, startLine, endLine, content) VALUES (?, ?, ?, ?, ?, ?)";
-        chunks.map((c) => {
-          db.db.run(
-            chunksSQL,
-            [c.digest, c.filepath, c.index, c.startLine, c.endLine, c.content],
-            (result: RunResult, err: Error) => {
-              if (err) {
-                reject(
-                  new Error("error inserting into chunks table", {
-                    cause: err,
-                  }),
+
+          let pending = chunks.length;
+          let failed = false;
+          const fail = (error: Error) => {
+            if (failed) {
+              return;
+            }
+            failed = true;
+            // Roll back the whole batch so a partial insert can never be
+            // persisted (atomicity), and so the write lock is always released.
+            db.db.exec("ROLLBACK", () => reject(error));
+          };
+          const maybeComplete = () => {
+            if (failed || pending > 0) {
+              return;
+            }
+            db.db.exec("COMMIT", (commitErr: Error | null) => {
+              if (commitErr) {
+                db.db.exec("ROLLBACK", () =>
+                  reject(
+                    new Error(
+                      "error while committing insert chunks transaction",
+                      {
+                        cause: commitErr,
+                      },
+                    ),
+                  ),
                 );
+              } else {
+                resolve();
               }
-            },
-          );
-          const chunkTagsSQL =
-            "INSERT INTO chunk_tags (chunkId, tag) VALUES (last_insert_rowid(), ?)";
-          db.db.run(
-            chunkTagsSQL,
-            [tagString],
-            (result: RunResult, err: Error) => {
-              if (err) {
-                reject(
-                  new Error("error inserting into chunk_tags table", {
-                    cause: err,
-                  }),
-                );
-              }
-            },
-          );
-        });
-        db.db.exec("COMMIT", (err: Error | null) => {
-          if (err) {
-            reject(
-              new Error("error while committing insert chunks transaction", {
-                cause: err,
-              }),
+            });
+          };
+
+          if (pending === 0) {
+            maybeComplete();
+            return;
+          }
+
+          for (const c of chunks) {
+            db.db.run(
+              chunksSQL,
+              [
+                c.digest,
+                c.filepath,
+                c.index,
+                c.startLine,
+                c.endLine,
+                c.content,
+              ],
+              (_result: RunResult, insertErr: Error) => {
+                if (insertErr) {
+                  fail(
+                    new Error("error inserting into chunks table", {
+                      cause: insertErr,
+                    }),
+                  );
+                }
+              },
             );
-          } else {
-            resolve();
+            db.db.run(
+              chunkTagsSQL,
+              [tagString],
+              (_result: RunResult, insertErr: Error) => {
+                if (insertErr) {
+                  fail(
+                    new Error("error inserting into chunk_tags table", {
+                      cause: insertErr,
+                    }),
+                  );
+                  return;
+                }
+                pending -= 1;
+                maybeComplete();
+              },
+            );
           }
         });
       });
