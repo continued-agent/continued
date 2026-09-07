@@ -22,6 +22,7 @@ $ProgressPreference = 'SilentlyContinue'  # Faster downloads
 
 $script:RequiredNodeVersion = [version]"20.20.1"
 $script:PackageName = "@continued/cli"
+$script:LegacyPackageName = "@continuedev/cli"
 $script:CliCommand = "cn"
 $script:FnmVersion = "1.39.0"
 $script:FnmSha256 = "8183bed4348cb78fdfd8abb3d1247fbeab7b2082f941363929c61e747c001e10"
@@ -340,6 +341,16 @@ function Install-Cli {
             throw "The downloaded CLI checksum does not match the release checksum."
         }
         Write-Success "Verified the CLI release checksum"
+
+        npm list --global --depth=0 $script:LegacyPackageName 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Info "Removing legacy $script:LegacyPackageName before installing $script:PackageName..."
+            $uninstallOutput = npm uninstall --global $script:LegacyPackageName 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host ($uninstallOutput -join [Environment]::NewLine) -ForegroundColor Red
+                throw "Failed to remove legacy $script:LegacyPackageName. Remove it manually and try again."
+            }
+        }
 
         $npmOutput = npm install -g $archivePath --ignore-scripts --omit=dev 2>&1
         $npmExitCode = $LASTEXITCODE
