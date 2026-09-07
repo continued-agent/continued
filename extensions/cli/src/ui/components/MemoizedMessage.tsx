@@ -57,7 +57,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     // Handle system messages
     if (isSystem) {
       return (
-        <Box key={index} marginBottom={1} paddingX={1}>
+        <Box key={index} marginBottom={1} paddingX={2}>
           <Text color="dim" italic>
             {message.content}
           </Text>
@@ -71,7 +71,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
         <Box
           key={index}
           marginBottom={1}
-          paddingX={1}
+          paddingX={2}
           borderStyle="single"
           borderBottom={false}
           borderLeft={false}
@@ -84,7 +84,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     // Handle tool calls
     if (toolCallStates && toolCallStates.length > 0) {
       return (
-        <Box key={index} flexDirection="column" paddingX={1}>
+        <Box key={index} flexDirection="column" marginBottom={1}>
           {/* Render assistant message content if any */}
           {message.content && (
             <Box marginBottom={1}>
@@ -164,7 +164,7 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
     const isStreaming = isAssistant && !message.content && !toolCallStates;
 
     return (
-      <Box key={index} paddingX={2}>
+      <Box key={index} marginBottom={1}>
         <Text color={isUser ? "blue" : "white"}>{hideBullet ? " " : "●"}</Text>
         <Text> </Text>
         {isUser ? (

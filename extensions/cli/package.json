@@ -1,5 +1,5 @@
 {
-  "name": "@continuedev/cli",
+  "name": "@continued/cli",
   "version": "0.0.0-dev",
   "description": "Continued CLI",
   "main": "dist/index.js",

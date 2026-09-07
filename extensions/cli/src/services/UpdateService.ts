@@ -159,7 +159,7 @@ export class UpdateService extends BaseService<UpdateServiceState> {
       const npmArgs = [
         "install",
         "--global",
-        `@continuedev/cli@${latestVersion}`,
+        `@continued/cli@${latestVersion}`,
       ];
       const { stdout, stderr } =
         process.platform === "win32"

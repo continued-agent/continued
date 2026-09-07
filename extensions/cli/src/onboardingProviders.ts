@@ -117,7 +117,7 @@ export const ONBOARDING_PROVIDERS: OnboardingProvider[] = [
     id: "opencode-zen",
     label: "OpenCode Zen (OpenAI-compatible)",
     provider: "openai",
-    model: "claude-sonnet-4-5",
+    model: "qwen3.6-plus",
     apiKeyEnv: "OPENCODE_API_KEY",
     apiBase: "https://opencode.ai/zen/v1",
     description: "OpenCode Zen through its compatible API",

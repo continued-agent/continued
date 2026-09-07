@@ -5,7 +5,7 @@ set -euo pipefail
 # curl -fsSL https://raw.githubusercontent.com/continued-agent/continued/main/extensions/cli/scripts/install.sh | bash
 
 REQUIRED_NODE_VERSION="20.20.1"
-PACKAGE_NAME="@continuedev/cli"
+PACKAGE_NAME="@continued/cli"
 CLI_COMMAND="cn"
 NETWORK_TIMEOUT=60
 FNM_INSTALL_DIR="$HOME/.local/share/fnm"

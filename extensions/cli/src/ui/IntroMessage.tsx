@@ -53,7 +53,6 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
             <Text color="dim">{prompt.description}</Text>
           </Text>
         ))}
-        <Text> </Text>
       </>
     ) : null;
 
@@ -68,7 +67,6 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
             - <Text color="white">{rule}</Text>
           </Text>
         ))}
-        <Text> </Text>
       </>
     ) : null;
 
@@ -83,54 +81,55 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
             - <Text color="white">{server?.name}</Text>
           </Text>
         ))}
-        <Text> </Text>
       </>
     ) : null;
 
   return (
     <Box flexDirection="column">
+      <Text> </Text>
       {/* ASCII Art */}
       <Text>{getDisplayableAsciiArt()}</Text>
+      <Text> </Text>
 
-      {/* Organization name */}
-      {organizationName && (
-        <Text color="blue">
-          <Text bold>Org:</Text> <Text color="white">{organizationName}</Text>
-        </Text>
-      )}
+      <Box flexDirection="column" paddingLeft={3}>
+        {/* Organization name */}
+        {organizationName && (
+          <Text color="blue">
+            <Text bold>Org:</Text> <Text color="white">{organizationName}</Text>
+          </Text>
+        )}
 
-      {/* Agent name */}
-      {config && (
-        <Text color="blue">
-          <Text bold>Config:</Text> <Text color="white">{config.name}</Text>
-        </Text>
-      )}
+        {/* Agent name */}
+        {config && (
+          <Text color="blue">
+            <Text bold>Config:</Text> <Text color="white">{config.name}</Text>
+          </Text>
+        )}
 
-      {/* Model */}
-      {model ? (
-        <Text color="blue">
-          <Text bold>Model:</Text>{" "}
-          <Text color="white">{model.name.split("/").pop()}</Text>
-        </Text>
-      ) : (
-        <Text color="blue">
-          <Text bold>Model:</Text> <Text color="dim">Loading...</Text>
-        </Text>
-      )}
+        {/* Model */}
+        {model ? (
+          <Text color="blue">
+            <Text bold>Model:</Text>{" "}
+            <Text color="white">{model.name.split("/").pop()}</Text>
+          </Text>
+        ) : (
+          <Text color="blue">
+            <Text bold>Model:</Text> <Text color="dim">Loading...</Text>
+          </Text>
+        )}
 
-      {/* Model capability warning */}
-      {model && !modelCapable && (
-        <>
+        {/* Model capability warning */}
+        {model && !modelCapable && (
           <ModelCapabilityWarning
             modelName={model.name.split("/").pop() || model.name}
           />
-          <Text> </Text>
-        </>
-      )}
+        )}
 
-      {renderMcpPrompts()}
-      {renderRules()}
-      {renderMcpServers()}
+        {renderMcpPrompts()}
+        {renderRules()}
+        {renderMcpServers()}
+      </Box>
+      <Text> </Text>
     </Box>
   );
 };

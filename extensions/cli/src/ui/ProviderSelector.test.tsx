@@ -62,6 +62,24 @@ describe("ProviderSelector", () => {
     unmount();
   });
 
+  it("accepts line-feed Enter input from terminals that normalize carriage returns", async () => {
+    const providers = [createProvider(1)];
+    const onSelect = vi.fn();
+    const { stdin, unmount } = render(
+      <ProviderSelector
+        options={providers}
+        onSelect={onSelect}
+        onCancel={vi.fn()}
+      />,
+    );
+
+    stdin.write("\n");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(onSelect).toHaveBeenCalledWith(providers[0]);
+    unmount();
+  });
+
   it("renders a useful empty state without trapping the selector", () => {
     const { lastFrame, unmount } = render(
       <ProviderSelector options={[]} onSelect={vi.fn()} onCancel={vi.fn()} />,

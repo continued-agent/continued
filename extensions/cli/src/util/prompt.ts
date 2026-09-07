@@ -1,27 +1,48 @@
 import * as readline from "readline";
 
+export class PromptCancelledError extends Error {
+  constructor() {
+    super("Input cancelled");
+    this.name = "PromptCancelledError";
+  }
+}
+
 /**
  * Creates a promise-based question prompt using readline
  * Properly handles backspace and Ctrl+C
  */
 export function question(prompt: string): Promise<string> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const rl = readline.createInterface({
       input: process.stdin,
       output: process.stdout,
       terminal: true,
     });
+    let settled = false;
 
-    // Handle Ctrl+C properly
-    rl.on("SIGINT", () => {
-      console.log("\n");
+    const close = () => {
+      if (settled) {
+        return false;
+      }
+      settled = true;
       rl.close();
-      process.exit(0);
+      return true;
+    };
+
+    // Let callers decide how a cancellation should end the CLI. Exiting here
+    // can interrupt provider onboarding midway through persistence and leaves
+    // the terminal in an inconsistent state.
+    rl.on("SIGINT", () => {
+      if (close()) {
+        process.stdout.write("\n");
+        reject(new PromptCancelledError());
+      }
     });
 
     rl.question(prompt, (answer) => {
-      rl.close();
-      resolve(answer);
+      if (close()) {
+        resolve(answer);
+      }
     });
   });
 }
@@ -59,7 +80,7 @@ export function secretQuestion(prompt: string): Promise<string> {
         if (character === "\u0003") {
           cleanup();
           stdout.write("\n");
-          reject(new Error("Input cancelled"));
+          reject(new PromptCancelledError());
           return;
         }
 

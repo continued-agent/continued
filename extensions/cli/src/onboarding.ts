@@ -14,7 +14,11 @@ import {
   OnboardingProvider,
 } from "./onboardingProviders.js";
 import { selectOnboardingProvider } from "./ui/ProviderSelector.js";
-import { question, secretQuestion } from "./util/prompt.js";
+import {
+  PromptCancelledError,
+  question,
+  secretQuestion,
+} from "./util/prompt.js";
 import {
   ProviderModelConfig,
   updateAnthropicModelInYaml,
@@ -409,7 +413,16 @@ export async function runOnboardingFlow(
     return false;
   }
 
-  const setup = await collectProviderSetup(provider);
+  let setup: ProviderSetup;
+  try {
+    setup = await collectProviderSetup(provider);
+  } catch (error) {
+    if (error instanceof PromptCancelledError) {
+      console.log(chalk.yellow("Provider setup cancelled."));
+      return false;
+    }
+    throw error;
+  }
   await createOrUpdateProviderConfig(setup);
   console.log(
     chalk.green(`✓ Config file updated successfully at ${CONFIG_PATH}`),
