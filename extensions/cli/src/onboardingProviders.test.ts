@@ -76,7 +76,9 @@ describe("ONBOARDING_PROVIDERS", () => {
 
   it("constructs an adapter for every provider without making a network request", () => {
     for (const provider of ONBOARDING_PROVIDERS) {
-      expect(() => constructLlmApi(createAdapterConfig(provider))).not.toThrow();
+      expect(() =>
+        constructLlmApi(createAdapterConfig(provider)),
+      ).not.toThrow();
       expect(constructLlmApi(createAdapterConfig(provider))).toBeDefined();
     }
   });

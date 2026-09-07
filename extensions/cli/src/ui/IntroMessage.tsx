@@ -94,8 +94,7 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
         {/* Organization name */}
         {organizationName && (
           <Text color="blue">
-            <Text bold>Org:</Text>{" "}
-            <Text color="white">{organizationName}</Text>
+            <Text bold>Org:</Text> <Text color="white">{organizationName}</Text>
           </Text>
         )}
 

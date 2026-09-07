@@ -68,11 +68,7 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     );
 
     expect(lastFrame()?.trimEnd()).toBe(
-      [
-        " ● Hello",
-        "",
-        " ● Hello! How can I help you today?",
-      ].join("\n"),
+      [" ● Hello", "", " ● Hello! How can I help you today?"].join("\n"),
     );
   });
 
