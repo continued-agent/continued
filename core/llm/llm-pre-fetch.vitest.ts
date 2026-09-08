@@ -86,16 +86,18 @@ describe("LLM Pre-fetch", () => {
     vi.clearAllMocks();
     const gemini = new Gemini({ model: "gemini-something", apiKey: "invalid" });
     await dudLLMCall(gemini, messagesWithInvalidToolCallArgs);
-    expect(fetchwithRequestOptions).toHaveBeenCalledWith(
-      expect.any(URL),
-      {
-        method: "POST",
-        // headers: expect.any(Object),
-        signal: expect.any(AbortSignal),
-        body: expect.stringContaining('"name":"say_name","args":{}'),
+    const geminiCall = vi.mocked(fetchwithRequestOptions).mock.calls[0];
+    expect(geminiCall[0]).toBeInstanceOf(URL);
+    // The API key must not leak into the request URL (it is sent via header).
+    expect(geminiCall[0].toString()).not.toContain("key=");
+    expect(geminiCall[1]).toMatchObject({
+      method: "POST",
+      body: expect.stringContaining('"name":"say_name","args":{}'),
+      headers: {
+        "x-goog-api-key": "invalid",
+        "Content-Type": "application/json",
       },
-      expect.any(Object),
-    );
+    });
 
     // OPENAI DOES NOT NEED TO CLEAR INVALID TOOL CALL ARGS BECAUSE IT STORES THEM IN STRINGS
     vi.clearAllMocks();

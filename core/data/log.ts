@@ -16,7 +16,7 @@ import { ContinueConfig, IdeInfo, IdeSettings } from "../index.js";
 import { getDevDataFilePath } from "../util/paths.js";
 import { joinPathsToUri } from "../util/uri.js";
 
-const DEFAULT_DEV_DATA_LEVEL: DataLogLevel = "all";
+const DEFAULT_DEV_DATA_LEVEL: DataLogLevel = "noCode";
 export const LOCAL_DEV_DATA_VERSION = "0.2.0";
 export class DataLogger {
   private static instance: DataLogger | null = null;

@@ -601,7 +601,15 @@ function llmToSerializedModelDescription(llm: ILLM): ModelDescription {
     underlyingProviderName: llm.underlyingProviderName,
     model: llm.model,
     title: llm.title ?? llm.model,
-    apiKey: llm.apiKey,
+    // Redact the literal API key before sending it to the webview. The GUI only
+    // needs to know whether a key is configured ("!== \"\"") and whether it is a
+    // `secrets.` reference (used for error messaging). Secrets references are
+    // kept as-is (they are a location, not the secret); literal keys are masked.
+    apiKey: llm.apiKey?.startsWith("secrets.")
+      ? llm.apiKey
+      : llm.apiKey
+        ? "<redacted>"
+        : "",
     apiBase: llm.apiBase,
     contextLength: llm.contextLength,
     template: llm.template,
@@ -636,7 +644,8 @@ async function finalToBrowserConfig(
     contextProviders: final.contextProviders?.map((c) => c.description),
     disableIndexing: final.disableIndexing,
     disableSessionTitles: final.disableSessionTitles,
-    userToken: final.userToken,
+    // userToken intentionally NOT serialized to the webview: it is an
+    // authentication token for the Continue server and has no GUI consumer.
     ui: final.ui,
     experimental: final.experimental,
     rules: final.rules,

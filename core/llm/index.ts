@@ -87,6 +87,51 @@ export function isModelInstaller(provider: any): provider is ModelInstaller {
 
 type InteractionStatus = "in_progress" | "success" | "error" | "cancelled";
 
+const SENSITIVE_URL_QUERY_KEYS = new Set([
+  "key",
+  "api_key",
+  "apikey",
+  "token",
+  "access_token",
+  "sig",
+  "signature",
+  "credential",
+]);
+
+/** Strips sensitive query parameters and userinfo from a URL before logging. */
+export function sanitizeUrlForLogging(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (SENSITIVE_URL_QUERY_KEYS.has(key.toLowerCase())) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    // Not parseable as a URL; fall back to a regex scrub for `key=`-style params.
+    return url.replace(
+      /([?&](?:key|api_key|apikey|token|sig|access_token)=)[^&#]*/gi,
+      "$1<redacted>",
+    );
+  }
+}
+
+/** Scrub common credential patterns from free-form text before logging. */
+export function sanitizeSecretsForLogging(text: string): string {
+  return text
+    .replace(
+      /((?:x-goog-api-key|x-api-key|authorization)\s*[:=]\s*)([^\s,;]+)/gi,
+      "$1<redacted>",
+    )
+    .replace(
+      /([?&](?:key|api_key|apikey|token|sig|access_token)=)[^&#]*/gi,
+      "$1<redacted>",
+    );
+}
+
 export abstract class BaseLLM implements ILLM {
   static providerName: string;
   static defaultOptions: Partial<LLMOptions> | undefined = undefined;
@@ -442,7 +487,7 @@ export abstract class BaseLLM implements ILLM {
       }
     }
     return new Error(
-      `HTTP ${resp.status} ${resp.statusText} from ${resp.url}\n\n${text}`,
+      `HTTP ${resp.status} ${resp.statusText} from ${sanitizeUrlForLogging(resp.url)}\n\n${sanitizeSecretsForLogging(text)}`,
     );
   }
 
@@ -470,7 +515,7 @@ export abstract class BaseLLM implements ILLM {
       } catch (e: any) {
         Logger.error(e, {
           context: "llm_fetch",
-          url: String(input),
+          url: sanitizeUrlForLogging(String(input)),
           method: init?.method || "GET",
           model: this.model,
           provider: this.providerName,

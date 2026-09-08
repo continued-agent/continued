@@ -26,6 +26,16 @@ import {
 import type * as LanceType from "vectordb";
 import { tagToString } from "./utils";
 
+/**
+ * Escapes a value for use inside a single-quoted string literal in a LanceDB
+ * filter expression. Paths/cacheKeys originate from the filesystem or config
+ * and may contain quotes; without escaping they could break out of the string
+ * literal and alter the filter (e.g. broaden a DELETE).
+ */
+function escapeLanceFilterValue(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
 interface LanceDbRow {
   uuid: string;
   path: string;
@@ -364,7 +374,7 @@ export class LanceDbIndex implements CodebaseIndex {
 
       for (const { path, cacheKey } of toDel) {
         await lanceTable.delete(
-          `cachekey = '${cacheKey}' AND path = '${path}'`,
+          `cachekey = '${escapeLanceFilterValue(cacheKey)}' AND path = '${escapeLanceFilterValue(path)}'`,
         );
 
         accumulatedProgress += 1 / toDel.length / 3;
@@ -419,7 +429,9 @@ export class LanceDbIndex implements CodebaseIndex {
     const table = await db.openTable(tableName);
     let query = table.search(vector);
     if (directory) {
-      query = query.where(`path LIKE '${directory}%'`).limit(300);
+      query = query
+        .where(`path LIKE '${escapeLanceFilterValue(directory)}%'`)
+        .limit(300);
     } else {
       query = query.limit(n);
     }
@@ -499,48 +511,77 @@ export class LanceDbIndex implements CodebaseIndex {
   ): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       db.db.serialize(() => {
+        const sql =
+          "INSERT INTO lance_db_cache (uuid, cacheKey, path, artifact_id, vector, startLine, endLine, contents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+
         db.db.exec("BEGIN", (err: Error | null) => {
           if (err) {
             reject(new Error("error creating transaction", { cause: err }));
+            return;
           }
-        });
 
-        const sql =
-          "INSERT INTO lance_db_cache (uuid, cacheKey, path, artifact_id, vector, startLine, endLine, contents) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        rows.map((r) => {
-          db.db.run(
-            sql,
-            [
-              r.uuid,
-              r.cachekey,
-              r.path,
-              this.artifactId,
-              JSON.stringify(r.vector),
-              r.startLine,
-              r.endLine,
-              r.contents,
-            ],
-            (result: RunResult, err: Error) => {
-              if (err) {
-                reject(
-                  new Error("error inserting into lance_db_cache table", {
-                    cause: err,
-                  }),
+          let pending = rows.length;
+          let failed = false;
+          const fail = (error: Error) => {
+            if (failed) {
+              return;
+            }
+            failed = true;
+            // Roll back so a partial insert is never persisted and the write
+            // lock is always released.
+            db.db.exec("ROLLBACK", () => reject(error));
+          };
+          const maybeComplete = () => {
+            if (failed || pending > 0) {
+              return;
+            }
+            db.db.exec("COMMIT", (commitErr: Error | null) => {
+              if (commitErr) {
+                db.db.exec("ROLLBACK", () =>
+                  reject(
+                    new Error(
+                      "error while committing insert into lance_db_rows transaction",
+                      { cause: commitErr },
+                    ),
+                  ),
                 );
+              } else {
+                resolve();
               }
-            },
-          );
-        });
-        db.db.exec("COMMIT", (err: Error | null) => {
-          if (err) {
-            reject(
-              new Error(
-                "error while committing insert into lance_db_rows transaction",
-                { cause: err },
-              ),
+            });
+          };
+
+          if (pending === 0) {
+            maybeComplete();
+            return;
+          }
+
+          for (const r of rows) {
+            db.db.run(
+              sql,
+              [
+                r.uuid,
+                r.cachekey,
+                r.path,
+                this.artifactId,
+                JSON.stringify(r.vector),
+                r.startLine,
+                r.endLine,
+                r.contents,
+              ],
+              (result: RunResult, insertErr: Error) => {
+                if (insertErr) {
+                  fail(
+                    new Error("error inserting into lance_db_cache table", {
+                      cause: insertErr,
+                    }),
+                  );
+                  return;
+                }
+                pending -= 1;
+                maybeComplete();
+              },
             );
-          } else {
-            resolve();
           }
         });
       });

@@ -10,6 +10,47 @@ import { getProxy, shouldBypassProxy } from "./util.js";
 
 const { http, https } = (followRedirects as any).default;
 
+const SENSITIVE_LOG_HEADERS = new Set([
+  "authorization",
+  "x-api-key",
+  "x-goog-api-key",
+  "proxy-authorization",
+  "cookie",
+]);
+
+function redactHeader(key: string, value: string): string {
+  return SENSITIVE_LOG_HEADERS.has(key.toLowerCase()) ? "<redacted>" : value;
+}
+
+/** Strips sensitive query params from a URL before it reaches any log. */
+function sanitizeUrlForLogging(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.username = "";
+    parsed.password = "";
+    for (const key of [
+      "key",
+      "api_key",
+      "apikey",
+      "token",
+      "access_token",
+      "sig",
+      "signature",
+      "credential",
+    ]) {
+      if (parsed.searchParams.has(key)) {
+        parsed.searchParams.delete(key);
+      }
+    }
+    return parsed.toString();
+  } catch {
+    return url.replace(
+      /([?&](?:key|api_key|apikey|token|sig|access_token)=)[^&#]*/gi,
+      "$1<redacted>",
+    );
+  }
+}
+
 function logRequest(
   method: string,
   url: URL,
@@ -20,12 +61,12 @@ function logRequest(
 ) {
   console.log("=== FETCH REQUEST ===");
   console.log(`Method: ${method}`);
-  console.log(`URL: ${url.toString()}`);
+  console.log(`URL: ${sanitizeUrlForLogging(url.toString())}`);
 
   // Log headers in curl format
   console.log("Headers:");
   for (const [key, value] of Object.entries(headers)) {
-    console.log(`  -H '${key}: ${value}'`);
+    console.log(`  -H '${key}: ${redactHeader(key, value)}'`);
   }
 
   // Log proxy information
@@ -41,7 +82,7 @@ function logRequest(
   // Generate equivalent curl command
   let curlCommand = `curl -X ${method}`;
   for (const [key, value] of Object.entries(headers)) {
-    curlCommand += ` -H '${key}: ${value}'`;
+    curlCommand += ` -H '${key}: ${redactHeader(key, value)}'`;
   }
   if (body) {
     curlCommand += ` -d '${body}'`;

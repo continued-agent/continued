@@ -281,9 +281,30 @@ const StyledMarkdownPreview = memo(function StyledMarkdownPreview(
     rehypeReactOptions: {
       components: {
         a: ({ ...aProps }) => {
+          // Only allow safe URL schemes. `javascript:`, `data:text/html`,
+          // `vbscript:` etc. from AI/prompt content would otherwise execute in
+          // the webview origin — restrict to standard web and app-internal
+          // schemes and neutralize everything else.
+          const href = aProps.href ?? "";
+          let safeHref = href;
+          try {
+            const url = new URL(href, window.location.href);
+            if (
+              !["http:", "https:", "vscode:", "command:"].includes(url.protocol)
+            ) {
+              safeHref = "#";
+            }
+          } catch {
+            safeHref = "#";
+          }
           return (
             <ToolTip place="top" className="m-0 p-0" content={aProps.href}>
-              <a href={aProps.href} target="_blank" className="hover:underline">
+              <a
+                href={safeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+              >
                 {aProps.children}
               </a>
             </ToolTip>

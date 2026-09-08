@@ -7,6 +7,7 @@ import {
 import Panzoom from "@panzoom/panzoom";
 // @ts-ignore
 import mermaid from "mermaid";
+import DOMPurify from "dompurify";
 import { useEffect, useRef, useState } from "react";
 import { useDebouncedEffect } from "../find/useDebounce";
 import { ToolTip } from "../gui/Tooltip";
@@ -63,7 +64,10 @@ const MERMAID_THEME_COLORS = {
 
 mermaid.initialize({
   startOnLoad: false,
-  securityLevel: "loose",
+  // "loose" allows raw HTML (images/click handlers) in node labels, which turns
+  // AI/model-generated or pasted diagrams into an XSS sink. "strict" disables
+  // HTML and click handlers inside diagrams.
+  securityLevel: "strict",
   theme: "dark",
   themeVariables: {
     ...MERMAID_THEME_COLORS,
@@ -96,7 +100,11 @@ export default function MermaidDiagram({ code }: { code: string }) {
         try {
           await mermaid.parse(code);
           const renderedSVG = await mermaid.render(diagramId, code);
-          mermaidRenderContainerRef.current.innerHTML = renderedSVG.svg;
+          // Defense in depth: sanitize the generated SVG before inserting it
+          // into the DOM, so any residual HTML in diagram content cannot execute.
+          mermaidRenderContainerRef.current.innerHTML = DOMPurify.sanitize(
+            renderedSVG.svg,
+          );
           setError("");
           const panzoom = Panzoom(mermaidRenderContainerRef.current, {
             step: MINIMUM_ZOOM_STEP,

@@ -7,6 +7,7 @@ import {
   decodeSecretLocation,
   getTemplateVariables,
 } from "@continuedev/config-yaml";
+import { isPrivateNetworkAddress } from "@continuedev/fetch";
 import {
   SSEClientTransport,
   SseError,
@@ -34,6 +35,79 @@ import { getEnvPathFromUserShell } from "../../util/shellPath";
 import { getOauthToken } from "./MCPOauth";
 
 const DEFAULT_MCP_TIMEOUT = 20_000; // 20 seconds
+
+/**
+ * Validates a network MCP server URL before a connection is attempted.
+ *
+ * MCP server URLs come from config files (including workspace `.continue`
+ * configs that may be supplied by a cloned repository), so they are
+ * attacker-influenced. We reject:
+ *  - unsupported schemes (only http/https/ws/wss are allowed)
+ *  - URLs with embedded credentials (userinfo)
+ *  - destinations on loopback, RFC1918, link-local (incl. cloud metadata
+ *    169.254.169.254) or otherwise private networks, including after DNS
+ *    resolution — unless the user explicitly opts in via
+ *    CONTINUE_ALLOW_PRIVATE_MCP_SERVERS=true (needed for local dev servers).
+ */
+function assertSafeMcpServerUrl(rawUrl: string): URL {
+  let url: URL;
+  try {
+    url = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid MCP server URL: ${rawUrl}`);
+  }
+
+  if (!["http:", "https:", "ws:", "wss:"].includes(url.protocol)) {
+    throw new Error(`Unsupported MCP server URL scheme: ${url.protocol}`);
+  }
+
+  if (url.username || url.password) {
+    throw new Error(
+      "MCP server URLs with embedded credentials are not allowed",
+    );
+  }
+
+  if (process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS === "true") {
+    return url;
+  }
+
+  const hostname = url.hostname.replace(/^\[|\]$/g, "");
+  if (
+    hostname === "localhost" ||
+    hostname.endsWith(".localhost") ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    isPrivateNetworkAddress(hostname)
+  ) {
+    throw new Error(
+      `MCP server URL resolves to a private or local network address (${hostname}). ` +
+        `Set CONTINUE_ALLOW_PRIVATE_MCP_SERVERS=true to allow local/dev MCP servers.`,
+    );
+  }
+
+  return url;
+}
+
+/** Header names whose values must never be exposed outside the core. */
+const SENSITIVE_HEADER_NAMES = [
+  "authorization",
+  "x-api-key",
+  "x-goog-api-key",
+  "proxy-authorization",
+  "cookie",
+];
+
+function redactSensitiveHeaders(
+  headers: Record<string, string>,
+): Record<string, string> {
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(headers)) {
+    redacted[key] = SENSITIVE_HEADER_NAMES.includes(key.toLowerCase())
+      ? "<redacted>"
+      : value;
+  }
+  return redacted;
+}
 
 // Commands that are batch scripts on Windows and need cmd.exe to execute
 const WINDOWS_BATCH_COMMANDS = [
@@ -106,8 +180,25 @@ class MCPConnection {
   }
 
   getStatus(): MCPServerStatus {
+    const { requestOptions, ...rest } = this.options;
+    // `apiKey` only exists on the network transports; stdio options don't have it.
+    const apiKey = "apiKey" in this.options ? this.options.apiKey : undefined;
+    // Never ship transport credentials (Authorization header, apiKey) to the
+    // frontend via the status model — they would surface in logs/dumps.
+    const sanitizedOptions = {
+      ...rest,
+      ...(apiKey ? { apiKey: "<redacted>" } : {}),
+      requestOptions: requestOptions
+        ? {
+            ...requestOptions,
+            headers: requestOptions.headers
+              ? redactSensitiveHeaders(requestOptions.headers)
+              : undefined,
+          }
+        : undefined,
+    };
     return {
-      ...this.options,
+      ...sanitizedOptions,
       errors: this.errors,
       infos: this.infos,
       prompts: this.prompts,
@@ -494,12 +585,14 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
   private constructWebsocketTransport(
     options: InternalWebsocketMcpOptions,
   ): WebSocketClientTransport {
-    return new WebSocketClientTransport(new URL(options.url));
+    const url = assertSafeMcpServerUrl(options.url);
+    return new WebSocketClientTransport(url);
   }
 
   private constructSseTransport(
     options: InternalSseMcpOptions,
   ): SSEClientTransport {
+    const url = assertSafeMcpServerUrl(options.url);
     const sseAgent =
       options.requestOptions?.verifySsl === false
         ? new HttpsAgent({ rejectUnauthorized: false })
@@ -511,7 +604,7 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
       ...(options.apiKey && { Authorization: `Bearer ${options.apiKey}` }),
     };
 
-    return new SSEClientTransport(new URL(options.url), {
+    return new SSEClientTransport(url, {
       eventSourceInit: {
         fetch: (input, init) =>
           fetch(input, {
@@ -533,7 +626,8 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
   private constructHttpTransport(
     options: InternalStreamableHttpMcpOptions,
   ): StreamableHTTPClientTransport {
-    const { url, requestOptions } = options;
+    const url = assertSafeMcpServerUrl(options.url);
+    const { requestOptions } = options;
     const streamableAgent =
       requestOptions?.verifySsl === false
         ? new HttpsAgent({ rejectUnauthorized: false })
@@ -545,7 +639,7 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
       ...(options.apiKey && { Authorization: `Bearer ${options.apiKey}` }),
     };
 
-    return new StreamableHTTPClientTransport(new URL(url), {
+    return new StreamableHTTPClientTransport(url, {
       requestInit: {
         headers,
         ...(streamableAgent && { agent: streamableAgent }),

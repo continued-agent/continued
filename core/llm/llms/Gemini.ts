@@ -464,7 +464,7 @@ class Gemini extends BaseLLM {
     options: CompletionOptions,
   ): AsyncGenerator<ChatMessage> {
     const apiURL = new URL(
-      `models/${options.model}:streamGenerateContent?key=${this.apiKey}`,
+      `models/${options.model}:streamGenerateContent`,
       this.apiBase,
     );
 
@@ -477,6 +477,12 @@ class Gemini extends BaseLLM {
       method: "POST",
       body: JSON.stringify(body),
       signal,
+      headers: {
+        // Send the API key via header instead of a query parameter so it never
+        // leaks into URLs, error messages, logs, or proxy access logs.
+        "x-goog-api-key": this.apiKey,
+        "Content-Type": "application/json",
+      } as any,
     });
     for await (const message of this.processGeminiResponse(
       streamResponse(response),
@@ -495,7 +501,7 @@ class Gemini extends BaseLLM {
     }
 
     const apiURL = new URL(
-      `models/${options.model}:generateMessage?key=${this.apiKey}`,
+      `models/${options.model}:generateMessage`,
       this.apiBase,
     );
     const body = { prompt: { messages: msgList } };
@@ -503,6 +509,10 @@ class Gemini extends BaseLLM {
       method: "POST",
       body: JSON.stringify(body),
       signal,
+      headers: {
+        "x-goog-api-key": this.apiKey,
+        "Content-Type": "application/json",
+      } as any,
     });
     if (response.status === 499) {
       return; // Aborted by user

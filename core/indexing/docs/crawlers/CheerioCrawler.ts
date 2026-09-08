@@ -91,7 +91,10 @@ export default class CheerioCrawler {
     let response;
 
     try {
-      response = await fetch(location.toString());
+      // Bound each request so a hanging page cannot stall the whole crawl.
+      response = await fetch(location.toString(), {
+        signal: AbortSignal.timeout(30_000),
+      });
     } catch (error: unknown) {
       if (
         error instanceof Error &&

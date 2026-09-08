@@ -392,10 +392,7 @@ function MCPServerPreview({
                 void ideMessenger.ide.showVirtualFile(server.name, info)
               }
             >
-              <span
-                className="text-xs"
-                dangerouslySetInnerHTML={{ __html: info }}
-              />
+              <span className="text-xs">{info}</span>
             </Alert>
           ))}
         </div>
