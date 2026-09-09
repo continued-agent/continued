@@ -45,7 +45,7 @@ describe("ProviderSelector", () => {
   it("returns the selected provider on Enter", async () => {
     const providers = [createProvider(1), createProvider(2)];
     const onSelect = vi.fn();
-    const { stdin, unmount } = render(
+    const { lastFrame, stdin, unmount } = render(
       <ProviderSelector
         options={providers}
         onSelect={onSelect}
@@ -54,11 +54,10 @@ describe("ProviderSelector", () => {
     );
 
     stdin.write("j");
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await vi.waitFor(() => expect(lastFrame()).toContain("➤ Provider 2"));
     stdin.write("\r");
-    await new Promise((resolve) => setTimeout(resolve, 50));
 
-    expect(onSelect).toHaveBeenCalledWith(providers[1]);
+    await vi.waitFor(() => expect(onSelect).toHaveBeenCalledWith(providers[1]));
     unmount();
   });
 
