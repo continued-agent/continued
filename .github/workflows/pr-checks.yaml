@@ -66,6 +66,12 @@ jobs:
         with:
           is_fork: ${{ github.event.pull_request.head.repo.fork == true }}
           is_dependabot: ${{ github.actor == 'dependabot[bot]' }}
+        env:
+          # Pass credentials only on trusted push runs. The action only emits
+          # whether the live tests may run; it never prints a credential.
+          OPENAI_API_KEY: ${{ github.event_name == 'push' && secrets.OPENAI_API_KEY || '' }}
+          ANTHROPIC_API_KEY: ${{ github.event_name == 'push' && secrets.ANTHROPIC_API_KEY || '' }}
+          MISTRAL_API_KEY: ${{ github.event_name == 'push' && secrets.MISTRAL_API_KEY || '' }}
 
       - name: Type check and lint
         run: |
@@ -210,6 +216,12 @@ jobs:
         with:
           is_fork: ${{ github.event.pull_request.head.repo.fork == true }}
           is_dependabot: ${{ github.actor == 'dependabot[bot]' }}
+        env:
+          # Pass credentials only on trusted push runs. The action only emits
+          # whether the live tests may run; it never prints a credential.
+          OPENAI_API_KEY: ${{ github.event_name == 'push' && secrets.OPENAI_API_KEY || '' }}
+          ANTHROPIC_API_KEY: ${{ github.event_name == 'push' && secrets.ANTHROPIC_API_KEY || '' }}
+          MISTRAL_API_KEY: ${{ github.event_name == 'push' && secrets.MISTRAL_API_KEY || '' }}
 
       - name: Test and check ${{ matrix.package }}
         env:
