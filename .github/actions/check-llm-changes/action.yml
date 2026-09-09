@@ -45,9 +45,21 @@ runs:
         echo "LLM files changed: $LLM_CHANGED"
         echo "llm_changed=$LLM_CHANGED" >> $GITHUB_OUTPUT
 
+        # The live test suite exercises OpenAI, Anthropic, and Codestral. Do
+        # not make unauthenticated provider requests when any required
+        # credential is unavailable (for example, in a repository without
+        # Actions secrets configured).
+        MISSING_REQUIRED_API_KEY=false
+        for API_KEY_NAME in OPENAI_API_KEY ANTHROPIC_API_KEY MISTRAL_API_KEY; do
+          if [ -z "${!API_KEY_NAME}" ]; then
+            MISSING_REQUIRED_API_KEY=true
+            break
+          fi
+        done
+
         # Determine whether to ignore API tests
         IGNORE_API_TESTS=false
-        if [ "${{ inputs.is_fork }}" = "true" ] || [ "${{ inputs.is_dependabot }}" = "true" ] || [ "$LLM_CHANGED" = "false" ]; then
+        if [ "${{ inputs.is_fork }}" = "true" ] || [ "${{ inputs.is_dependabot }}" = "true" ] || [ "$LLM_CHANGED" = "false" ] || [ "$MISSING_REQUIRED_API_KEY" = "true" ]; then
           IGNORE_API_TESTS=true
         fi
 
