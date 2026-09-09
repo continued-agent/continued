@@ -3,6 +3,10 @@ import * as vscode from "vscode";
 import { getTheme } from "./util/getTheme";
 import { getExtensionVersion, getvsCodeUriScheme } from "./util/util";
 import { getExtensionUri, getNonce, getUniqueId } from "./util/vscode";
+import {
+  getWebviewContentSecurityPolicy,
+  serializeForInlineScript,
+} from "./util/webviewSecurity";
 import { VsCodeWebviewProtocol } from "./webviewProtocol";
 
 import type { FileEdit } from "core";
@@ -98,7 +102,6 @@ export class ContinueGUIWebviewViewProvider
         vscode.Uri.joinPath(extensionUri, "gui"),
         vscode.Uri.joinPath(extensionUri, "assets"),
       ],
-      enableCommandUris: true,
       portMapping: [
         {
           webviewPort: 65433,
@@ -108,6 +111,11 @@ export class ContinueGUIWebviewViewProvider
     };
 
     const nonce = getNonce();
+    const contentSecurityPolicy = getWebviewContentSecurityPolicy(
+      panel.webview.cspSource,
+      nonce,
+      inDevelopmentMode,
+    );
 
     const currentTheme = getTheme();
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -132,7 +140,8 @@ export class ContinueGUIWebviewViewProvider
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script>const vscode = acquireVsCodeApi();</script>
+        <meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy}">
+        <script nonce="${nonce}">const vscode = acquireVsCodeApi();</script>
         <link href="${styleMainUri}" rel="stylesheet">
 
         <title>Continue</title>
@@ -142,7 +151,7 @@ export class ContinueGUIWebviewViewProvider
 
         ${
           inDevelopmentMode
-            ? `<script type="module">
+            ? `<script type="module" nonce="${nonce}">
           import RefreshRuntime from "http://localhost:5173/@react-refresh"
           RefreshRuntime.injectIntoGlobalHook(window)
           window.$RefreshReg$ = () => {}
@@ -154,28 +163,32 @@ export class ContinueGUIWebviewViewProvider
 
         <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
 
-        <script>localStorage.setItem("ide", '"vscode"')</script>
-        <script>localStorage.setItem("vsCodeUriScheme", '"${getvsCodeUriScheme()}"')</script>
-        <script>localStorage.setItem("extensionVersion", '"${getExtensionVersion()}"')</script>
-        <script>window.windowId = "${this.windowId}"</script>
-        <script>window.vscMachineId = "${getUniqueId()}"</script>
-        <script>window.vscMediaUrl = "${vscMediaUrl}"</script>
-        <script>window.ide = "vscode"</script>
-        <script>window.fullColorTheme = ${JSON.stringify(currentTheme)}</script>
-        <script>window.colorThemeName = "dark-plus"</script>
-        <script>window.workspacePaths = ${JSON.stringify(
+        <script nonce="${nonce}">localStorage.setItem("ide", ${serializeForInlineScript("vscode")})</script>
+        <script nonce="${nonce}">localStorage.setItem("vsCodeUriScheme", ${serializeForInlineScript(getvsCodeUriScheme())})</script>
+        <script nonce="${nonce}">localStorage.setItem("extensionVersion", ${serializeForInlineScript(getExtensionVersion())})</script>
+        <script nonce="${nonce}">window.windowId = ${serializeForInlineScript(this.windowId)}</script>
+        <script nonce="${nonce}">window.vscMachineId = ${serializeForInlineScript(getUniqueId())}</script>
+        <script nonce="${nonce}">window.vscMediaUrl = ${serializeForInlineScript(vscMediaUrl)}</script>
+        <script nonce="${nonce}">window.ide = ${serializeForInlineScript("vscode")}</script>
+        <script nonce="${nonce}">window.fullColorTheme = ${serializeForInlineScript(currentTheme)}</script>
+        <script nonce="${nonce}">window.colorThemeName = ${serializeForInlineScript("dark-plus")}</script>
+        <script nonce="${nonce}">window.workspacePaths = ${serializeForInlineScript(
           vscode.workspace.workspaceFolders?.map((folder) =>
             folder.uri.toString(),
           ) || [],
         )}</script>
-        <script>window.isFullScreen = ${isFullScreen}</script>
+        <script nonce="${nonce}">window.isFullScreen = ${serializeForInlineScript(isFullScreen)}</script>
 
         ${
           edits
-            ? `<script>window.edits = ${JSON.stringify(edits)}</script>`
+            ? `<script nonce="${nonce}">window.edits = ${serializeForInlineScript(edits)}</script>`
             : ""
         }
-        ${page ? `<script>window.location.pathname = "${page}"</script>` : ""}
+        ${
+          page
+            ? `<script nonce="${nonce}">window.location.pathname = ${serializeForInlineScript(page)}</script>`
+            : ""
+        }
       </body>
     </html>`;
   }

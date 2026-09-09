@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 
+import { throwIfFileIsSecurityConcern } from "core/indexing/ignore.js";
 import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 import { createTwoFilesPatch } from "diff";
 
@@ -12,6 +13,30 @@ import {
 import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { Tool, ToolCallPreview } from "./types.js";
+
+function resolveSafeWritePath(filepath: string): string {
+  let existingPath = filepath;
+  const missingPathSegments: string[] = [];
+
+  while (!fs.existsSync(existingPath)) {
+    const parentPath = path.dirname(existingPath);
+    if (parentPath === existingPath) {
+      throw new Error(`Could not find an existing parent for ${filepath}`);
+    }
+    missingPathSegments.unshift(path.basename(existingPath));
+    existingPath = parentPath;
+  }
+
+  // Resolve the closest existing ancestor before writing. This catches a
+  // workspace directory symlink that would otherwise redirect a new file into
+  // a sensitive location, and gives us a stable canonical path for the write.
+  const realExistingPath = fs.realpathSync(existingPath);
+  throwIfFileIsSecurityConcern(realExistingPath);
+  const safeWritePath = path.join(realExistingPath, ...missingPathSegments);
+  throwIfFileIsSecurityConcern(safeWritePath);
+
+  return safeWritePath;
+}
 
 export function generateDiff(
   oldContent: string,
@@ -55,13 +80,15 @@ export const writeFileTool: Tool = {
       throw new Error("Filepath must be a string");
     }
     const filepath = resolvePathInWorkspace(inputPath);
+    throwIfFileIsSecurityConcern(filepath);
+    const safeWritePath = resolveSafeWritePath(filepath);
     const content = args?.content ?? "";
     if (typeof content !== "string") {
       throw new Error("New file content must be a string");
     }
     try {
-      if (fs.existsSync(filepath)) {
-        const oldContent = fs.readFileSync(filepath, "utf-8");
+      if (fs.existsSync(safeWritePath)) {
+        const oldContent = fs.readFileSync(safeWritePath, "utf-8");
 
         const diff = createTwoFilesPatch(
           args.filepath,
@@ -121,7 +148,9 @@ export const writeFileTool: Tool = {
   },
   run: async (args: { filepath: string; content: string }): Promise<string> => {
     try {
-      const filepath = resolvePathInWorkspace(args.filepath);
+      const resolvedFilepath = resolvePathInWorkspace(args.filepath);
+      throwIfFileIsSecurityConcern(resolvedFilepath);
+      const filepath = resolveSafeWritePath(resolvedFilepath);
       const dirPath = path.dirname(filepath);
       if (!fs.existsSync(dirPath)) {
         fs.mkdirSync(dirPath, { recursive: true });
@@ -133,8 +162,24 @@ export const writeFileTool: Tool = {
         oldContent = fs.readFileSync(filepath, "utf-8");
       }
 
-      // Write new content
-      fs.writeFileSync(filepath, args.content, "utf-8");
+      // Do not follow a symlink that may have replaced the path after workspace
+      // resolution. Windows does not support O_NOFOLLOW, but still benefits from
+      // the canonical-path checks above.
+      const noFollow =
+        process.platform === "win32" ? 0 : fs.constants.O_NOFOLLOW;
+      const fileDescriptor = fs.openSync(
+        filepath,
+        fs.constants.O_WRONLY |
+          fs.constants.O_CREAT |
+          fs.constants.O_TRUNC |
+          noFollow,
+        0o600,
+      );
+      try {
+        fs.writeFileSync(fileDescriptor, args.content, "utf-8");
+      } finally {
+        fs.closeSync(fileDescriptor);
+      }
 
       // Track lines of code changes if file existed before
       if (oldContent) {
@@ -175,6 +220,12 @@ export const writeFileTool: Tool = {
     } catch (error) {
       if (error instanceof ContinueError) {
         throw error;
+      }
+      if ((error as NodeJS.ErrnoException).code === "ELOOP") {
+        throw new ContinueError(
+          ContinueErrorReason.FileIsSecurityConcern,
+          `Refusing to follow symlink while writing ${args.filepath}`,
+        );
       }
       throw new ContinueError(
         ContinueErrorReason.FileWriteError,

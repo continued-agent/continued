@@ -8,7 +8,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getMatchingHookGroups, loadHooksConfig } from "./hookConfig.js";
 import { runHooks } from "./hookRunner.js";
@@ -160,8 +160,10 @@ describe("hookConfig", () => {
     });
 
     // Helper: call loadHooksConfig with isolated homeDir and project cwd
-    function loadIsolated(cwd?: string) {
-      return loadHooksConfig(cwd ?? projectDir, fakeHome);
+    function loadIsolated(cwd?: string, trustProjectHooks = false) {
+      return loadHooksConfig(cwd ?? projectDir, fakeHome, {
+        trustProjectHooks,
+      });
     }
 
     it("returns empty config when no settings files exist", () => {
@@ -170,7 +172,7 @@ describe("hookConfig", () => {
       expect(result.disabled).toBe(false);
     });
 
-    it("loads hooks from .continue/settings.json", () => {
+    it("does not load hooks from an untrusted project by default", () => {
       const settingsDir = path.join(projectDir, ".continue");
       fs.mkdirSync(settingsDir, { recursive: true });
       fs.writeFileSync(
@@ -188,11 +190,32 @@ describe("hookConfig", () => {
       );
 
       const result = loadIsolated();
+      expect(result.hooks).toEqual({});
+    });
+
+    it("loads trusted .continue/settings.json hooks", () => {
+      const settingsDir = path.join(projectDir, ".continue");
+      fs.mkdirSync(settingsDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(settingsDir, "settings.json"),
+        JSON.stringify({
+          hooks: {
+            PreToolUse: [
+              {
+                matcher: "Bash",
+                hooks: [{ type: "command", command: "echo test" }],
+              },
+            ],
+          },
+        }),
+      );
+
+      const result = loadIsolated(undefined, true);
       expect(result.hooks.PreToolUse).toHaveLength(1);
       expect(result.hooks.PreToolUse![0].matcher).toBe("Bash");
     });
 
-    it("loads hooks from .claude/settings.json for cross-compatibility", () => {
+    it("loads trusted .claude/settings.json hooks for cross-compatibility", () => {
       const settingsDir = path.join(projectDir, ".claude");
       fs.mkdirSync(settingsDir, { recursive: true });
       fs.writeFileSync(
@@ -208,7 +231,7 @@ describe("hookConfig", () => {
         }),
       );
 
-      const result = loadIsolated();
+      const result = loadIsolated(undefined, true);
       expect(result.hooks.PostToolUse).toHaveLength(1);
     });
 
@@ -241,7 +264,7 @@ describe("hookConfig", () => {
         }),
       );
 
-      const result = loadIsolated();
+      const result = loadIsolated(undefined, true);
       // Both hooks should be merged (appended)
       expect(result.hooks.PreToolUse).toHaveLength(2);
     });
@@ -261,7 +284,7 @@ describe("hookConfig", () => {
         }),
       );
 
-      const result = loadIsolated();
+      const result = loadIsolated(undefined, true);
       expect(result.disabled).toBe(true);
       // Hooks are still loaded but won't be executed
       expect(result.hooks.PreToolUse).toHaveLength(1);
@@ -509,6 +532,47 @@ describeUnix("hookRunner", () => {
       const result = await runHooks(config, input);
       expect(result.blocked).toBe(true);
       expect(result.blockReason).toBe("Blocked by policy");
+    });
+  });
+
+  describe("runHooks - HTTP execution", () => {
+    it("reads structured output from an HTTP hook", async () => {
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ decision: "block", reason: "HTTP policy" }),
+            { status: 200 },
+          ),
+        );
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        const config: HooksConfig = {
+          PreToolUse: [
+            {
+              hooks: [{ type: "http", url: "https://hooks.example.test" }],
+            },
+          ],
+        };
+        const input: PreToolUseInput = {
+          session_id: "test-session",
+          transcript_path: "",
+          cwd: process.cwd(),
+          hook_event_name: "PreToolUse",
+          tool_name: "Bash",
+          tool_input: { command: "echo test" },
+          tool_use_id: "test-id",
+        };
+
+        const result = await runHooks(config, input);
+
+        expect(fetchMock).toHaveBeenCalledOnce();
+        expect(result.blocked).toBe(true);
+        expect(result.blockReason).toBe("HTTP policy");
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 

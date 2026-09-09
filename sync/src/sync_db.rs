@@ -1,30 +1,35 @@
-use crate::db::{add_tag, create_database, remove_chunks_for_hash, remove_tag};
+use crate::db::{apply_sync_changes, create_database};
 use crate::sync;
 
-pub fn sync_db(tag: &sync::Tag) -> Vec<(String, String)> {
-    create_database();
+pub fn sync_db(tag: &sync::Tag) -> Result<Vec<(String, String)>, String> {
+    create_database()?;
 
-    let results = sync::sync(tag).unwrap();
+    let (compute, deleted, tags_to_add, tags_to_remove) =
+        sync::sync(tag).map_err(|error| format!("Failed to calculate sync changes: {}", error))?;
 
     // Send to IDE Extension to compute embeddings
-    let compute = results.0;
+    let hashes_to_remove = deleted
+        .into_iter()
+        .map(|(_, hash)| hash)
+        .collect::<Vec<_>>();
+    let hashes_to_tag = tags_to_add
+        .into_iter()
+        .map(|(_, hash)| hash)
+        .collect::<Vec<_>>();
+    let hashes_to_untag = tags_to_remove
+        .into_iter()
+        .map(|(_, hash)| hash)
+        .collect::<Vec<_>>();
 
-    // Delete chunks
-    for (_, hash) in results.1 {
-        remove_chunks_for_hash(hash);
-    }
+    let tag_name = tag.to_string();
+    apply_sync_changes(
+        &hashes_to_remove,
+        &hashes_to_tag,
+        &hashes_to_untag,
+        &tag_name,
+    )?;
 
-    // Add tag from chunks
-    for (_, hash) in results.2 {
-        add_tag(hash, tag.to_string());
-    }
-
-    // Remove tag from chunk_rows
-    for (_, hash) in results.3 {
-        remove_tag(hash, tag.to_string());
-    }
-
-    return compute;
+    Ok(compute)
 }
 
 #[cfg(test)]
@@ -39,6 +44,6 @@ mod tests {
             branch: "main",
             provider_id: "test",
         };
-        sync_db(tag);
+        sync_db(tag).unwrap();
     }
 }

@@ -10,6 +10,7 @@ import {
   FetchFunction,
 } from "../../index.js";
 import { fetchFavicon } from "../../util/fetchFavicon";
+import { readResponseTextWithLimit } from "../../util/readResponse";
 import { isBlockedUrl } from "../../util/urlSecurity";
 
 const MAX_REDIRECTS = 5;
@@ -87,7 +88,7 @@ export async function getUrlContextItems(
     throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
   }
 
-  const html = await resp.text();
+  const html = await readResponseTextWithLimit(resp);
 
   const dom = new JSDOM(html);
   let reader = new Readability(dom.window.document);

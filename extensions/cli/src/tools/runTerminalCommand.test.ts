@@ -1,3 +1,26 @@
+import { vi } from "vitest";
+
+vi.mock("../services/BackgroundJobService.js", () => ({
+  backgroundJobService: {
+    createJob: vi.fn(),
+    createJobWithProcess: vi.fn(),
+    startJob: vi.fn(),
+  },
+}));
+vi.mock("../services/index.js", () => ({
+  services: { chatHistory: { addToolResult: vi.fn() } },
+}));
+vi.mock("../telemetry/telemetryService.js", () => ({
+  telemetryService: {
+    recordCommitCreated: vi.fn(),
+    recordPullRequestCreated: vi.fn(),
+  },
+}));
+vi.mock("../util/cli.js", () => ({
+  emitBashToolEnded: vi.fn(),
+  emitBashToolStarted: vi.fn(),
+}));
+
 import {
   isRunningInWsl,
   runTerminalCommandTool,
@@ -76,6 +99,12 @@ describe("runTerminalCommandTool", () => {
       await expect(runTerminalCommandTool.run({ command })).rejects.toMatch(
         /Error \(exit code|Command timed out|not found|not recognized/,
       );
+    });
+
+    it("rejects a non-zero exit code even without stderr", async () => {
+      await expect(
+        runTerminalCommandTool.run({ command: "exit 7" }),
+      ).rejects.toContain("exit code 7");
     });
   });
 
