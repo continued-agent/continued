@@ -3,6 +3,7 @@ import { ContextItem, McpUiState, Tool, ToolCall, ToolExtras } from "..";
 import { MCPManagerSingleton } from "../context/mcp/MCPManagerSingleton";
 import { ContinueError, ContinueErrorReason } from "../util/errors";
 import { canParseUrl } from "../util/url";
+import { readResponseTextWithLimit } from "../util/readResponse";
 import { BuiltInToolNames } from "./builtIn";
 
 import { codebaseToolImpl } from "./implementations/codebaseTool";
@@ -40,7 +41,7 @@ async function callHttpTool(
     }),
   });
 
-  const data = await response.json();
+  const data = JSON.parse(await readResponseTextWithLimit(response));
 
   if (!response.ok) {
     throw new Error(`Failed to call tool at ${url}:\n${JSON.stringify(data)}`);

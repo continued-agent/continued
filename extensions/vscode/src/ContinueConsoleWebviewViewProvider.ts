@@ -4,6 +4,7 @@ import { LLMLogger } from "core/llm/logger";
 import * as vscode from "vscode";
 
 import { getExtensionUri, getNonce } from "./util/vscode";
+import { getWebviewContentSecurityPolicy } from "./util/webviewSecurity";
 
 interface FromConsoleView {
   type: "start" | "stop";
@@ -179,7 +180,6 @@ export class ContinueConsoleWebviewViewProvider
         vscode.Uri.joinPath(extensionUri, "gui"),
         vscode.Uri.joinPath(extensionUri, "assets"),
       ],
-      enableCommandUris: true,
       portMapping: [
         {
           webviewPort: 65433,
@@ -189,13 +189,19 @@ export class ContinueConsoleWebviewViewProvider
     };
 
     const nonce = getNonce();
+    const contentSecurityPolicy = getWebviewContentSecurityPolicy(
+      panel.webview.cspSource,
+      nonce,
+      inDevelopmentMode,
+    );
 
     return `<!DOCTYPE html>
     <html lang="en">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script>const vscode = acquireVsCodeApi();</script>
+        <meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy}">
+        <script nonce="${nonce}">const vscode = acquireVsCodeApi();</script>
         <link href="${styleMainUri}" rel="stylesheet">
 
         <title>Continue</title>
@@ -205,7 +211,7 @@ export class ContinueConsoleWebviewViewProvider
 
         ${
           inDevelopmentMode
-            ? `<script type="module">
+            ? `<script type="module" nonce="${nonce}">
           import RefreshRuntime from "http://localhost:5173/@react-refresh"
           RefreshRuntime.injectIntoGlobalHook(window)
           window.$RefreshReg$ = () => {}

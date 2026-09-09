@@ -31,6 +31,7 @@ import { isSymbolNotRif, matchCodeToSymbolOrFile } from "./utils";
 import { fixDoubleDollarNewLineLatex } from "./utils/fixDoubleDollarLatex";
 import { patchNestedMarkdown } from "./utils/patchNestedMarkdown";
 import { remarkTables } from "./utils/remarkTables";
+import { sanitizeMarkdownHref } from "./utils/sanitizeHref";
 
 const StyledMarkdown = styled.div<{
   fontSize?: number;
@@ -281,22 +282,13 @@ const StyledMarkdownPreview = memo(function StyledMarkdownPreview(
     rehypeReactOptions: {
       components: {
         a: ({ ...aProps }) => {
-          // Only allow safe URL schemes. `javascript:`, `data:text/html`,
-          // `vbscript:` etc. from AI/prompt content would otherwise execute in
-          // the webview origin — restrict to standard web and app-internal
-          // schemes and neutralize everything else.
-          const href = aProps.href ?? "";
-          let safeHref = href;
-          try {
-            const url = new URL(href, window.location.href);
-            if (
-              !["http:", "https:", "vscode:", "command:"].includes(url.protocol)
-            ) {
-              safeHref = "#";
-            }
-          } catch {
-            safeHref = "#";
-          }
+          // Links from AI/prompt content must not invoke VS Code commands.
+          // Restrict them to normal web URLs and neutralize every app-internal
+          // or executable scheme.
+          const safeHref = sanitizeMarkdownHref(
+            aProps.href ?? "",
+            window.location.href,
+          );
           return (
             <ToolTip place="top" className="m-0 p-0" content={aProps.href}>
               <a

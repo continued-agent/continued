@@ -7,6 +7,62 @@ mod utils;
 
 use neon::prelude::*;
 
+fn string_array_argument(
+    cx: &mut FunctionContext,
+    index: i32,
+    argument_name: &str,
+) -> NeonResult<Vec<String>> {
+    let array = cx.argument::<JsArray>(index)?;
+    let values = array.to_vec(cx)?;
+    let mut result = Vec::with_capacity(values.len());
+
+    for (position, value) in values.into_iter().enumerate() {
+        let string = match value.downcast::<JsString, _>(cx) {
+            Ok(string) => string,
+            Err(_) => {
+                return cx.throw_type_error(format!(
+                    "{}[{}] must be a string",
+                    argument_name, position
+                ))
+            }
+        };
+        result.push(string.value(cx));
+    }
+
+    Ok(result)
+}
+
+fn number_array_argument(
+    cx: &mut FunctionContext,
+    index: i32,
+    argument_name: &str,
+) -> NeonResult<Vec<f32>> {
+    let array = cx.argument::<JsArray>(index)?;
+    let values = array.to_vec(cx)?;
+    let mut result = Vec::with_capacity(values.len());
+
+    for (position, value) in values.into_iter().enumerate() {
+        let number = match value.downcast::<JsNumber, _>(cx) {
+            Ok(number) => number.value(cx),
+            Err(_) => {
+                return cx.throw_type_error(format!(
+                    "{}[{}] must be a number",
+                    argument_name, position
+                ))
+            }
+        };
+        if !number.is_finite() {
+            return cx.throw_type_error(format!(
+                "{}[{}] must be finite",
+                argument_name, position
+            ));
+        }
+        result.push(number as f32);
+    }
+
+    Ok(result)
+}
+
 fn build_js_array<'a>(
     rs_array: Vec<(String, String)>,
     cx: &mut FunctionContext<'a>,
@@ -37,7 +93,10 @@ fn sync_results(mut cx: FunctionContext) -> JsResult<JsArray> {
         provider_id: &provider_id.to_string(),
     };
 
-    let compute = sync_db::sync_db(&tag);
+    let compute = match sync_db::sync_db(&tag) {
+        Ok(compute) => compute,
+        Err(error) => return cx.throw_error(error),
+    };
     let compute_js_array = build_js_array(compute, &mut cx);
 
     return Ok(compute_js_array);
@@ -70,25 +129,8 @@ fn db_add_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         .get::<JsNumber, _, _>(&mut cx, "index")?
         .value(&mut cx) as usize;
 
-    let tags_vec = cx.argument::<JsArray>(1)?.to_vec(&mut cx).unwrap();
-    let mut tags: Vec<String> = Vec::new();
-    for item in tags_vec {
-        let tag = item
-            .downcast::<JsString, _>(&mut cx)
-            .unwrap()
-            .value(&mut cx);
-        tags.push(tag);
-    }
-
-    let embedding_vec = cx.argument::<JsArray>(2)?.to_vec(&mut cx).unwrap();
-    let mut embedding: Vec<f32> = Vec::new();
-    for item in embedding_vec {
-        let float = item
-            .downcast::<JsNumber, _>(&mut cx)
-            .unwrap()
-            .value(&mut cx) as f32;
-        embedding.push(float);
-    }
+    let tags = string_array_argument(&mut cx, 1, "tags")?;
+    let embedding = number_array_argument(&mut cx, 2, "embedding")?;
 
     let chunk = db::Chunk {
         hash,
@@ -100,7 +142,9 @@ fn db_add_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
         embedding,
     };
 
-    db::add_chunk(chunk, tags);
+    if let Err(error) = db::add_chunk(chunk, tags) {
+        return cx.throw_error(error);
+    }
 
     return Ok(JsUndefined::new(&mut cx));
 }
@@ -108,27 +152,13 @@ fn db_add_chunk(mut cx: FunctionContext) -> JsResult<JsUndefined> {
 fn db_retrieve(mut cx: FunctionContext) -> JsResult<JsArray> {
     let n = cx.argument::<JsNumber>(0)?.value(&mut cx) as usize;
 
-    let tags_vec = cx.argument::<JsArray>(1)?.to_vec(&mut cx).unwrap();
-    let mut tags: Vec<String> = Vec::new();
-    for item in tags_vec {
-        let tag = item
-            .downcast::<JsString, _>(&mut cx)
-            .unwrap()
-            .value(&mut cx);
-        tags.push(tag);
-    }
+    let tags = string_array_argument(&mut cx, 1, "tags")?;
+    let v = number_array_argument(&mut cx, 2, "embedding")?;
 
-    let v_vec = cx.argument::<JsArray>(2)?.to_vec(&mut cx).unwrap();
-    let mut v: Vec<f32> = Vec::new();
-    for item in v_vec {
-        let float = item
-            .downcast::<JsNumber, _>(&mut cx)
-            .unwrap()
-            .value(&mut cx) as f32;
-        v.push(float);
-    }
-
-    let results = db::retrieve(n, tags, v);
+    let results = match db::retrieve(n, tags, v) {
+        Ok(results) => results,
+        Err(error) => return cx.throw_error(error),
+    };
 
     let js_array = JsArray::new(&mut cx, results.len() as u32);
     for (i, chunk) in results.iter().enumerate() {

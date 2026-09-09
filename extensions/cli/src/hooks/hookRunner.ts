@@ -1,5 +1,7 @@
 import { execFile } from "child_process";
 
+import { readResponseTextWithLimit } from "core/util/readResponse.js";
+
 import { logger } from "../util/logger.js";
 
 import { getMatchingHookGroups } from "./hookConfig.js";
@@ -154,46 +156,48 @@ async function executeHttpHook(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    const response = await fetch(handler.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(input),
-      signal: controller.signal,
-    });
+    try {
+      const response = await fetch(handler.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(input),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeout);
+      if (!response.ok) {
+        // Non-2xx = non-blocking error (matches Claude Code behavior)
+        logger.warn(`HTTP hook returned ${response.status}: ${handler.url}`);
+        return {
+          output: null,
+          stdout: "",
+          stderr: `HTTP ${response.status}`,
+          exitCode: 1,
+          blocked: false,
+        };
+      }
 
-    if (!response.ok) {
-      // Non-2xx = non-blocking error (matches Claude Code behavior)
-      logger.warn(`HTTP hook returned ${response.status}: ${handler.url}`);
+      const bodyText = await readResponseTextWithLimit(response);
+      const output = tryParseJson(bodyText);
+
+      let blocked = false;
+      let blockReason: string | undefined;
+
+      if (output?.decision === "block") {
+        blocked = true;
+        blockReason = output.reason || "Blocked by hook";
+      }
+
       return {
-        output: null,
-        stdout: "",
-        stderr: `HTTP ${response.status}`,
-        exitCode: 1,
-        blocked: false,
+        output,
+        stdout: bodyText.trim(),
+        stderr: "",
+        exitCode: 0,
+        blocked,
+        blockReason,
       };
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const bodyText = await response.text();
-    const output = tryParseJson(bodyText);
-
-    let blocked = false;
-    let blockReason: string | undefined;
-
-    if (output?.decision === "block") {
-      blocked = true;
-      blockReason = output.reason || "Blocked by hook";
-    }
-
-    return {
-      output,
-      stdout: bodyText.trim(),
-      stderr: "",
-      exitCode: 0,
-      blocked,
-      blockReason,
-    };
   } catch (error) {
     // Connection failures and timeouts = non-blocking errors
     logger.warn(`HTTP hook failed: ${handler.url}`, error);

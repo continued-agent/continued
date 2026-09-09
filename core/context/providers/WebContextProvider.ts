@@ -6,6 +6,7 @@ import {
   FetchFunction,
 } from "../..";
 import { getHeaders } from "../../continueServer/stubs/headers";
+import { readResponseTextWithLimit } from "../../util/readResponse";
 const TRIAL_PROXY_URL = "https://proxy-server-blue-l6vsfbzhba-uw.a.run.app";
 
 export const fetchSearchResults = async (
@@ -26,10 +27,10 @@ export const fetchSearchResults = async (
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
+    const text = await readResponseTextWithLimit(resp);
     throw new Error(`Failed to fetch web context: ${text}`);
   }
-  return await resp.json();
+  return JSON.parse(await readResponseTextWithLimit(resp));
 };
 
 export default class WebContextProvider extends BaseContextProvider {

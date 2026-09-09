@@ -243,12 +243,16 @@ export function isSecurityConcern(filePathOrUri: string) {
   try {
     filepath = fileURLToPath(filePathOrUri);
   } catch {}
-  if (path.isAbsolute(filepath)) {
-    const dir = path.dirname(filepath).split(/\/|\\/).at(-1) ?? "";
-    const basename = path.basename(filepath);
-    filepath = `${dir ? dir + "/" : ""}${basename}`;
-  }
-  if (!filepath) {
+
+  // `ignore` only accepts relative POSIX paths. Preserve every path segment
+  // when converting an absolute path instead of reducing it to its basename:
+  // otherwise nested sensitive directories such as /workspace/secrets/prod/
+  // would no longer match the `secrets/` rule.
+  filepath = filepath.replace(/\\/g, "/");
+  filepath = filepath.replace(/^[A-Za-z]:\/?/, "").replace(/^\/+/, "");
+  filepath = path.posix.normalize(filepath).replace(/^(\.\.\/)+/, "");
+
+  if (!filepath || filepath === ".") {
     return false;
   }
   return defaultFileAndFolderSecurityIgnores.ignores(filepath);

@@ -26,6 +26,8 @@ import { Tool, ToolRunContext } from "./types.js";
 // Output truncation defaults
 const DEFAULT_BASH_MAX_CHARS = 50000; // ~12.5k tokens
 const DEFAULT_BASH_MAX_LINES = 1000;
+const OUTPUT_LIMIT_MESSAGE =
+  "\n[Command stopped after reaching the output limit]";
 
 /**
  * When running on Windows, but inside WSL, shell commands need to run using the WSL environment.
@@ -200,6 +202,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
       let stderr = "";
       let timeoutId: NodeJS.Timeout;
       let isResolved = false;
+      let outputLimitReached = false;
 
       const abortChild = () => {
         if (!isResolved) {
@@ -317,14 +320,31 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
       // Start the initial timeout
       resetTimeout();
 
+      const appendOutput = (currentOutput: string, data: Buffer): string => {
+        if (outputLimitReached) {
+          return currentOutput;
+        }
+
+        const output = data.toString();
+        const currentLength = stdout.length + stderr.length;
+        const remaining = Math.max(0, maxChars - currentLength);
+        if (output.length <= remaining) {
+          return currentOutput + output;
+        }
+
+        outputLimitReached = true;
+        child.kill();
+        return currentOutput + output.slice(0, remaining);
+      };
+
       const onStdout = (data: Buffer) => {
-        stdout += data.toString();
+        stdout = appendOutput(stdout, data);
         resetTimeout();
         showCurrentOutput();
       };
 
       const onStderr = (data: Buffer) => {
-        stderr += data.toString();
+        stderr = appendOutput(stderr, data);
         resetTimeout();
         showCurrentOutput();
       };
@@ -346,9 +366,18 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         );
         context?.signal?.removeEventListener("abort", abortChild);
 
-        // Only reject on non-zero exit code if there's also stderr
-        if (code !== 0 && stderr) {
-          reject(`Error (exit code ${code}): ${stderr}`);
+        if (outputLimitReached) {
+          resolve(
+            appendParallelLimitNote(
+              `${stdout}${stderr ? `\nStderr: ${stderr}` : ""}${OUTPUT_LIMIT_MESSAGE}`,
+            ),
+          );
+          return;
+        }
+
+        if (code !== 0) {
+          const details = stderr || stdout || "Command produced no output";
+          reject(`Error (exit code ${code}): ${details}`);
           return;
         }
 

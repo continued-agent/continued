@@ -11,7 +11,9 @@
  * - .claude/settings.json
  * - .claude/settings.local.json
  *
- * Hooks from all sources are merged (project > user, continue > claude).
+ * User-global hooks are trusted by default. Project hooks execute arbitrary
+ * commands, so they are opt-in through CONTINUE_TRUST_PROJECT_HOOKS=1 (or the
+ * equivalent load option) before they are merged.
  */
 
 import * as fs from "fs";
@@ -70,16 +72,27 @@ function mergeHooksConfigs(
  * Resolve all settings file paths in precedence order (lowest to highest).
  * Later files' hooks are appended but all run.
  */
-function getSettingsFilePaths(cwd: string, homeDir?: string): string[] {
+function getSettingsFilePaths(
+  cwd: string,
+  homeDir: string | undefined,
+  trustProjectHooks: boolean,
+): string[] {
   const home = homeDir ?? os.homedir();
   const continueHome =
     process.env.CONTINUE_GLOBAL_DIR || path.join(home, ".continue");
 
-  return [
+  const userSettingsPaths = [
     // User-global (lowest precedence)
     path.join(home, ".claude", "settings.json"),
     path.join(continueHome, "settings.json"),
+  ];
 
+  if (!trustProjectHooks) {
+    return userSettingsPaths;
+  }
+
+  return [
+    ...userSettingsPaths,
     // Project-level
     path.join(cwd, ".claude", "settings.json"),
     path.join(cwd, ".continue", "settings.json"),
@@ -95,14 +108,27 @@ export interface LoadedHooksConfig {
   disabled: boolean;
 }
 
+export interface LoadHooksConfigOptions {
+  /**
+   * Allow hooks committed in the workspace. These hooks execute arbitrary
+   * commands and should only be enabled for repositories the user trusts.
+   * Defaults to CONTINUE_TRUST_PROJECT_HOOKS=1.
+   */
+  trustProjectHooks?: boolean;
+}
+
 /**
  * Load all hook configurations from settings files and merge them.
  */
 export function loadHooksConfig(
   cwd: string = process.cwd(),
   homeDir?: string,
+  options: LoadHooksConfigOptions = {},
 ): LoadedHooksConfig {
-  const paths = getSettingsFilePaths(cwd, homeDir);
+  const trustProjectHooks =
+    options.trustProjectHooks ??
+    process.env.CONTINUE_TRUST_PROJECT_HOOKS === "1";
+  const paths = getSettingsFilePaths(cwd, homeDir, trustProjectHooks);
   let mergedHooks: HooksConfig = {};
   let disabled = false;
 

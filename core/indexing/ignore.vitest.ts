@@ -121,6 +121,12 @@ describe("isSecurityConcern", () => {
       expect(isSecurityConcern("/home/user/.env")).toBe(true);
       expect(isSecurityConcern("/var/www/.secrets/")).toBe(true);
       expect(isSecurityConcern("/etc/ssl/private.key")).toBe(true);
+      expect(isSecurityConcern("/workspace/secrets/prod/application.txt")).toBe(
+        true,
+      );
+      expect(
+        isSecurityConcern("/home/user/.aws/profiles/team/credentials.txt"),
+      ).toBe(true);
     });
 
     it("should handle URI schemes", () => {
@@ -138,7 +144,9 @@ describe("isSecurityConcern", () => {
 
     // it("should handle Windows-style paths", () => {
     //   expect(isSecurityConcern("C:\\Users\\user\\.env")).toBe(true);
-    //   expect(isSecurityConcern("D:\\projects\\app\\secrets\\")).toBe(true);
+    //   expect(
+    //     isSecurityConcern("D:\\projects\\app\\secrets\\prod\\value.txt"),
+    //   ).toBe(true);
     // });
   });
 
