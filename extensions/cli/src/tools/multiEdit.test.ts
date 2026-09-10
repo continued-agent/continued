@@ -30,6 +30,8 @@ vi.mock("fs", async () => {
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
+    openSync: vi.fn(() => 3),
+    closeSync: vi.fn(),
     unlinkSync: vi.fn(),
     realpathSync: vi.fn(),
   };
@@ -45,6 +47,8 @@ describe("multiEditTool CLI specific", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(originalContent);
     vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+    vi.mocked(fs.openSync).mockReturnValue(3);
+    vi.mocked(fs.closeSync).mockImplementation(() => {});
     vi.mocked(fs.realpathSync).mockImplementation((path) => path.toString());
 
     // Setup utility mocks with proper return values
@@ -158,11 +162,8 @@ describe("multiEditTool CLI specific", () => {
       expect(result).toBe(
         `Successfully edited ${testFilePath} with 1 edit\nDiff:\nmocked diff`,
       );
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        testFilePath,
-        newContent,
-        "utf-8",
-      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(3, newContent, "utf-8");
+      expect(fs.openSync).toHaveBeenCalled();
     });
 
     it("should return correct message for multiple edits", async () => {

@@ -24,6 +24,8 @@ vi.mock("fs", async () => {
     existsSync: vi.fn(),
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
+    openSync: vi.fn(() => 3),
+    closeSync: vi.fn(),
     unlinkSync: vi.fn(),
     realpathSync: vi.fn(),
   };
@@ -39,6 +41,8 @@ describe("editTool", () => {
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(originalContent);
     vi.mocked(fs.writeFileSync).mockImplementation(() => {});
+    vi.mocked(fs.openSync).mockReturnValue(3);
+    vi.mocked(fs.closeSync).mockImplementation(() => {});
     vi.mocked(fs.realpathSync).mockImplementation((path) => path.toString());
 
     // Setup utility mocks with proper return values
@@ -193,15 +197,12 @@ describe("editTool", () => {
       expect(result).toBe(
         `Successfully edited ${testFilePath}\nDiff:\nmocked diff`,
       );
-      expect(fs.writeFileSync).toHaveBeenCalledWith(
-        testFilePath,
-        newContent,
-        "utf-8",
-      );
+      expect(fs.writeFileSync).toHaveBeenCalledWith(3, newContent, "utf-8");
+      expect(fs.openSync).toHaveBeenCalled();
     });
 
     it("should throw error if file write fails", async () => {
-      vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      vi.mocked(fs.openSync).mockImplementation(() => {
         throw new Error("Write failed");
       });
 

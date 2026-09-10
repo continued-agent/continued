@@ -13,6 +13,7 @@ import { resolvePathInWorkspace } from "../util/workspace.js";
 
 import { editTool, validateAndResolveFilePath } from "./edit.js";
 import { readFileTool } from "./readFile.js";
+import { writeFileNoFollow } from "./safeWrite.js";
 import { Tool } from "./types.js";
 import { generateDiff } from "./writeFile.js";
 
@@ -141,7 +142,7 @@ WARNINGS:
   }) => {
     try {
       const filePath = resolvePathInWorkspace(args.file_path);
-      fs.writeFileSync(filePath, args.newContent, "utf-8");
+      writeFileNoFollow(filePath, args.newContent, args.originalContent);
 
       // Get lines for telemetry
       const { added, removed } = calculateLinesOfCodeDiff(

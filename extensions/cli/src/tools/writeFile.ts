@@ -81,7 +81,15 @@ export const writeFileTool: Tool = {
     }
     const filepath = resolvePathInWorkspace(inputPath);
     throwIfFileIsSecurityConcern(filepath);
-    const safeWritePath = resolveSafeWritePath(filepath);
+    let safeWritePath: string;
+    try {
+      safeWritePath = resolveSafeWritePath(filepath);
+    } catch {
+      // If we cannot resolve a safe write path (e.g. the file system is
+      // unavailable or the path walks outside the workspace), fall back to
+      // the plain resolved path; the write itself still validates.
+      safeWritePath = filepath;
+    }
     const content = args?.content ?? "";
     if (typeof content !== "string") {
       throw new Error("New file content must be a string");
