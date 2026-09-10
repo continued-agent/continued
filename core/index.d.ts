@@ -1443,6 +1443,7 @@ export type MCPServerStatus = InternalMcpOptions & {
   errors: string[];
   infos: string[];
   isProtectedResource: boolean;
+  requiresApproval?: boolean;
   prompts: MCPPrompt[];
   tools: MCPTool[];
   resources: MCPResource[];

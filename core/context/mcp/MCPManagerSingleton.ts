@@ -2,6 +2,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 
 import { InternalMcpOptions, MCPServerStatus } from "../..";
 import MCPConnection, { MCPExtras } from "./MCPConnection";
+import {
+  isWorkspaceMcpServer,
+  isWorkspaceMcpServerApproved,
+} from "./workspaceMcpApproval";
 
 export class MCPManagerSingleton {
   private static instance: MCPManagerSingleton;
@@ -18,6 +22,19 @@ export class MCPManagerSingleton {
       MCPManagerSingleton.instance = new MCPManagerSingleton();
     }
     return MCPManagerSingleton.instance;
+  }
+
+  /**
+   * A workspace-supplied stdio MCP server (declared in a file inside the
+   * workspace, e.g. `.continue/mcpServers/*.json`) can execute arbitrary
+   * commands when started. It must only be connected once the user has
+   * explicitly approved the exact configuration.
+   */
+  public canConnect(server: InternalMcpOptions): boolean {
+    if (!isWorkspaceMcpServer(server)) {
+      return true;
+    }
+    return isWorkspaceMcpServerApproved(server);
   }
 
   async setEnabled(serverId: string, enabled: boolean) {
@@ -146,6 +163,11 @@ export class MCPManagerSingleton {
     if (!connection) {
       throw new Error(`MCP Connection ${serverId} not found`);
     }
+    if (!this.canConnect(connection.options)) {
+      throw new Error(
+        `MCP server "${connection.options.name}" comes from the workspace and has not been approved yet. Approve it in the MCP settings before connecting.`,
+      );
+    }
     await connection.connectClient(true, this.abortController.signal);
     if (this.onConnectionsRefreshed) {
       this.onConnectionsRefreshed();
@@ -164,6 +186,15 @@ export class MCPManagerSingleton {
       (async () => {
         await Promise.all(
           Array.from(this.connections.values()).map(async (connection) => {
+            if (!this.canConnect(connection.options)) {
+              connection.status = "not-connected";
+              connection.errors = [
+                `MCP server "${connection.options.name}" comes from the workspace and has not been approved yet. Approve it in the MCP settings to start it.`,
+              ];
+              connection.setRequiresApproval(true);
+              return;
+            }
+            connection.setRequiresApproval(false);
             await connection.connectClient(force, this.abortController.signal);
           }),
         );

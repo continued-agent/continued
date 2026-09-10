@@ -15,16 +15,16 @@ import url from "url";
 import { v4 as uuidv4 } from "uuid";
 import { GlobalContext, GlobalContextType } from "../../util/GlobalContext";
 
-// Use a Map to support concurrent authentications for different servers
+// Use a Map keyed by the OAuth `state` parameter to support concurrent
+// authentications. Keying by URL is unsafe: two flows to the same server URL
+// would collide and the callback would be matched to the wrong serverId.
 interface MCPOauthContext {
   serverId: string;
+  serverUrl: string;
   ide: IDE;
-  state?: string;
+  state: string;
 }
-const authenticatingContexts = new Map<string, MCPOauthContext>();
-
-// Map state parameters to server URLs for OAuth callback matching
-const stateToServerUrl = new Map<string, string>();
+const stateToContext = new Map<string, MCPOauthContext>();
 
 const PORT = 3000;
 
@@ -123,8 +123,11 @@ class MCPConnectionOauthProvider implements OAuthClientProvider {
   }
 
   get clientMetadata() {
-    // Generate state parameter if needed
-    const state = authenticatingContexts.get(this.oauthServerUrl)?.state;
+    // Find the in-flight flow for this server URL (there may be several
+    // concurrent flows; each carries its own state).
+    const state = Array.from(stateToContext.values()).find(
+      (ctx) => ctx.serverUrl === this.oauthServerUrl,
+    )?.state;
     const redirectUri = state
       ? this.getRedirectUrlWithState(state)
       : this.redirectUrl;
@@ -256,15 +259,14 @@ export async function performAuth(serverId: string, url: string, ide: IDE) {
   // Generate a unique state parameter for this auth flow
   const state = uuidv4();
 
-  // Store context for this specific server with state
-  authenticatingContexts.set(url, {
+  // Store the full context keyed by state so concurrent flows to the same
+  // server URL cannot overwrite each other.
+  stateToContext.set(state, {
     serverId,
+    serverUrl: url,
     ide,
     state,
   });
-
-  // Map state to server URL for callback matching
-  stateToServerUrl.set(state, url);
 
   try {
     return await auth(authProvider, {
@@ -272,8 +274,7 @@ export async function performAuth(serverId: string, url: string, ide: IDE) {
     });
   } catch (error) {
     // Clean up on error
-    authenticatingContexts.delete(url);
-    stateToServerUrl.delete(state);
+    stateToContext.delete(state);
     throw error;
   }
 }
@@ -282,35 +283,24 @@ export async function performAuth(serverId: string, url: string, ide: IDE) {
  * handle the authentication code received from the oauth redirect
  */
 async function handleMCPOauthCode(authorizationCode: string, state?: string) {
-  let serverUrl: string | undefined;
-  let context: MCPOauthContext | undefined;
-
   // The `state` parameter is required to match the callback to the in-flight
   // flow. Never fall back to "the only authenticating context": an attacker
   // who can reach the callback (e.g. a local process or a malicious webpage
   // on http://localhost:3000) could otherwise inject their own auth code.
-  if (state) {
-    // Use state parameter to find the correct server
-    serverUrl = stateToServerUrl.get(state);
-    if (serverUrl) {
-      context = authenticatingContexts.get(serverUrl);
-    }
-  } else {
+  if (!state) {
     console.error("No state parameter supplied for MCP OAuth callback");
     return;
   }
 
-  if (!context || !serverUrl) {
+  const context = stateToContext.get(state);
+  if (!context) {
     console.error("No matching authenticating context found for state:", state);
     return;
   }
 
-  const { ide, serverId } = context;
+  const { ide, serverId, serverUrl } = context;
 
   try {
-    if (!serverUrl) {
-      throw new Error("No MCP server url found for authentication");
-    }
     if (!authorizationCode) {
       throw new Error(`No MCP authorization code found for ${serverUrl}`);
     }
@@ -344,11 +334,8 @@ async function handleMCPOauthCode(authorizationCode: string, state?: string) {
       await context.ide.showToast("error", `OAuth failed: ${errorMessage}`);
     }
   } finally {
-    // Always clean up the context and state mapping
-    authenticatingContexts.delete(serverUrl);
-    if (state) {
-      stateToServerUrl.delete(state);
-    }
+    // Always clean up the state mapping
+    stateToContext.delete(state);
   }
 }
 
