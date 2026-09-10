@@ -671,12 +671,10 @@ export class CodebaseIndexer {
 
   // New methods using messenger directly
 
-  private updateProgress(update: IndexingProgressUpdate): Promise<void> | void {
+  private updateProgress(update: IndexingProgressUpdate): void {
     this.codebaseIndexingState = update;
     if (this.messenger) {
-      // Return the promise so callers that need the error path to settle
-      // before the test/process completes can await it.
-      return this.messenger.request("indexProgress", update).then(() => {});
+      void this.messenger.request("indexProgress", update);
     }
   }
 
@@ -840,7 +838,9 @@ export class CodebaseIndexer {
     // Await the telemetry send so the error path fully settles before the
     // caller (and the test) completes; otherwise the async logging can fire
     // after the Jest environment has been torn down.
-    await this.updateProgress(updateToSend);
+    if (this.messenger) {
+      await this.messenger.request("indexProgress", updateToSend);
+    }
     await this.sendIndexingErrorTelemetry(updateToSend);
   }
 
