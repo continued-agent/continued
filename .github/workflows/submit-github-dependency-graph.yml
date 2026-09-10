@@ -14,14 +14,14 @@ jobs:
     if: github.repository == 'continuedev/continue'
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: "temurin"
           java-version: 17
       - name: Generate and submit dependency graph
-        uses: gradle/actions/dependency-submission@v6
+        uses: gradle/actions/dependency-submission@4733eaac7c1b0da527e4206b7671e0061de1ce37
         with:
           # The gradle project is not in the root of the repository.
           build-root-directory: extensions/intellij

@@ -17,7 +17,7 @@ jobs:
           assignees: Patrick-Erichsen,tomasz-stefaniak,RomneyDa,tingwai,uinstinct
           numOfAssignee: 1
       # - name: "Add default labels"
-      #   uses: actions-ecosystem/action-add-labels@v1
+      #   uses: actions-ecosystem/action-add-labels@18f1af5e3544586314bbe15c0273249c770b2daf
       #   with:
       #     github_token: ${{ secrets.GITHUB_TOKEN }}
       #     labels: |

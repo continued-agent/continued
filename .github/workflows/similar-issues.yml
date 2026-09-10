@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout deja-view
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           repository: "bdougie/deja-view"
           # Option 1: Pin to specific commit (most secure)
@@ -31,7 +31,7 @@ jobs:
           path: deja-view
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: "3.11"
 
@@ -190,7 +190,7 @@ jobs:
           echo "confidence=$CONFIDENCE" >> $GITHUB_OUTPUT
 
       - name: Comment with analysis
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             let comment = '';
@@ -307,7 +307,7 @@ jobs:
 
       - name: Add labels
         if: github.event_name == 'issues'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const labels = [];

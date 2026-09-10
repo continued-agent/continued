@@ -27,7 +27,7 @@ jobs:
       matrix: ${{ steps.discover.outputs.matrix }}
       has-agents: ${{ steps.discover.outputs.has_agents }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Discover agents
         id: discover
@@ -75,15 +75,15 @@ jobs:
       matrix:
         agent: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "20"
 
       - name: Install Continue CLI
-        run: npm i -g @continuedev/cli
+        run: npm i -g @continuedev/cli@1.5.47
 
       - name: Extract agent name
         id: agent-name
@@ -95,7 +95,7 @@ jobs:
 
       - name: Create Check Run
         id: check
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         env:
           AGENT_NAME: ${{ steps.agent-name.outputs.name }}
         with:
@@ -171,7 +171,7 @@ jobs:
 
       - name: Update Check Run
         if: always()
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         env:
           AGENT_OUTPUT: ${{ steps.run.outputs.output }}
           AGENT_ERROR: ${{ steps.run.outputs.error }}
