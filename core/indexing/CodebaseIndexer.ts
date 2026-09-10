@@ -734,19 +734,26 @@ export class CodebaseIndexer {
 
     // Acquire the index lock to prevent multiple windows from indexing
     // concurrently. The owner token scopes heartbeat/unlock to this indexer so
-    // one window can never release another's lock.
+    // one window can never release another's lock. If another indexer won the
+    // race between the wait loop and the insert, retry briefly.
     const lockOwner = `indexer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    const acquired = await IndexLock.lock(paths.join(", "), lockOwner);
+    let acquired = await IndexLock.lock(paths.join(", "), lockOwner);
     if (!acquired) {
-      // Another indexer won the race between our wait loop and the insert.
-      throw new Error(
-        "Failed to acquire index lock: another indexer is running.",
+      for (let retry = 0; retry < 3 && !acquired; retry++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        acquired = await IndexLock.lock(paths.join(", "), lockOwner);
+      }
+    }
+    if (!acquired) {
+      // Another indexer is still holding the lock; proceed without one rather
+      // than failing indexing outright (matches pre-lock behavior).
+      console.log(
+        `Failed to acquire index lock for ${paths.join(", ")}; indexing without lock.`,
       );
     }
-    const indexLockTimestampUpdateInterval = setInterval(
-      () => void IndexLock.updateTimestamp(lockOwner),
-      5_000,
-    );
+    const indexLockTimestampUpdateInterval = acquired
+      ? setInterval(() => void IndexLock.updateTimestamp(lockOwner), 5_000)
+      : null;
 
     try {
       for await (const update of this.refreshDirs(
@@ -764,8 +771,12 @@ export class CodebaseIndexer {
       await this.handleIndexingError(e);
     }
 
-    clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
-    await IndexLock.unlock(lockOwner);
+    if (indexLockTimestampUpdateInterval) {
+      clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
+    }
+    if (acquired) {
+      await IndexLock.unlock(lockOwner);
+    }
 
     // Directly refresh submenu items
     if (this.messenger) {

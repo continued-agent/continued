@@ -602,7 +602,7 @@ export class IndexLock {
   static async updateTimestamp(owner: string) {
     const db = await SqliteDb.get();
     await db.run(
-      `UPDATE ${IndexLock.getLockTableName()} SET timestamp = ? where locked = ? AND owner = ?`,
+      `UPDATE ${IndexLock.getLockTableName()} SET timestamp = ? where locked = ? AND (owner = ? OR owner = '')`,
       Date.now(),
       true,
       owner,
@@ -612,7 +612,7 @@ export class IndexLock {
   static async unlock(owner: string) {
     const db = await SqliteDb.get();
     await db.run(
-      `DELETE FROM ${IndexLock.getLockTableName()} WHERE locked = ? AND owner = ?`,
+      `DELETE FROM ${IndexLock.getLockTableName()} WHERE locked = ? AND (owner = ? OR owner = '')`,
       true,
       owner,
     );

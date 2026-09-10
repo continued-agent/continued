@@ -517,15 +517,15 @@ class IntelliJIDE(
         // Consume stdout and stderr concurrently: reading stdout to completion
         // before stderr can deadlock when the child fills the stderr pipe
         // buffer while we wait on stdout.
-        val stdoutDeferred = async(Dispatchers.IO) {
-            process.inputStream.bufferedReader().readText()
+        val (stdout, stderr) = coroutineScope {
+            val stdoutDeferred = async(Dispatchers.IO) {
+                process.inputStream.bufferedReader().readText()
+            }
+            val stderrDeferred = async(Dispatchers.IO) {
+                process.errorStream.bufferedReader().readText()
+            }
+            stdoutDeferred.await() to stderrDeferred.await()
         }
-        val stderrDeferred = async(Dispatchers.IO) {
-            process.errorStream.bufferedReader().readText()
-        }
-
-        val stdout = stdoutDeferred.await()
-        val stderr = stderrDeferred.await()
 
         withContext(Dispatchers.IO) {
             process.waitFor()
