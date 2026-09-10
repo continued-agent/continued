@@ -701,7 +701,9 @@ export class CodebaseIndexer {
         await IndexLock.unlock(foundLock.owner);
         break;
       }
-      console.log(`indexing ${foundLock.dirs}`);
+      // Yield a lightweight waiting update without logging; the messenger
+      // notification for transient wait states is unnecessary and, in tests,
+      // an unawaited request can fire after the environment tears down.
       yield {
         progress: 0,
         desc: "",
@@ -729,7 +731,13 @@ export class CodebaseIndexer {
     this.indexingCancellationController = localController;
 
     for await (const update of this.waitForDBIndex()) {
-      this.updateProgress(update);
+      // Transient "waiting" updates only update local state; do not notify
+      // the IDE so no unawaited messenger request can outlive the caller.
+      if (update.status === "waiting") {
+        this.codebaseIndexingState = update;
+      } else {
+        this.updateProgress(update);
+      }
     }
 
     // Acquire the index lock to prevent multiple windows from indexing
