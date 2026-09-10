@@ -137,6 +137,13 @@ function MCPServerPreview({
     });
   };
 
+  const onApprove = async () => {
+    updateMCPServerStatus("connecting");
+    await ideMessenger.request("mcp/approveServer", {
+      id: server.id,
+    });
+  };
+
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
       ...prev,
@@ -229,6 +236,18 @@ function MCPServerPreview({
         </div>
 
         <div className="flex items-center gap-1">
+          {server.requiresApproval && (
+            <ToolTip content="This MCP server is declared in the workspace and can execute commands. Approve it to start it.">
+              <Button
+                onClick={onApprove}
+                variant="outline"
+                size="sm"
+                className="my-0 h-6 text-xs"
+              >
+                Approve &amp; Start
+              </Button>
+            </ToolTip>
+          )}
           {server.isProtectedResource &&
             "url" in server &&
             server.status !== "connected" && (

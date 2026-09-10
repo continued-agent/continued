@@ -150,6 +150,7 @@ export class IdeMessenger implements IIdeMessenger {
   request<T extends keyof FromWebviewProtocol>(
     messageType: T,
     data: FromWebviewProtocol[T][0],
+    timeoutMs?: number,
   ): Promise<WebviewSingleMessage<T>> {
     const messageId = uuidv4();
 
@@ -164,10 +165,24 @@ export class IdeMessenger implements IIdeMessenger {
             return;
           }
           window.removeEventListener("message", handler);
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
           resolve(event.data.data as WebviewSingleMessage<T>);
         }
       };
       window.addEventListener("message", handler);
+
+      // Requests that never get a response must not accumulate listeners
+      // forever. Default to 60s; callers that expect long-running operations
+      // can pass a longer timeout.
+      const timeoutId = setTimeout(() => {
+        window.removeEventListener("message", handler);
+        resolve({
+          status: "error",
+          error: `Request ${messageType} timed out after ${(timeoutMs ?? 60_000) / 1000}s`,
+        } as WebviewSingleMessage<T>);
+      }, timeoutMs ?? 60_000);
 
       this.post(messageType, data, messageId);
     });
@@ -220,7 +235,6 @@ export class IdeMessenger implements IIdeMessenger {
           // throw new Error(responseData.error);
         }
         if (responseData.done) {
-          window.removeEventListener("message", handler);
           done = true;
           returnVal = responseData.content;
         } else {
@@ -260,6 +274,9 @@ export class IdeMessenger implements IIdeMessenger {
     } catch (e) {
       throw e;
     } finally {
+      // Always remove listeners so a cancelled or failed stream does not leak
+      // the message handler or the abort listener.
+      window.removeEventListener("message", handler);
       cancelToken?.removeEventListener("abort", handleAbort);
     }
   }
