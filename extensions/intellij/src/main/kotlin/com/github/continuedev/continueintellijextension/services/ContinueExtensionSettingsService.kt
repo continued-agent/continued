@@ -282,7 +282,12 @@ class ContinueExtensionConfigurable : Configurable {
         val newUrl = mySettingsComponent?.remoteConfigServerUrl?.text
         val validationError = ContinueExtensionSettings.validateRemoteConfigServerUrl(newUrl.orEmpty())
         if (validationError != null) {
-            mySettingsComponent?.remoteConfigServerUrl?.error = validationError
+            // Surface the validation error to the user without relying on the
+            // component's error property (not available on all platform versions).
+            val errorLabel = mySettingsComponent?.panel?.components
+                ?.filterIsInstance<JLabel>()
+                ?.firstOrNull { it.text == "Remote Config Server URL:" }
+            errorLabel?.text = "Remote Config Server URL: ($validationError)"
             return
         }
         settings.continueState.remoteConfigServerUrl = newUrl
@@ -308,7 +313,7 @@ class ContinueExtensionConfigurable : Configurable {
         val settings = ContinueExtensionSettings.instance
         mySettingsComponent?.remoteConfigServerUrl?.text = settings.continueState.remoteConfigServerUrl
         mySettingsComponent?.remoteConfigSyncPeriod?.text = settings.continueState.remoteConfigSyncPeriod.toString()
-        mySettingsComponent?.userToken?.password = (ContinueExtensionSettings.getTokenFromCredentialStore() ?: "").toCharArray()
+        mySettingsComponent?.userToken?.text = (ContinueExtensionSettings.getTokenFromCredentialStore() ?: "")
         mySettingsComponent?.enableTabAutocomplete?.isSelected = settings.continueState.enableTabAutocomplete
         mySettingsComponent?.displayEditorTooltip?.isSelected = settings.continueState.displayEditorTooltip
         mySettingsComponent?.showIDECompletionSideBySide?.isSelected =

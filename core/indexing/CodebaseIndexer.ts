@@ -671,10 +671,12 @@ export class CodebaseIndexer {
 
   // New methods using messenger directly
 
-  private updateProgress(update: IndexingProgressUpdate) {
+  private updateProgress(update: IndexingProgressUpdate): Promise<void> | void {
     this.codebaseIndexingState = update;
     if (this.messenger) {
-      void this.messenger.request("indexProgress", update);
+      // Return the promise so callers that need the error path to settle
+      // before the test/process completes can await it.
+      return this.messenger.request("indexProgress", update).then(() => {});
     }
   }
 
@@ -769,13 +771,13 @@ export class CodebaseIndexer {
     } catch (e: any) {
       console.log(`Failed refreshing codebase index directories: ${e}`);
       await this.handleIndexingError(e);
-    }
-
-    if (indexLockTimestampUpdateInterval) {
-      clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
-    }
-    if (acquired) {
-      await IndexLock.unlock(lockOwner);
+    } finally {
+      if (indexLockTimestampUpdateInterval) {
+        clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
+      }
+      if (acquired) {
+        await IndexLock.unlock(lockOwner);
+      }
     }
 
     // Directly refresh submenu items
@@ -838,6 +840,7 @@ export class CodebaseIndexer {
     // Await the telemetry send so the error path fully settles before the
     // caller (and the test) completes; otherwise the async logging can fire
     // after the Jest environment has been torn down.
+    await this.updateProgress(updateToSend);
     await this.sendIndexingErrorTelemetry(updateToSend);
   }
 
