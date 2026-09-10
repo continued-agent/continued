@@ -105,12 +105,36 @@ class Docker extends OpenAI implements ModelInstaller {
     }
   }
 
+  /**
+   * Validate a Docker model reference before passing it to a spawned process.
+   * Docker image references follow the form [registry/]repository[:tag], where
+   * repository components may contain lowercase letters, digits and a few
+   * separators. Reject anything that could be interpreted by a shell.
+   */
+  private assertSafeModelReference(model: string): string {
+    const trimmed = model.trim();
+    if (
+      trimmed.length === 0 ||
+      trimmed.length > 255 ||
+      !/^[a-z0-9][a-z0-9._/-]*(:[a-zA-Z0-9._-]+)?$/.test(trimmed) ||
+      trimmed.includes("..") ||
+      /[;|&`$"'\\\s]/.test(trimmed)
+    ) {
+      throw new Error(
+        `Invalid Docker model reference "${model}": model names must be safe Docker image references (alphanumeric, '.', '_', '/', '-', optional ':tag').`,
+      );
+    }
+    return trimmed;
+  }
+
   private async executeDockerCommand(
     args: string[],
     signal?: AbortSignal,
   ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const proc = spawn("docker", args, { shell: true });
+      // shell:false (the default) passes args verbatim to docker without shell
+      // reinterpretation, preventing command injection via model names or args.
+      const proc = spawn("docker", args, { shell: false });
 
       let stdout = "";
       let stderr = "";
@@ -166,7 +190,9 @@ class Docker extends OpenAI implements ModelInstaller {
     signal: AbortSignal,
     progressReporter?: (task: string, increment: number, total: number) => void,
   ): Promise<any> {
-    const targetModel = this.modelMap[modelName] || modelName;
+    const targetModel = this.assertSafeModelReference(
+      this.modelMap[modelName] || modelName,
+    );
 
     const release = await Docker.modelsBeingInstalledMutex.acquire();
     try {
