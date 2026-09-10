@@ -245,14 +245,20 @@ impl Tree {
         }
     }
 
-    /// Persist the tree to disk as JSONL
+    /// Persist the tree to disk as JSONL, atomically (temp file + rename) so a
+    /// crash mid-write cannot leave a truncated tree behind.
     pub fn persist(&self, filepath: &Path) {
         if let Some(dir) = filepath.parent() {
             std::fs::create_dir_all(dir)
                 .unwrap_or_else(|_| panic!("Failed to create dir {}", dir.display()));
         }
-        let mut file = std::fs::File::create(filepath).unwrap();
-        file.write_all(self.json_for_obj().as_bytes()).unwrap();
+        let tmp_path = filepath.with_extension("merkle_tree.tmp");
+        {
+            let mut file = std::fs::File::create(&tmp_path).unwrap();
+            file.write_all(self.json_for_obj().as_bytes()).unwrap();
+            file.sync_all().unwrap();
+        }
+        std::fs::rename(&tmp_path, filepath).unwrap();
     }
 
     /// Load the tree from JSONL file
@@ -335,9 +341,11 @@ impl Tree {
         // Remove - along with all children
         for obj in old_path_to_object.values() {
             match obj {
-                Object::Tree(tree) => tree.walk(&mut |_obj| {
+                Object::Tree(tree) => {
+                    // all_obj_descriptions() already walks the whole subtree;
+                    // calling it once per node would be O(N^2) on large trees.
                     remove.extend(tree.all_obj_descriptions());
-                }),
+                }
                 Object::Blob(_) => remove.push(obj.descr()),
             }
         }
