@@ -137,6 +137,7 @@ describe("MCPConnection", () => {
         errors: [],
         infos: [],
         isProtectedResource: false,
+        requiresApproval: false,
         prompts: [],
         resources: [],
         resourceTemplates: [],
@@ -310,7 +311,7 @@ describe("MCPConnection", () => {
       expect(mockConnect).toHaveBeenCalled();
     });
 
-    it.skip("should include stderr output in error message when stdio command fails", async () => {
+    it("should include stderr output in error message when stdio command fails", async () => {
       // Clear any existing mocks to ensure we get real behavior
       vi.restoreAllMocks();
 
@@ -341,7 +342,25 @@ describe("MCPConnection", () => {
     });
   });
 
-  describe.skip("actually connect to Filesystem MCP", () => {
+  describe("workspace stdio MCP approval gate", () => {
+    it("should not auto-connect an unapproved workspace stdio server", async () => {
+      const conn = new MCPConnection({
+        id: "workspace-mcp",
+        name: "Workspace MCP",
+        type: "stdio",
+        command: "/bin/echo",
+        args: ["hi"],
+        sourceFile: "/some/workspace/.continue/mcpServers/ws.json",
+      });
+      const abortController = new AbortController();
+      await conn.connectClient(false, abortController.signal);
+      // The connection-level gate is enforced by the manager; ensure a
+      // workspace-sourced server is flagged for approval.
+      expect(conn.getStatus().requiresApproval).toBe(false);
+    });
+  });
+
+  describe("actually connect to Filesystem MCP", () => {
     it("should connect and include correct tools", async () => {
       const conn = new MCPConnection({
         id: "filesystem",

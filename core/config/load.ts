@@ -909,5 +909,6 @@ async function loadContinueConfigFromJson(
 export {
   finalToBrowserConfig,
   loadContinueConfigFromJson,
+  buildConfigTsandReadConfigJs,
   type BrowserSerializedContinueConfig,
 };

@@ -409,5 +409,48 @@ describe("E2E Scenarios", () => {
     expect(result.config?.rules?.length).toBeGreaterThan(0);
   });
 
-  it.skip("should prioritize org over user / package secrets", () => {});
+  it("should prioritize org over user / package secrets", async () => {
+    // The same secret name exists at multiple scopes: the resolution order is
+    // package -> org -> user, and the first location with a value wins.
+    const fqsn: FQSN = {
+      packageSlugs: [{ ownerSlug: "test-org", packageSlug: "agent" }],
+      secretName: "GEMINI_API_KEY",
+    };
+
+    // Org secret exists; user secret also exists for the same name.
+    const result = await resolveFQSN(
+      "test-user",
+      fqsn,
+      platformSecretStore,
+      "test-org",
+    );
+
+    expect(result.found).toBe(true);
+    if (result.found) {
+      expect(result.secretLocation.secretType).toBe(SecretType.Organization);
+      if (result.secretLocation.secretType === SecretType.Organization) {
+        expect(result.secretLocation.orgSlug).toBe("test-org");
+      }
+    }
+  });
+
+  it("should fall back to user secrets when no org/package secret exists", async () => {
+    const fqsn: FQSN = {
+      packageSlugs: [{ ownerSlug: "test-org", packageSlug: "agent" }],
+      secretName: "OPENAI_API_KEY",
+    };
+
+    const result = await resolveFQSN(
+      "test-user",
+      fqsn,
+      platformSecretStore,
+      "test-org",
+    );
+
+    expect(result.found).toBe(true);
+    if (result.found && "value" in result) {
+      expect(result.value).toBe("sk-123");
+      expect(result.secretLocation.secretType).toBe(SecretType.User);
+    }
+  });
 });
