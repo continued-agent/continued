@@ -166,6 +166,21 @@ export function checkToolPermission(
       };
     }
 
+    // A dynamic decision that is MORE restrictive than the static policy must
+    // also take precedence (e.g. a tool statically "allowed" that the dynamic
+    // evaluator wants to gate on user approval). Only when the dynamic
+    // evaluation is at least as permissive as the static policy does the
+    // static policy stand.
+    if (
+      evaluatedPolicy === "allowedWithPermission" &&
+      basePermission === "allow"
+    ) {
+      return {
+        permission: "ask",
+        matchedPolicy,
+      };
+    }
+
     // Otherwise, user preference wins - return the original base permission
     return {
       permission: basePermission,

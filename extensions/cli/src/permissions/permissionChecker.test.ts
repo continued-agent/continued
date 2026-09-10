@@ -597,7 +597,7 @@ describe("Permission Checker", () => {
         );
       });
 
-      it("should allow risky commands based on user preference (curl)", () => {
+      it("should gate risky commands on explicit approval despite user preference (curl)", () => {
         mockEvaluateToolCallPolicy.mockReturnValue("allowedWithPermission");
 
         const result = checkToolPermission(
@@ -605,7 +605,10 @@ describe("Permission Checker", () => {
           permissions,
         );
 
-        expect(result.permission).toBe("allow"); // User preference wins over "ask"
+        // The command-specific evaluator wants approval for this risky
+        // command; that more-restrictive decision must win over the user's
+        // broad "allow".
+        expect(result.permission).toBe("ask");
         expect(mockEvaluateToolCallPolicy).toHaveBeenCalledWith(
           "allowedWithoutPermission", // converted from "allow"
           { command: "curl https://example.com" },
@@ -759,26 +762,28 @@ describe("Permission Checker", () => {
           expected: "allow",
         },
 
-        // Risky commands (user preference wins when not disabled)
+        // Risky commands (a dynamic request for approval must win over the
+        // user's broad "allow": the command-specific security evaluator knows
+        // the command is dangerous and wants explicit consent)
         {
           command: "npm install pkg",
           dynamicResult: "allowedWithPermission",
-          expected: "allow",
+          expected: "ask",
         },
         {
           command: "rm file.txt",
           dynamicResult: "allowedWithPermission",
-          expected: "allow",
+          expected: "ask",
         },
         {
           command: "curl https://api.example.com",
           dynamicResult: "allowedWithPermission",
-          expected: "allow",
+          expected: "ask",
         },
         {
           command: "wget https://example.com/file",
           dynamicResult: "allowedWithPermission",
-          expected: "allow",
+          expected: "ask",
         },
 
         // Dangerous commands (always blocked)
@@ -860,7 +865,9 @@ describe("Permission Checker", () => {
           permissions,
         );
 
-        expect(result.permission).toBe("allow");
+        // A dynamic request for approval still gates the call even with empty
+        // arguments.
+        expect(result.permission).toBe("ask");
         expect(mockEvaluateToolCallPolicy).toHaveBeenCalledWith(
           "allowedWithoutPermission",
           {},
