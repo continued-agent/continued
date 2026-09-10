@@ -1,7 +1,7 @@
 import { ChildProcess, spawn } from "child_process";
 
-import { killProcessTree } from "../util/processTree.js";
 import { logger } from "../util/logger.js";
+import { killProcessTree } from "../util/processTree.js";
 import { getWorkspaceDirectory } from "../util/workspace.js";
 
 export type BackgroundJobStatus =
