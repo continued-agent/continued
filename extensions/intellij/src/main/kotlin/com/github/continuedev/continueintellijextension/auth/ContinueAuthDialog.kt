@@ -2,7 +2,7 @@ package com.github.continuedev.continueintellijextension.auth
 
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.HyperlinkLabel
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -14,7 +14,7 @@ class ContinueAuthDialog(
     private val authUrl: String? = null,
     private val onTokenEntered: (String) -> Unit,
 ) : DialogWrapper(true) {
-    private val tokenField = JBTextField()
+    private val tokenField = JBPasswordField()
 
     init {
         init()
@@ -44,7 +44,7 @@ class ContinueAuthDialog(
     }
 
     override fun doOKAction() {
-        val token = tokenField.text
+        val token = String(tokenField.password)
         if (token.isNotBlank()) {
             onTokenEntered(token)
             super.doOKAction()

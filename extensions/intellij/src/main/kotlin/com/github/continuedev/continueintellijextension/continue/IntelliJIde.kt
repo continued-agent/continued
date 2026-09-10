@@ -171,7 +171,7 @@ class IntelliJIDE(
         return IdeSettings(
             remoteConfigServerUrl = settings.continueState.remoteConfigServerUrl,
             remoteConfigSyncPeriod = settings.continueState.remoteConfigSyncPeriod,
-            userToken = settings.continueState.userToken ?: "",
+            userToken = ContinueExtensionSettings.getTokenFromCredentialStore() ?: "",
             continueTestEnvironment = "production",
             pauseCodebaseIndexOnStart = false, // TODO: Needs to be implemented
         )
@@ -514,8 +514,18 @@ class IntelliJIDE(
             builder.start()
         }
 
-        val stdout = process.inputStream.bufferedReader().readText()
-        val stderr = process.errorStream.bufferedReader().readText()
+        // Consume stdout and stderr concurrently: reading stdout to completion
+        // before stderr can deadlock when the child fills the stderr pipe
+        // buffer while we wait on stdout.
+        val stdoutDeferred = async(Dispatchers.IO) {
+            process.inputStream.bufferedReader().readText()
+        }
+        val stderrDeferred = async(Dispatchers.IO) {
+            process.errorStream.bufferedReader().readText()
+        }
+
+        val stdout = stdoutDeferred.await()
+        val stderr = stderrDeferred.await()
 
         withContext(Dispatchers.IO) {
             process.waitFor()

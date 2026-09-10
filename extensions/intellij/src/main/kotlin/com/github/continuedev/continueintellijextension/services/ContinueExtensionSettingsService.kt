@@ -3,6 +3,9 @@ package com.github.continuedev.continueintellijextension.services
 import com.github.continuedev.continueintellijextension.constants.getConfigJsonPath
 import com.github.continuedev.continueintellijextension.constants.getConfigJsPath
 import com.google.gson.Gson
+import com.intellij.credentialStore.CredentialAttributes
+import com.intellij.credentialStore.Credentials
+import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.State
@@ -11,6 +14,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.DumbAware
+import com.intellij.ui.components.JBPasswordField
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.messages.Topic
@@ -26,7 +30,7 @@ class ContinueSettingsComponent : DumbAware {
     val panel: JPanel = JPanel(GridBagLayout())
     val remoteConfigServerUrl: JTextField = JTextField()
     val remoteConfigSyncPeriod: JTextField = JTextField()
-    val userToken: JTextField = JTextField()
+    val userToken: JBPasswordField = JBPasswordField()
     val enableTabAutocomplete: JCheckBox = JCheckBox("Enable Tab Autocomplete")
     val displayEditorTooltip: JCheckBox = JCheckBox("Display Editor Tooltip")
     val showIDECompletionSideBySide: JCheckBox = JCheckBox("Show IDE completions side-by-side")
@@ -83,11 +87,79 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
         var shownWelcomeDialog: Boolean = false
         var remoteConfigServerUrl: String? = null
         var remoteConfigSyncPeriod: Int = 60
-        var userToken: String? = null
         var enableTabAutocomplete: Boolean = true
         var displayEditorTooltip: Boolean = true
         var showIDECompletionSideBySide: Boolean = false
         var continueTestEnvironment: String = "production"
+    }
+
+    companion object {
+        private val log = Logger.getInstance(ContinueExtensionSettings::class.java)
+
+        // The user token is a secret: it must never be persisted in the
+        // settings XML (which is part of the IDE profile and can leak via
+        // backups/screenshots). Store it in the IDE Credential Store instead.
+        private val TOKEN_CREDENTIAL_ATTRIBUTES = CredentialAttributes(
+            "ContinueExtensionSettings.userToken",
+            "continue-user-token",
+            this::class.java,
+            false
+        )
+
+        val instance: ContinueExtensionSettings
+            get() = service<ContinueExtensionSettings>()
+
+        fun getTokenFromCredentialStore(): String? {
+            return try {
+                PasswordSafe.instance.getPassword(TOKEN_CREDENTIAL_ATTRIBUTES)
+            } catch (e: Exception) {
+                log.warn("Failed to read user token from credential store", e)
+                null
+            }
+        }
+
+        fun saveTokenToCredentialStore(token: String) {
+            try {
+                PasswordSafe.instance.set(
+                    TOKEN_CREDENTIAL_ATTRIBUTES,
+                    Credentials(TOKEN_CREDENTIAL_ATTRIBUTES.userName, token)
+                )
+            } catch (e: Exception) {
+                log.warn("Failed to save user token to credential store", e)
+            }
+        }
+
+        fun clearTokenFromCredentialStore() {
+            try {
+                PasswordSafe.instance.set(
+                    TOKEN_CREDENTIAL_ATTRIBUTES,
+                    Credentials(TOKEN_CREDENTIAL_ATTRIBUTES.userName, null)
+                )
+            } catch (e: Exception) {
+                log.warn("Failed to clear user token from credential store", e)
+            }
+        }
+
+        /**
+         * Remote config servers are fetched and their response is written to
+         * disk and imported as executable JavaScript. Only HTTPS is allowed so
+         * the bearer token cannot be sniffed and the response cannot be
+         * tampered with on the wire. HTTP is only accepted for loopback
+         * addresses, which is the explicit local-development case.
+         */
+        fun validateRemoteConfigServerUrl(rawUrl: String): String? {
+            val url = try {
+                URL(rawUrl)
+            } catch (e: Exception) {
+                return "Remote config server URL is not a valid URL: $rawUrl"
+            }
+            val host = url.host.lowercase()
+            val isLoopback = host == "localhost" || host == "127.0.0.1" || host == "::1"
+            if (url.protocol != "https" && !(url.protocol == "http" && isLoopback)) {
+                return "Remote config server URL must use HTTPS (HTTP is only allowed for localhost/127.0.0.1). Got: ${url.protocol}://${url.host}"
+            }
+            return null
+        }
     }
 
     var continueState: ContinueState = ContinueState()
@@ -100,26 +172,34 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
 
     override fun loadState(state: ContinueState) {
         continueState = state
-    }
-
-    companion object {
-        private val log = Logger.getInstance(ContinueExtensionSettings::class.java)
-
-        val instance: ContinueExtensionSettings
-            get() = service<ContinueExtensionSettings>()
+        // Migration: the token used to live in the XML state. If a value is
+        // still present, move it into the credential store and clear it from
+        // the XML so it is no longer persisted in the IDE profile.
+        val legacyToken = state.userToken
+        if (!legacyToken.isNullOrEmpty()) {
+            saveTokenToCredentialStore(legacyToken)
+            state.userToken = null
+        }
     }
 
     private fun syncRemoteConfig() {
         val remoteServerUrl = state.remoteConfigServerUrl
         if (remoteServerUrl.isNullOrEmpty()) return
 
-        val token = state.userToken
+        val validationError = validateRemoteConfigServerUrl(remoteServerUrl)
+        if (validationError != null) {
+            log.warn("Skipping remote config sync: $validationError")
+            return
+        }
+
+        val token = getTokenFromCredentialStore()
         val baseUrl = remoteServerUrl.removeSuffix("/")
         try {
             val url = "$baseUrl/sync"
             val responseBody = HttpRequests.request(url)
                 .connectTimeout(5000)
                 .readTimeout(5000)
+                .redirectsPolicy(HttpRequests.RedirectPolicy.NONE)
                 .tuner { connection ->
                     if (token != null)
                         connection.addRequestProperty("Authorization", "Bearer $token")
@@ -145,6 +225,12 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
 
         val remoteServerUrl = continueState.remoteConfigServerUrl
         if (remoteServerUrl.isNullOrEmpty()) return
+
+        val validationError = validateRemoteConfigServerUrl(remoteServerUrl)
+        if (validationError != null) {
+            log.warn("Not scheduling remote config sync: $validationError")
+            return
+        }
 
         remoteSyncFuture = AppExecutorUtil.getAppScheduledExecutorService()
             .scheduleWithFixedDelay(
@@ -174,10 +260,11 @@ class ContinueExtensionConfigurable : Configurable {
 
     override fun isModified(): Boolean {
         val settings = ContinueExtensionSettings.instance
+        val currentToken = ContinueExtensionSettings.getTokenFromCredentialStore() ?: ""
         val modified =
             mySettingsComponent?.remoteConfigServerUrl?.text != settings.continueState.remoteConfigServerUrl ||
-                    mySettingsComponent?.remoteConfigSyncPeriod?.text?.toInt() != settings.continueState.remoteConfigSyncPeriod ||
-                    mySettingsComponent?.userToken?.text != settings.continueState.userToken ||
+                    mySettingsComponent?.remoteConfigSyncPeriod?.text?.toIntOrNull() != settings.continueState.remoteConfigSyncPeriod ||
+                    String(mySettingsComponent?.userToken?.password ?: CharArray(0)) != currentToken ||
                     mySettingsComponent?.enableTabAutocomplete?.isSelected != settings.continueState.enableTabAutocomplete ||
                     mySettingsComponent?.displayEditorTooltip?.isSelected != settings.continueState.displayEditorTooltip ||
                     mySettingsComponent?.showIDECompletionSideBySide?.isSelected != settings.continueState.showIDECompletionSideBySide
@@ -186,9 +273,21 @@ class ContinueExtensionConfigurable : Configurable {
 
     override fun apply() {
         val settings = ContinueExtensionSettings.instance
-        settings.continueState.remoteConfigServerUrl = mySettingsComponent?.remoteConfigServerUrl?.text
-        settings.continueState.remoteConfigSyncPeriod = mySettingsComponent?.remoteConfigSyncPeriod?.text?.toInt() ?: 60
-        settings.continueState.userToken = mySettingsComponent?.userToken?.text
+        val newUrl = mySettingsComponent?.remoteConfigServerUrl?.text
+        val validationError = ContinueExtensionSettings.validateRemoteConfigServerUrl(newUrl.orEmpty())
+        if (validationError != null) {
+            mySettingsComponent?.remoteConfigServerUrl?.error = validationError
+            return
+        }
+        settings.continueState.remoteConfigServerUrl = newUrl
+        settings.continueState.remoteConfigSyncPeriod = mySettingsComponent?.remoteConfigSyncPeriod?.text?.toIntOrNull() ?: 60
+        val newToken = String(mySettingsComponent?.userToken?.password ?: CharArray(0))
+        if (newToken.isNotEmpty()) {
+            ContinueExtensionSettings.saveTokenToCredentialStore(newToken)
+        } else if (ContinueExtensionSettings.getTokenFromCredentialStore() != null) {
+            // Empty field means "clear the token"
+            ContinueExtensionSettings.clearTokenFromCredentialStore()
+        }
         settings.continueState.enableTabAutocomplete = mySettingsComponent?.enableTabAutocomplete?.isSelected ?: false
         settings.continueState.displayEditorTooltip = mySettingsComponent?.displayEditorTooltip?.isSelected ?: true
         settings.continueState.showIDECompletionSideBySide =
@@ -203,7 +302,7 @@ class ContinueExtensionConfigurable : Configurable {
         val settings = ContinueExtensionSettings.instance
         mySettingsComponent?.remoteConfigServerUrl?.text = settings.continueState.remoteConfigServerUrl
         mySettingsComponent?.remoteConfigSyncPeriod?.text = settings.continueState.remoteConfigSyncPeriod.toString()
-        mySettingsComponent?.userToken?.text = settings.continueState.userToken
+        mySettingsComponent?.userToken?.password = (ContinueExtensionSettings.getTokenFromCredentialStore() ?: "").toCharArray()
         mySettingsComponent?.enableTabAutocomplete?.isSelected = settings.continueState.enableTabAutocomplete
         mySettingsComponent?.displayEditorTooltip?.isSelected = settings.continueState.displayEditorTooltip
         mySettingsComponent?.showIDECompletionSideBySide?.isSelected =
