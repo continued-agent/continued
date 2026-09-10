@@ -698,7 +698,7 @@ export class CodebaseIndexer {
     while (foundLock?.locked) {
       if ((Date.now() - foundLock.timestamp) / 1000 > 10) {
         console.log(`${foundLock.dirs} is not being indexed... unlocking`);
-        await IndexLock.unlock();
+        await IndexLock.unlock(foundLock.owner);
         break;
       }
       console.log(`indexing ${foundLock.dirs}`);
@@ -732,9 +732,19 @@ export class CodebaseIndexer {
       this.updateProgress(update);
     }
 
-    await IndexLock.lock(paths.join(", ")); // acquire the index lock to prevent multiple windows to begin indexing
+    // Acquire the index lock to prevent multiple windows from indexing
+    // concurrently. The owner token scopes heartbeat/unlock to this indexer so
+    // one window can never release another's lock.
+    const lockOwner = `indexer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const acquired = await IndexLock.lock(paths.join(", "), lockOwner);
+    if (!acquired) {
+      // Another indexer won the race between our wait loop and the insert.
+      throw new Error(
+        "Failed to acquire index lock: another indexer is running.",
+      );
+    }
     const indexLockTimestampUpdateInterval = setInterval(
-      () => void IndexLock.updateTimestamp(),
+      () => void IndexLock.updateTimestamp(lockOwner),
       5_000,
     );
 
@@ -755,7 +765,7 @@ export class CodebaseIndexer {
     }
 
     clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
-    await IndexLock.unlock();
+    await IndexLock.unlock(lockOwner);
 
     // Directly refresh submenu items
     if (this.messenger) {

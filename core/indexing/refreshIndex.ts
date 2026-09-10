@@ -51,7 +51,8 @@ export class SqliteDb {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             locked BOOLEAN NOT NULL,
             timestamp INTEGER NOT NULL,
-            dirs STRING NOT NULL
+            dirs STRING NOT NULL,
+            owner STRING NOT NULL DEFAULT ''
         )`,
     );
 
@@ -549,40 +550,71 @@ export class IndexLock {
   }
 
   static async isLocked(): Promise<
-    { locked: boolean; dirs: string; timestamp: number } | undefined | undefined
+    | { locked: boolean; dirs: string; timestamp: number; owner: string }
+    | undefined
   > {
     const db = await SqliteDb.get();
     const row = (await db.get(
-      `SELECT locked, dirs, timestamp FROM ${IndexLock.getLockTableName()} WHERE locked = ?`,
+      `SELECT locked, dirs, timestamp, owner FROM ${IndexLock.getLockTableName()} WHERE locked = ?`,
       true,
-    )) as { locked: boolean; dirs: string; timestamp: number } | undefined;
+    )) as
+      | { locked: boolean; dirs: string; timestamp: number; owner: string }
+      | undefined;
     return row;
   }
 
-  static async lock(dirs: string) {
+  /**
+   * Atomically acquire the index lock. The check-and-insert happen in a single
+   * transaction so two concurrent indexers cannot both acquire the lock.
+   * Returns false if the lock is already held (by anyone).
+   */
+  static async lock(dirs: string, owner: string): Promise<boolean> {
+    const db = await SqliteDb.get();
+    try {
+      await db.exec("BEGIN IMMEDIATE");
+      const existing = (await db.get(
+        `SELECT locked FROM ${IndexLock.getLockTableName()} WHERE locked = ?`,
+        true,
+      )) as { locked: boolean } | undefined;
+      if (existing) {
+        await db.exec("ROLLBACK");
+        return false;
+      }
+      await db.run(
+        `INSERT INTO ${IndexLock.getLockTableName()} (locked, timestamp, dirs, owner) VALUES (?, ?, ?, ?)`,
+        true,
+        Date.now(),
+        dirs,
+        owner,
+      );
+      await db.exec("COMMIT");
+      return true;
+    } catch (error) {
+      try {
+        await db.exec("ROLLBACK");
+      } catch {
+        // No transaction in flight.
+      }
+      throw error;
+    }
+  }
+
+  static async updateTimestamp(owner: string) {
     const db = await SqliteDb.get();
     await db.run(
-      `INSERT INTO ${IndexLock.getLockTableName()} (locked, timestamp, dirs) VALUES (?, ?, ?)`,
-      true,
+      `UPDATE ${IndexLock.getLockTableName()} SET timestamp = ? where locked = ? AND owner = ?`,
       Date.now(),
-      dirs,
+      true,
+      owner,
     );
   }
 
-  static async updateTimestamp() {
+  static async unlock(owner: string) {
     const db = await SqliteDb.get();
     await db.run(
-      `UPDATE ${IndexLock.getLockTableName()} SET timestamp = ? where locked = ?`,
-      Date.now(),
+      `DELETE FROM ${IndexLock.getLockTableName()} WHERE locked = ? AND owner = ?`,
       true,
-    );
-  }
-
-  static async unlock() {
-    const db = await SqliteDb.get();
-    await db.run(
-      `DELETE FROM ${IndexLock.getLockTableName()} WHERE locked = ?`,
-      true,
+      owner,
     );
   }
 }
