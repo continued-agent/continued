@@ -1,0 +1,11 @@
+{
+  "supportsES6": true,
+  "modelPropertyNaming": "camelCase",
+  "enumPropertyNaming": "UPPERCASE",
+  "apiPackage": "openapi_client.api",
+  "modelPackage": "openapi_client.models",
+  "nullSafeAdditionalProps": true,
+  "useSingleRequestParameter": true,
+  "withSeparateModelsAndApi": true,
+  "packageName": "openapi_client"
+}

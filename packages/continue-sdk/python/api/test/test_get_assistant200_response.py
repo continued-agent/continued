@@ -12,59 +12,52 @@
 """  # noqa: E501
 
 
+import json
 import unittest
 
 from openapi_client.models.get_assistant200_response import GetAssistant200Response
+from openapi_client.models.list_assistants200_response_inner_config_result import (
+    ListAssistants200ResponseInnerConfigResult,
+)
+
 
 class TestGetAssistant200Response(unittest.TestCase):
-    """GetAssistant200Response unit test stubs"""
+    """GetAssistant200Response unit tests"""
 
-    def setUp(self):
-        pass
-
-    def tearDown(self):
-        pass
-
-    def make_instance(self, include_optional) -> GetAssistant200Response:
-        """Test GetAssistant200Response
-            include_optional is a boolean, when False only required
-            params are included, when True both required and
-            optional params are included """
-        # uncomment below to create an instance of `GetAssistant200Response`
-        """
-        model = GetAssistant200Response()
-        if include_optional:
-            return GetAssistant200Response(
-                config_result = openapi_client.models.list_assistants_200_response_inner_config_result.listAssistants_200_response_inner_configResult(
-                    config = openapi_client.models.config.config(), 
-                    config_load_interrupted = True, 
-                    errors = [
-                        ''
-                        ], ),
-                owner_slug = '',
-                package_slug = '',
-                icon_url = '',
-                on_prem_proxy_url = '',
-                use_on_prem_proxy = True,
-                raw_yaml = ''
-            )
-        else:
-            return GetAssistant200Response(
-                config_result = openapi_client.models.list_assistants_200_response_inner_config_result.listAssistants_200_response_inner_configResult(
-                    config = openapi_client.models.config.config(), 
-                    config_load_interrupted = True, 
-                    errors = [
-                        ''
-                        ], ),
-                owner_slug = '',
-                package_slug = '',
+    def setUp(self) -> None:
+        self.model = GetAssistant200Response(
+            owner_slug="my-org",
+            package_slug="review-bot",
+            config_result=ListAssistants200ResponseInnerConfigResult(
+                config={"models": []},
+                config_load_interrupted=False,
+            ),
         )
-        """
 
-    def testGetAssistant200Response(self):
-        """Test GetAssistant200Response"""
-        # inst_req_only = self.make_instance(include_optional=False)
-        # inst_req_and_optional = self.make_instance(include_optional=True)
+    def tearDown(self) -> None:
+        pass
 
-if __name__ == '__main__':
+    def test_serialization_round_trip(self) -> None:
+        """Serialized JSON must preserve required fields."""
+        data = json.loads(self.model.model_dump_json())
+        self.assertEqual(data["owner_slug"], "my-org")
+        self.assertEqual(data["package_slug"], "review-bot")
+        self.assertIsNotNone(data["config_result"])
+        self.assertFalse(data["config_result"]["config_load_interrupted"])
+
+    def test_deserialization(self) -> None:
+        """A payload parsed back into the model must match the original."""
+        payload = json.loads(self.model.model_dump_json())
+        parsed = GetAssistant200Response.model_validate(payload)
+        self.assertEqual(parsed.owner_slug, "my-org")
+        self.assertEqual(parsed.package_slug, "review-bot")
+        self.assertFalse(parsed.config_result.config_load_interrupted)
+
+    def test_required_fields_are_enforced(self) -> None:
+        """Missing required fields must raise a validation error, not silently pass."""
+        with self.assertRaises(Exception):
+            GetAssistant200Response(owner_slug="x")
+
+
+if __name__ == "__main__":
     unittest.main()
