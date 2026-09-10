@@ -4,7 +4,6 @@ import com.github.continuedev.continueintellijextension.constants.getConfigJsonP
 import com.github.continuedev.continueintellijextension.constants.getConfigJsPath
 import com.google.gson.Gson
 import com.intellij.credentialStore.CredentialAttributes
-import com.intellij.credentialStore.Credentials
 import com.intellij.ide.passwordSafe.PasswordSafe
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.PersistentStateComponent
@@ -120,9 +119,9 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
 
         fun saveTokenToCredentialStore(token: String) {
             try {
-                PasswordSafe.instance.set(
+                PasswordSafe.instance.setPassword(
                     TOKEN_CREDENTIAL_ATTRIBUTES,
-                    Credentials(TOKEN_CREDENTIAL_ATTRIBUTES.userName, token)
+                    token
                 )
             } catch (e: Exception) {
                 log.warn("Failed to save user token to credential store", e)
@@ -131,9 +130,9 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
 
         fun clearTokenFromCredentialStore() {
             try {
-                PasswordSafe.instance.set(
+                PasswordSafe.instance.setPassword(
                     TOKEN_CREDENTIAL_ATTRIBUTES,
-                    Credentials(TOKEN_CREDENTIAL_ATTRIBUTES.userName, null)
+                    null
                 )
             } catch (e: Exception) {
                 log.warn("Failed to clear user token from credential store", e)
@@ -175,10 +174,18 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
         // Migration: the token used to live in the XML state. If a value is
         // still present, move it into the credential store and clear it from
         // the XML so it is no longer persisted in the IDE profile.
-        val legacyToken = state.userToken
-        if (!legacyToken.isNullOrEmpty()) {
-            saveTokenToCredentialStore(legacyToken)
-            state.userToken = null
+        // (ContinueState no longer declares userToken; read the legacy field
+        // reflectively so old XML can still be migrated.)
+        try {
+            val legacyField = ContinueState::class.java.getDeclaredField("userToken")
+            legacyField.isAccessible = true
+            val legacyToken = legacyField.get(state) as? String
+            if (!legacyToken.isNullOrEmpty()) {
+                saveTokenToCredentialStore(legacyToken)
+                legacyField.set(state, null)
+            }
+        } catch (e: Exception) {
+            // No legacy field present; nothing to migrate.
         }
     }
 
@@ -199,7 +206,6 @@ open class ContinueExtensionSettings : PersistentStateComponent<ContinueExtensio
             val responseBody = HttpRequests.request(url)
                 .connectTimeout(5000)
                 .readTimeout(5000)
-                .redirectsPolicy(HttpRequests.RedirectPolicy.NONE)
                 .tuner { connection ->
                     if (token != null)
                         connection.addRequestProperty("Authorization", "Bearer $token")

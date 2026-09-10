@@ -835,7 +835,10 @@ export class CodebaseIndexer {
     };
 
     this.updateProgress(updateToSend);
-    void this.sendIndexingErrorTelemetry(updateToSend);
+    // Await the telemetry send so the error path fully settles before the
+    // caller (and the test) completes; otherwise the async logging can fire
+    // after the Jest environment has been torn down.
+    await this.sendIndexingErrorTelemetry(updateToSend);
   }
 
   public get currentIndexingState(): IndexingProgressUpdate {
