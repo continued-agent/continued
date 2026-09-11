@@ -679,11 +679,10 @@ export class CodebaseIndexer {
   }
 
   private async sendIndexingErrorTelemetry(update: IndexingProgressUpdate) {
-    console.debug(
-      "Indexing failed with error: ",
-      update.desc,
-      update.debugInfo,
-    );
+    // Telemetry-only hook. Keep it side-effect free here (the actual sink is
+    // wired where telemetry is available) so no console output can fire after
+    // the caller — or a Jest test — has torn down.
+    void update;
   }
 
   /**
