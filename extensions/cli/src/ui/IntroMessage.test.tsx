@@ -28,11 +28,10 @@ describe("IntroMessage", () => {
     expect(lastFrame()).toContain("MOCK ASCII ART");
   });
 
-  it("adds an empty row before the intro", () => {
+  it("starts the intro on the artwork row", () => {
     const { lastFrame } = render(<IntroMessage />);
 
-    expect(lastFrame()?.split("\n")[0]).toBe("");
-    expect(lastFrame()?.split("\n")[1]).toContain("MOCK ASCII ART");
+    expect(lastFrame()?.split("\n")[0]).toContain("MOCK ASCII ART");
   });
 
   it("renders config name when config is provided", () => {
@@ -71,11 +70,10 @@ describe("IntroMessage", () => {
 
     expect(lastFrame()?.trimEnd()).toBe(
       [
-        "",
         "MOCK ASCII ART",
         "",
-        "   Config: Main Config",
-        "   Model: Google Gemini",
+        "  Config: Main Config",
+        "  Model: Google Gemini",
       ].join("\n"),
     );
   });

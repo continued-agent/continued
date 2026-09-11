@@ -31,22 +31,30 @@ export const CONTINUE_ASCII_ART = `${mind.multiline(CONTINUE_ASCII_ART_SOURCE)}\
   ("v" + getVersion()).padStart(ASCII_ART_WIDTH),
 )}`;
 
+const COMPACT_ASCII_ART = `✦ Continued CLI v${getVersion()}`;
+
 // The full mark is 40 columns wide. Account for the TUI's horizontal inset so
 // it does not wrap at the exact minimum terminal width.
 const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 2;
+const MIN_HEIGHT_FOR_ASCII_ART = 30;
 
 /**
- * Returns the ASCII art only if the terminal is wide enough to display it properly.
- * If terminal is too narrow, returns just the version string.
+ * Returns the full ASCII art only when the terminal has enough width and height
+ * to keep the intro from crowding the chat history. Otherwise, use the compact
+ * branded version.
  */
 export function getDisplayableAsciiArt(): string {
   const terminalWidth = process.stdout.columns || 80;
+  const terminalHeight = process.stdout.rows;
 
-  if (terminalWidth >= MIN_WIDTH_FOR_ASCII_ART) {
+  if (
+    terminalWidth >= MIN_WIDTH_FOR_ASCII_ART &&
+    (terminalHeight === undefined || terminalHeight >= MIN_HEIGHT_FOR_ASCII_ART)
+  ) {
     return CONTINUE_ASCII_ART;
   }
 
-  return d("v" + getVersion());
+  return COMPACT_ASCII_ART;
 }
 
 export const CONTINUE_LOGO_ASCII_ART = `

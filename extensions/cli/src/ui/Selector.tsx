@@ -3,6 +3,8 @@ import React, { ReactNode } from "react";
 
 import { defaultBoxStyles } from "./styles.js";
 
+const SELECTOR_ACCENT_COLOR = "cyan";
+
 export interface SelectorOption {
   id: string;
   name: string;
@@ -76,8 +78,12 @@ export function Selector<T extends SelectorOption>({
 
   if (loading) {
     return (
-      <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
-        <Text color="blue" bold wrap="truncate-end">
+      <Box
+        {...defaultBoxStyles(SELECTOR_ACCENT_COLOR)}
+        width="100%"
+        minWidth={0}
+      >
+        <Text color={SELECTOR_ACCENT_COLOR} bold wrap="truncate-end">
           {title}
         </Text>
         <Text> </Text>
@@ -90,7 +96,11 @@ export function Selector<T extends SelectorOption>({
 
   if (error) {
     return (
-      <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
+      <Box
+        {...defaultBoxStyles(SELECTOR_ACCENT_COLOR)}
+        width="100%"
+        minWidth={0}
+      >
         <Text color="red" bold>
           Error
         </Text>
@@ -111,8 +121,11 @@ export function Selector<T extends SelectorOption>({
   ) => (
     <>
       <Text
-        color={isSelected ? "blue" : isCurrent ? "green" : "white"}
+        color={
+          isSelected ? SELECTOR_ACCENT_COLOR : isCurrent ? "green" : undefined
+        }
         bold={isSelected}
+        wrap="truncate-end"
       >
         {isSelected ? "➤ " : "  "}
         {option.name}
@@ -127,8 +140,8 @@ export function Selector<T extends SelectorOption>({
   );
 
   return (
-    <Box {...defaultBoxStyles("blue")} width="100%" minWidth={0}>
-      <Text color="blue" bold wrap="truncate-end">
+    <Box {...defaultBoxStyles(SELECTOR_ACCENT_COLOR)} width="100%" minWidth={0}>
+      <Text color={SELECTOR_ACCENT_COLOR} bold wrap="truncate-end">
         {title}
       </Text>
       <Box flexDirection="column" marginTop={1} width="100%" minWidth={0}>

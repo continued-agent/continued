@@ -59,7 +59,7 @@ export function getResponsiveRepoText(
   }
 
   // Calculate the minimum space needed for different display options
-  const branchSeparator = " ⊦";
+  const branchSeparator = " · ";
   const branchText = repoInfo.branchName || "";
   const repoText = repoInfo.repoName;
 

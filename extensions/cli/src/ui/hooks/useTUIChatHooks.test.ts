@@ -45,11 +45,11 @@ describe("Responsive repo text functionality", () => {
 
     it("should return full text when width allows", () => {
       const result = getResponsiveRepoText(undefined, 100);
-      expect(result).toBe("testuser/testrepo ⊦feature/test-branch");
+      expect(result).toBe("testuser/testrepo · feature/test-branch");
     });
 
     it("should prefer branch when both fit individually", () => {
-      // Full text: "testuser/testrepo ⊦ feature/test-branch" (38 chars)
+      // Full text: "testuser/testrepo · feature/test-branch" (38 chars)
       // Repo only: "testuser/testrepo" (17 chars)
       // Branch only: "feature/test-branch" (18 chars)
       // With width 20, both repo and branch fit, but we prefer branch

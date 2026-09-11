@@ -47,9 +47,11 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
   const renderMcpPrompts = () =>
     mcpPrompts.length > 0 ? (
       <>
+        <Text> </Text>
+        <Text bold>Prompts:</Text>
         {mcpPrompts.map((prompt, index) => (
           <Text key={`mcp-${index}`}>
-            - <Text color="white">/{prompt.name}</Text>:{" "}
+            - <Text>/{prompt.name}</Text>:{" "}
             <Text color="dim">{prompt.description}</Text>
           </Text>
         ))}
@@ -59,12 +61,11 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
   const renderRules = () =>
     allRules.length > 0 ? (
       <>
-        <Text bold color="blue">
-          Rules:
-        </Text>
+        <Text> </Text>
+        <Text bold>Rules:</Text>
         {allRules.map((rule, index) => (
           <Text key={index}>
-            - <Text color="white">{rule}</Text>
+            - <Text>{rule}</Text>
           </Text>
         ))}
       </>
@@ -73,12 +74,11 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
   const renderMcpServers = () =>
     (config?.mcpServers?.length ?? 0) > 0 ? (
       <>
-        <Text bold color="blue">
-          MCP Servers:
-        </Text>
+        <Text> </Text>
+        <Text bold>MCP Servers:</Text>
         {config?.mcpServers?.map((server: any, index: number) => (
           <Text key={index}>
-            - <Text color="white">{server?.name}</Text>
+            - <Text>{server?.name}</Text>
           </Text>
         ))}
       </>
@@ -86,34 +86,32 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
 
   return (
     <Box flexDirection="column">
-      <Text> </Text>
       {/* ASCII Art */}
       <Text>{getDisplayableAsciiArt()}</Text>
       <Text> </Text>
 
-      <Box flexDirection="column" paddingLeft={3}>
+      <Box flexDirection="column" paddingLeft={2}>
         {/* Organization name */}
         {organizationName && (
-          <Text color="blue">
-            <Text bold>Org:</Text> <Text color="white">{organizationName}</Text>
+          <Text>
+            <Text bold>Org:</Text> <Text>{organizationName}</Text>
           </Text>
         )}
 
         {/* Agent name */}
         {config && (
-          <Text color="blue">
-            <Text bold>Config:</Text> <Text color="white">{config.name}</Text>
+          <Text>
+            <Text bold>Config:</Text> <Text>{config.name}</Text>
           </Text>
         )}
 
         {/* Model */}
         {model ? (
-          <Text color="blue">
-            <Text bold>Model:</Text>{" "}
-            <Text color="white">{model.name.split("/").pop()}</Text>
+          <Text>
+            <Text bold>Model:</Text> <Text>{model.name.split("/").pop()}</Text>
           </Text>
         ) : (
-          <Text color="blue">
+          <Text>
             <Text bold>Model:</Text> <Text color="dim">Loading...</Text>
           </Text>
         )}
@@ -129,7 +127,6 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
         {renderRules()}
         {renderMcpServers()}
       </Box>
-      <Text> </Text>
     </Box>
   );
 };

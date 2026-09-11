@@ -98,13 +98,14 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
     const staticItems: React.ReactElement[] = [];
     if (showIntroMessage) {
       staticItems.push(
-        <IntroMessage
-          key="intro"
-          config={config}
-          model={model}
-          mcpService={mcpService}
-          organizationName={organizationName}
-        />,
+        <Box key="intro" marginLeft={1}>
+          <IntroMessage
+            config={config}
+            model={model}
+            mcpService={mcpService}
+            organizationName={organizationName}
+          />
+        </Box>,
       );
     }
 
@@ -120,7 +121,11 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
 
     // Add stable messages to static items
     stableHistory.forEach((item, index) => {
-      staticItems.push(renderMessage(item, index, processedChatHistory));
+      staticItems.push(
+        <Box key={`message-${index}`} marginLeft={1}>
+          {renderMessage(item, index, processedChatHistory)}
+        </Box>,
+      );
     });
 
     // Pending items will be rendered dynamically outside Static
@@ -167,7 +172,7 @@ export const StaticChatContent: React.FC<StaticChatContentProps> = ({
 
       {/* Queued messages - show at bottom with queue indicators */}
       {queuedMessages.length > 0 && (
-        <Box paddingLeft={3} paddingBottom={1}>
+        <Box paddingLeft={2} paddingBottom={1}>
           <Text color="dim" italic>
             {queuedMessages.map((msg) => msg.message).join("\n")}
           </Text>
