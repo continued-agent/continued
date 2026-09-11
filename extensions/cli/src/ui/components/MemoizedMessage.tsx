@@ -165,12 +165,12 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
 
     return (
       <Box key={index} marginBottom={1}>
-        <Text color={isUser ? "blue" : "white"}>{hideBullet ? " " : "●"}</Text>
+        <Text color={isUser ? "cyan" : "white"}>
+          {hideBullet ? " " : isUser ? "›" : "●"}
+        </Text>
         <Text> </Text>
         {isUser ? (
-          <Text color="dim">
-            {formatMessageContentForDisplay(message.content)}
-          </Text>
+          <Text>{formatMessageContentForDisplay(message.content)}</Text>
         ) : (
           <MarkdownRenderer
             content={formatMessageContentForDisplay(message.content)}

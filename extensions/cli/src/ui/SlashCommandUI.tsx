@@ -7,16 +7,16 @@ import {
   type SlashCommand,
 } from "../commands/commands.js";
 
-const MAX_DESCRIPTION_LENGTH = 80;
+import { useTerminalSize } from "./hooks/useTerminalSize.js";
 
-const truncateDescription = (description: string): string => {
-  if (description.length <= MAX_DESCRIPTION_LENGTH) {
+const truncateDescription = (
+  description: string,
+  maxLength: number,
+): string => {
+  if (description.length <= maxLength) {
     return description;
   }
-  return (
-    Array.from(description).slice(0, MAX_DESCRIPTION_LENGTH).join("").trim() +
-    "…"
-  );
+  return Array.from(description).slice(0, maxLength).join("").trim() + "…";
 };
 
 interface SlashCommandUIProps {
@@ -30,6 +30,7 @@ const SlashCommandUI: React.FC<SlashCommandUIProps> = ({
   filter,
   selectedIndex,
 }) => {
+  const { columns } = useTerminalSize();
   const [allCommands, setAllCommands] = useState<SlashCommand[]>(
     // Fallback - basic commands without assistant
     [
@@ -77,33 +78,52 @@ const SlashCommandUI: React.FC<SlashCommandUIProps> = ({
 
   if (filteredCommands.length === 0) {
     return (
-      <Box paddingX={1} marginBottom={1}>
+      <Box
+        paddingX={1}
+        marginBottom={1}
+        borderStyle="single"
+        borderColor="gray"
+      >
         <Text color="gray">No matching commands found</Text>
       </Box>
     );
   }
 
   return (
-    <Box paddingX={1} marginBottom={1} flexDirection="column">
+    <Box
+      paddingX={1}
+      marginBottom={1}
+      flexDirection="column"
+      borderStyle="single"
+      borderColor="gray"
+    >
       {filteredCommands.map((command, index) => {
         const isSelected = index === selectedIndex;
-
-        // Find the longest command name to vertically align command descriptions
         const maxCommandLength = Math.max(
           ...filteredCommands.map((cmd) => cmd.name.length),
         );
+        const maxDescriptionLength = Math.max(
+          8,
+          Math.min(80, columns - maxCommandLength - 12),
+        );
+
+        // Find the longest command name to vertically align command descriptions
         const paddedCommandName = `/${command.name}`.padEnd(
           maxCommandLength + 1,
         );
 
         return (
           <Box key={command.name}>
-            <Text color={isSelected ? "blue" : "white"} bold={isSelected}>
+            <Text
+              color={isSelected ? "cyan" : undefined}
+              bold={isSelected}
+              wrap="truncate-end"
+            >
               {"  "}
               {paddedCommandName}
-              <Text color={isSelected ? "blue" : "gray"}>
+              <Text color={isSelected ? "cyan" : "gray"}>
                 {"    "}
-                {truncateDescription(command.description)}
+                {truncateDescription(command.description, maxDescriptionLength)}
               </Text>
             </Text>
           </Box>

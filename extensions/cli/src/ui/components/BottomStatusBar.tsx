@@ -48,8 +48,14 @@ export const BottomStatusBar: React.FC<BottomStatusBarProps> = ({
   const showingExitMessage = shouldShowExitMessage();
 
   return (
-    <Box flexDirection="row" justifyContent="space-between" alignItems="center">
-      <Box flexDirection="row" alignItems="center">
+    <Box flexDirection="row" alignItems="center" width="100%" minWidth={0}>
+      <Box
+        flexDirection="row"
+        alignItems="center"
+        flexGrow={1}
+        flexShrink={1}
+        minWidth={0}
+      >
         {currentMode === "normal" && (
           <React.Fragment>
             {hasImageInClipboard ? (
@@ -88,7 +94,7 @@ export const BottomStatusBar: React.FC<BottomStatusBarProps> = ({
           </React.Fragment>
         )}
       </Box>
-      <Box>
+      <Box flexShrink={0} marginLeft={1}>
         <UpdateNotification isRemoteMode={isRemoteMode} />
       </Box>
     </Box>

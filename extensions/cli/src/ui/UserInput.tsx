@@ -22,6 +22,7 @@ import { InputHistory } from "../util/inputHistory.js";
 
 import { FileSearchUI } from "./FileSearchUI.js";
 import { useClipboardMonitor } from "./hooks/useClipboardMonitor.js";
+import { useTerminalSize } from "./hooks/useTerminalSize.js";
 import {
   handleControlKeys,
   updateTextBufferState,
@@ -177,6 +178,7 @@ const UserInput: React.FC<UserInputProps> = ({
     Array<{ path: string; displayName: string }>
   >([]);
   const { exit } = useApp();
+  const { columns } = useTerminalSize();
 
   // Get file index service state for reactive updates (unused but needed for service initialization)
   useServices<{
@@ -784,10 +786,15 @@ const UserInput: React.FC<UserInputProps> = ({
   });
 
   const renderInputText = () => {
-    const placeholderText = isRemoteMode
-      ? "Ask anything, / for slash commands, ! for shell mode"
-      : placeholder ||
-        "Ask anything, @ for context, / for slash commands, ! for shell mode";
+    const placeholderText =
+      columns < 80
+        ? isRemoteMode
+          ? "Ask anything · / commands · ! shell"
+          : placeholder || "Ask anything · @ context · / commands · ! shell"
+        : isRemoteMode
+          ? "Ask anything, / for slash commands, ! for shell mode"
+          : placeholder ||
+            "Ask anything, @ for context, / for slash commands, ! for shell mode";
     if (inputText.length === 0) {
       return (
         <>

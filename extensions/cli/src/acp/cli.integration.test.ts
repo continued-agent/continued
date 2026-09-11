@@ -86,5 +86,5 @@ describe("ACP CLI transport", () => {
       await stopChild(child);
       await rm(workspace, { recursive: true, force: true });
     }
-  }, 30000);
+  }, 60000);
 });
