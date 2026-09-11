@@ -34,7 +34,9 @@ describe("ProviderSelector", () => {
 
     for (let index = 1; index < providers.length; index++) {
       stdin.write("j");
-      await new Promise((resolve) => setTimeout(resolve, 5));
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain(`➤ Provider ${index + 1}`),
+      );
     }
 
     expect(lastFrame()).toContain("Provider 20");
