@@ -775,7 +775,9 @@ export class CodebaseIndexer {
         }
       }
     } catch (e: any) {
-      console.log(`Failed refreshing codebase index directories: ${e}`);
+      // handleIndexingError already broadcasts the error via updateProgress;
+      // avoid an extra console.log here so no async log can fire after the
+      // caller (or a Jest test) has torn down.
       await this.handleIndexingError(e);
     } finally {
       if (indexLockTimestampUpdateInterval) {
