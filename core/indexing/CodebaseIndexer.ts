@@ -831,8 +831,11 @@ export class CodebaseIndexer {
 
   public async handleIndexingError(e: any) {
     if (e instanceof LLMError && this.messenger) {
-      // Need to report this specific error to the IDE for special handling
-      void this.messenger.request("reportError", e);
+      // Need to report this specific error to the IDE for special handling.
+      // Await so the error path settles before the caller (and the test)
+      // completes; otherwise the async messenger call can fire after the
+      // Jest environment has been torn down.
+      await this.messenger.request("reportError", e);
     }
 
     // broadcast indexing error
