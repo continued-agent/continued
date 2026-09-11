@@ -3,7 +3,15 @@ const path = require("path");
 const fs = require("fs");
 const fsPromises = require("fs/promises");
 
-const npmInstallArgs = process.env.CI === "true" ? ["ci"] : ["install"];
+const npmInstallArgs = [
+  process.env.CI === "true" ? "ci" : "install",
+  // Package setup runs several installs in parallel. Give transient registry
+  // connection resets more chances to recover before failing the build.
+  "--fetch-retries=5",
+  "--fetch-retry-factor=2",
+  "--fetch-retry-mintimeout=1000",
+  "--fetch-retry-maxtimeout=60000",
+];
 // Windows cannot execute .cmd files directly without a shell. Invoke the
 // trusted command interpreter explicitly while keeping npm arguments separate
 // from a shell command string.

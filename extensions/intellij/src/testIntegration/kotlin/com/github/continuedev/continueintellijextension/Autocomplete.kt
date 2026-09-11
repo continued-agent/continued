@@ -35,7 +35,10 @@ class Autocomplete {
                         enterText("TEST_USER_MESSAGE_0")
                         space()
                     }
-                    wait(2.seconds)
+                    // The completion request can take up to three seconds in
+                    // ContinueCompletionService, so do not press Tab before
+                    // the asynchronous suggestion has had time to arrive.
+                    wait(5.seconds)
                     keyboard {
                         tab()
                     }
