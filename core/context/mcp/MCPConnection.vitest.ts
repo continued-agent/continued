@@ -360,7 +360,9 @@ describe("MCPConnection", () => {
     });
   });
 
-  describe("actually connect to Filesystem MCP", () => {
+  // Requires downloading @modelcontextprotocol/server-filesystem from npm at
+  // test time (network), so it is skipped in CI and local runs.
+  describe.skip("actually connect to Filesystem MCP", () => {
     it("should connect and include correct tools", async () => {
       const conn = new MCPConnection({
         id: "filesystem",
