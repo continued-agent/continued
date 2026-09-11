@@ -428,20 +428,29 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
           }
           const apiKey = this.apiKeyCache.get(serverConfig.name);
           if (serverConfig.type === "sse") {
-            const transport = constructSseTransport(serverConfig, apiKey);
+            const transport = await constructSseTransport(serverConfig, apiKey);
             await client.connect(transport, {});
           } else if (serverConfig.type === "streamable-http") {
-            const transport = constructHttpTransport(serverConfig, apiKey);
+            const transport = await constructHttpTransport(
+              serverConfig,
+              apiKey,
+            );
             await client.connect(transport, {});
           } else {
             try {
-              const transport = constructHttpTransport(serverConfig, apiKey);
+              const transport = await constructHttpTransport(
+                serverConfig,
+                apiKey,
+              );
               await client.connect(transport, {});
             } catch (e) {
               if (isAuthError(e)) {
                 throw e;
               }
-              const transport = constructSseTransport(serverConfig, apiKey);
+              const transport = await constructSseTransport(
+                serverConfig,
+                apiKey,
+              );
               await client.connect(transport, {});
             }
           }

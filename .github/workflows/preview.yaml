@@ -68,11 +68,11 @@ jobs:
             arch: arm64
             npm_config_arch: arm64
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version-file: ".nvmrc"
 
@@ -85,7 +85,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload .vsix artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-vsix
           path: "extensions/vscode/*.vsix"
@@ -99,7 +99,7 @@ jobs:
       - build
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Set up Git
         run: |
@@ -107,14 +107,14 @@ jobs:
           git config --local user.name "GitHub Action"
 
       # Download the .vsix artifacts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: "*-vsix"
           path: vsix-artifacts
           merge-multiple: true
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65
         with:
           tag_name: ${{ github.ref_name }}
           files: |
@@ -134,7 +134,7 @@ jobs:
     steps:
       # 0. Setup git
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       - name: Set up Git
         run: |
@@ -147,7 +147,7 @@ jobs:
         run: git fetch origin "$RELEASE_REF" && git checkout -- "$RELEASE_REF"
 
       # 1. Download the artifacts
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           pattern: "*-vsix"
           path: vsix-artifacts
@@ -169,7 +169,7 @@ jobs:
 
       # 4. Create PR with version bump
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version-file: ".nvmrc"
 
@@ -187,7 +187,7 @@ jobs:
           echo "NEW_VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1
         with:
           token: ${{ secrets.CI_GITHUB_TOKEN }}
           commit-message: "chore: bump vscode extension version to ${{ env.NEW_VERSION }}"
@@ -212,7 +212,7 @@ jobs:
       #     git commit -am "💚 Update package.json version [skip ci]"
 
       # - name: Push changes
-      #   uses: ad-m/github-push-action@master
+      #   uses: ad-m/github-push-action@881a6320fdb16eb5318c5054f31c218aec2b324c
       #   with:
       #     github_token: ${{ secrets.GITHUB_TOKEN }}
       #     branch: ${{ github.ref }}

@@ -179,3 +179,5 @@ keys
 .copy-status
 .copy-log
 
+sync/sync.db
+sync/target/

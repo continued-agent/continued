@@ -58,7 +58,7 @@ jobs:
   #   steps:
   #     # 0. Setup git
   #     - name: Checkout
-  #       uses: actions/checkout@v6
+  #       uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
   #     - name: Set up Git
   #       run: |
@@ -79,7 +79,7 @@ jobs:
   #         echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
 
   #     - name: Create Pull Request
-  #       uses: peter-evans/create-pull-request@v7
+  #       uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676
   #       with:
   #         token: ${{ secrets.CI_GITHUB_TOKEN }}
   #         commit-message: "chore: bump jetbrains extension version to ${{ env.NEW_VERSION }}"
@@ -104,12 +104,12 @@ jobs:
     steps:
       # Check out current repository
       - name: Fetch Sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           ref: ${{ github.event.release.tag_name }}
 
       - name: Import Apple certificate
-        uses: apple-actions/import-codesign-certs@v6
+        uses: apple-actions/import-codesign-certs@8cd59b36c197ab4209cc6cf6eb93e47835f79b28
         with:
           keychain: ${{ github.run_id }}
           keychain-password: ${{ github.run_id }}
@@ -118,18 +118,18 @@ jobs:
 
       # Validate wrapper
       - name: Gradle Wrapper Validation
-        uses: gradle/actions/wrapper-validation@v6
+        uses: gradle/actions/wrapper-validation@4733eaac7c1b0da527e4206b7671e0061de1ce37
 
       # # Set up Java environment for the next steps
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: zulu
           java-version: 17
 
       # # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37
         with:
           gradle-home-cache-cleanup: true
 
@@ -154,24 +154,24 @@ jobs:
 
       # # Setup Node.js
       - name: Use Node.js from .nvmrc
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version-file: ".nvmrc"
 
       - name: Cache core node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: core/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('core/package-lock.json') }}
 
       - name: Cache binary node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: binary/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('binary/package-lock.json') }}
 
       - name: Cache gui node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: gui/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('gui/package-lock.json') }}
@@ -223,7 +223,7 @@ jobs:
       #     codesign --sign - ../../binary/bin/darwin-arm64/continue-binary
 
       # - name: Sign darwin-arm64 binary
-      #   uses: lando/code-sign-action@v2
+      #   uses: lando/code-sign-action@0779d463b08142ea9cb9bc87dc755670a8675c30
       #   with:
       #     file: ./binary/bin/darwin-arm64/continue-binary
       #     certificate-data: ${{ secrets.APPLE_CERT_DATA }}
@@ -294,44 +294,44 @@ jobs:
 
       # Store already-built plugin as an artifact for downloading
       - name: Upload artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.artifact.outputs.filename }}
           path: ./extensions/intellij/build/distributions/content/*/*
 
       # Upload binaries as artifacts
       - name: Upload artifact (darwin-arm64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-darwin-arm64
           path: ./binary/bin/darwin-arm64/
 
       - name: Upload artifact (darwin-x64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-darwin-x64
           path: ./binary/bin/darwin-x64/
 
       - name: Upload artifact (win32-x64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-win32-x64
           path: ./binary/bin/win32-x64/
 
       - name: Upload artifact (win32-arm64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-win32-arm64
           path: ./binary/bin/win32-arm64/
 
       - name: Upload artifact (linux-arm64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-linux-arm64
           path: ./binary/bin/linux-arm64/
 
       - name: Upload artifact (linux-x64)
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: continue-binary-linux-x64
           path: ./binary/bin/linux-x64/
@@ -366,22 +366,22 @@ jobs:
     steps:
       # 1. Check-out repository
       - name: Check-out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       # 2. Install npm dependencies
       - name: Use Node.js from .nvmrc
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version-file: ".nvmrc"
 
       - name: Cache core node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: core/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('core/package-lock.json') }}
 
       - name: Cache binary node_modules
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: binary/node_modules
           key: ${{ runner.os }}-node-${{ hashFiles('binary/package-lock.json') }}
@@ -398,7 +398,7 @@ jobs:
 
       # Download the binary artifact
       - name: Download binary artifact
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: continue-binary-${{ matrix.platform }}-${{ matrix.arch }}
           path: ./binary/bin/${{ matrix.platform }}-${{ matrix.arch }}/
@@ -420,7 +420,7 @@ jobs:
 
       - name: Upload logs
         if: ${{ always() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: core-logs-${{ matrix.platform }}-${{ matrix.arch }}
           path: ~/.continue/logs/core.log
@@ -433,18 +433,18 @@ jobs:
     steps:
       # Check out current repository
       - name: Fetch Sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       # Set up Java environment for the next steps
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: zulu
           java-version: 17
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37
         with:
           gradle-home-cache-cleanup: true
 
@@ -455,7 +455,7 @@ jobs:
       # Collect Tests Result of failed tests
       - name: Collect Tests Result
         if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: tests-result
           path: ${{ github.workspace }}/extensions/intellij/build/reports/tests
@@ -480,18 +480,18 @@ jobs:
 
       # Check out current repository
       - name: Fetch Sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       # Set up Java environment for the next steps
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: zulu
           java-version: 17
 
       # Run Qodana inspections
       - name: Qodana - Code Inspection
-        uses: JetBrains/qodana-action@v2025.3.2
+        uses: JetBrains/qodana-action@119d0a737348511148d0e9e30092c9631be95d36
         with:
           cache-default-branch-only: true
 
@@ -511,24 +511,24 @@ jobs:
 
       # Check out current repository
       - name: Fetch Sources
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
 
       # Set up Java environment for the next steps
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: zulu
           java-version: 17
 
       # Setup Gradle
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37
         with:
           gradle-home-cache-cleanup: true
 
       # Cache Plugin Verifier IDEs
       - name: Setup Plugin Verifier IDEs Cache
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25
         with:
           path: ${{ needs.build.outputs.pluginVerifierHomeDir }}/ides
           key: plugin-verifier-${{ hashFiles('build/printProductsReleases.txt') }}
@@ -540,7 +540,7 @@ jobs:
       # Collect Plugin Verifier Result
       - name: Collect Plugin Verifier Result
         if: ${{ always() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: pluginVerifier-result
           path: ${{ github.workspace }}/build/reports/pluginVerifier
@@ -563,7 +563,7 @@ jobs:
       #     ./gradlew patchChangelog --release-note="$CHANGELOG"
 
       - name: Download the plugin
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: ${{ steps.artifact.outputs.filename }}
           path: ./build/distributions/

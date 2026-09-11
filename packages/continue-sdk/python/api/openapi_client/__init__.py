@@ -17,7 +17,7 @@
 __version__ = "1.0.0"
 
 # import apis into sdk package
-from api.default_api import DefaultApi
+from openapi_client.api.default_api import DefaultApi
 
 # import ApiClient
 from openapi_client.api_response import ApiResponse

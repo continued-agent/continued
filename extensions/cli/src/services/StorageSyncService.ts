@@ -48,6 +48,8 @@ export class StorageSyncService {
   private targetsExpiresAt: number | null = null;
   private refreshTimer: NodeJS.Timeout | null = null;
   private isRefreshing = false;
+  private generation = 0;
+  private abortController: AbortController | null = null;
 
   async initialize(): Promise<StorageSyncServiceState> {
     this.stop();
@@ -100,9 +102,18 @@ export class StorageSyncService {
     // Ensure any existing sync loop is stopped before starting a new one
     this.stop();
 
+    // Generation + abort token guard: if stop() runs while presigning or
+    // uploading, the in-flight work is aborted and any late response is
+    // discarded instead of reactivating the stopped cycle or replacing the
+    // targets of a newer session.
+    const generation = ++this.generation;
+    const abortController = new AbortController();
+    this.abortController = abortController;
+
     const targets = await this.requestStorageTargets(
       options.storageId,
       options.accessToken,
+      abortController.signal,
     );
 
     if (!targets) {
@@ -111,6 +122,11 @@ export class StorageSyncService {
         storageId: options.storageId,
         lastError: "Failed to obtain presigned URLs",
       });
+      return false;
+    }
+
+    // A newer start()/stop() may have superseded this one while we awaited.
+    if (generation !== this.generation) {
       return false;
     }
 
@@ -188,6 +204,9 @@ export class StorageSyncService {
 
   stop(): void {
     this.stopped = true;
+    this.generation++;
+    this.abortController?.abort();
+    this.abortController = null;
     this.targets = null;
     this.targetsExpiresAt = null;
     this.options = null;
@@ -221,6 +240,7 @@ export class StorageSyncService {
   private async requestStorageTargets(
     storageId: string,
     accessToken: string,
+    signal?: AbortSignal,
   ): Promise<StorageTargets | null> {
     const url = new URL("agents/storage/presigned-url", env.apiBase);
 
@@ -232,6 +252,7 @@ export class StorageSyncService {
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ storageId }),
+        signal,
       });
 
       if (!response.ok) {
@@ -276,6 +297,11 @@ export class StorageSyncService {
         this.options.storageId,
         this.options.accessToken,
       );
+
+      // A stop()/start() may have superseded this refresh while we awaited.
+      if (this.stopped || !this.options) {
+        return false;
+      }
 
       if (!newTargets) {
         logger.warn(
@@ -368,6 +394,7 @@ export class StorageSyncService {
     // Capture references to prevent race condition with stop()
     const targets = this.targets;
     const options = this.options;
+    const generation = this.generation;
 
     this.uploadInFlight = true;
 
@@ -380,6 +407,12 @@ export class StorageSyncService {
         sessionPayload,
         "application/json",
       );
+
+      // A stop()/start() happened while we were uploading; discard the rest so
+      // we never upload to a stale storage ID or reactivate a stopped cycle.
+      if (this.stopped || generation !== this.generation) {
+        return;
+      }
 
       const diffResult = await getGitDiffSnapshot();
       if (!diffResult.repoFound && !this.missingRepoLogged) {
@@ -394,6 +427,10 @@ export class StorageSyncService {
         "text/plain",
       );
 
+      if (this.stopped || generation !== this.generation) {
+        return;
+      }
+
       this.setState({
         isEnabled: true,
         storageId: this.state.storageId,
@@ -401,6 +438,9 @@ export class StorageSyncService {
         lastError: null,
       });
     } catch (error) {
+      if (this.stopped || generation !== this.generation) {
+        return;
+      }
       this.setState({
         isEnabled: true,
         storageId: this.state.storageId,

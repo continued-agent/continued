@@ -350,11 +350,6 @@ describe("CodebaseIndexer", () => {
     test("should handle errors properly during indexing", async () => {
       const testError = new Error("Test indexing error");
 
-      // Mock console.log to avoid printing errors
-      const consoleLogSpy = jest
-        .spyOn(console, "log")
-        .mockImplementation(() => {});
-
       // Mock refreshDirs to throw an error
       jest
         .spyOn(codebaseIndexer as any, "refreshDirs")
@@ -365,18 +360,14 @@ describe("CodebaseIndexer", () => {
       // We don't need to mock AbortController because we're mocking the entire refreshDirs call
       await codebaseIndexer.refreshCodebaseIndex([TEST_DIR]);
 
-      // Use the first argument only for the assertion since the second argument doesn't match exactly
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        `Failed refreshing codebase index directories: Error: ${testError.message}`,
-      );
+      // The error is broadcast via updateProgress (indexProgress) rather than
+      // a raw console.log, so no async logging can fire after teardown.
       expect(mockMessenger.request).toHaveBeenCalledWith(
         "indexProgress",
         expect.objectContaining({
           status: "failed",
         }),
       );
-
-      consoleLogSpy.mockRestore();
     });
 
     test("should handle LLMError specially during indexing", async () => {

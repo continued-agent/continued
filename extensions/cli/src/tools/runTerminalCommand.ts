@@ -15,6 +15,7 @@ import {
 } from "../telemetry/utils.js";
 import { backgroundSignalManager } from "../util/backgroundSignalManager.js";
 import { emitBashToolEnded, emitBashToolStarted } from "../util/cli.js";
+import { killProcessTreeWithEscalation } from "../util/processTree.js";
 import {
   parseEnvNumber,
   truncateOutputFromStart,
@@ -195,9 +196,14 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
     emitBashToolStarted();
 
     const terminalOutput: string = await new Promise((resolve, reject) => {
-      // Use same shell logic as core implementation
+      // Use same shell logic as core implementation. Spawn detached so the
+      // child leads its own process group and we can kill the whole tree on
+      // timeout/cancel.
       const { shell, args } = getShellCommand(command);
-      const child = spawn(shell, args, { cwd: getWorkspaceDirectory() });
+      const child = spawn(shell, args, {
+        cwd: getWorkspaceDirectory(),
+        detached: process.platform !== "win32",
+      });
       let stdout = "";
       let stderr = "";
       let timeoutId: NodeJS.Timeout;
@@ -206,7 +212,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
 
       const abortChild = () => {
         if (!isResolved) {
-          child.kill();
+          killProcessTreeWithEscalation(child);
         }
       };
       context?.signal?.addEventListener("abort", abortChild, { once: true });
@@ -287,7 +293,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         timeoutId = setTimeout(() => {
           if (isResolved) return;
           isResolved = true;
-          child.kill();
+          killProcessTreeWithEscalation(child);
           context?.signal?.removeEventListener("abort", abortChild);
           let output = stdout + (stderr ? `\nStderr: ${stderr}` : "");
           output += `\n\n[Command timed out after ${TIMEOUT_MS / 1000} seconds of no output]`;

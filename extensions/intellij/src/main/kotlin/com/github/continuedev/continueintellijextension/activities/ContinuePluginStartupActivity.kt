@@ -156,7 +156,7 @@ class ContinuePluginStartupActivity : StartupActivity, DumbAware {
                         "config/ideSettingsUpdate", mapOf(
                             "remoteConfigServerUrl" to settings.remoteConfigServerUrl,
                             "remoteConfigSyncPeriod" to settings.remoteConfigSyncPeriod,
-                            "userToken" to settings.userToken,
+                            "userToken" to (ContinueExtensionSettings.getTokenFromCredentialStore() ?: ""),
                         ), null
                     ) { _ -> }
                 }

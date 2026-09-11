@@ -67,6 +67,7 @@ import {
   createNewWorkspaceBlockFile,
 } from "./config/workspace/workspaceBlocks";
 import { MCPManagerSingleton } from "./context/mcp/MCPManagerSingleton";
+import { approveWorkspaceMcpServer } from "./context/mcp/workspaceMcpApproval";
 import { performAuth, removeMCPAuth } from "./context/mcp/MCPOauth";
 import { myersDiff } from "./diff/myers";
 import { ApplyAbortManager } from "./edit/applyAbortManager";
@@ -471,6 +472,17 @@ export class Core {
     on("mcp/setServerEnabled", async (msg) => {
       const { id, enabled } = msg.data;
       await MCPManagerSingleton.getInstance().setEnabled(id, enabled);
+    });
+    on("mcp/approveServer", async (msg) => {
+      const { id } = msg.data;
+      const manager = MCPManagerSingleton.getInstance();
+      const connection = manager.getConnection(id);
+      if (!connection) {
+        throw new Error(`MCP Connection ${id} not found`);
+      }
+      // Explicit user approval: record the fingerprint, then start the server.
+      approveWorkspaceMcpServer(connection.options);
+      await manager.refreshConnection(id);
     });
     on("mcp/getPrompt", async (msg) => {
       const { serverName, promptName, args } = msg.data;

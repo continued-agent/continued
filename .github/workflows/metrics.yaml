@@ -36,7 +36,7 @@ jobs:
           echo "last_month=$first_day..$last_day" >> "$GITHUB_ENV"
 
       - name: Run issue-metrics tool
-        uses: github/issue-metrics@v3
+        uses: github/issue-metrics@6fa9041b3ea7b6a9dafbdc388d25d86d06b2b6af
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEARCH_QUERY: 'repo:continuedev/continue created:${{ env.last_month }} -reason:"not planned"'
@@ -52,7 +52,7 @@ jobs:
           echo "metrics_content=$content" >> "$GITHUB_OUTPUT"
 
       - name: Post a message in a channel
-        uses: slackapi/slack-github-action@v3.0.1
+        uses: slackapi/slack-github-action@af78098f536edbc4de71162a307590698245be95
         with:
           webhook: ${{ secrets.ISSUE_PR_METRICS_SLACK_WEBHOOK_URL }}
           webhook-type: incoming-webhook
@@ -71,7 +71,7 @@ jobs:
                       ${{ steps.read-metrics.outputs.metrics_content }}
 
       - name: Upload metrics report as artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: issue-metrics-report
           path: ./issue_metrics.md

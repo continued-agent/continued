@@ -25,7 +25,7 @@ jobs:
         # artifacts that the producer workflow cannot create.
         platform: [Linux]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           fetch-depth: 2 # Get the last 2 commits to find the merge commit
 
@@ -140,7 +140,7 @@ jobs:
 
       - name: Republish as main branch artifact
         if: steps.find-run.outputs.run_id != ''
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: vscode-extension-build-${{ matrix.platform }}
           path: ./temp-download/*

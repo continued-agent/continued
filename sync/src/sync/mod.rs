@@ -53,25 +53,27 @@ fn path_for_tag(tag: &Tag) -> PathBuf {
 
 /// Stored in ~/.continue/index/.last_sync
 fn get_last_sync_time(tag: &Tag) -> u64 {
-    // TODO: Error handle here
     let path = path_for_tag(tag).join(".last_sync");
-
-//     let mut file = File::open(path).unwrap();
-//     let mut contents = String::new();
-//     file.read_to_string(&mut contents).unwrap();
-
-//     contents.parse::<u64>().unwrap()
-// }
+    let contents = fs::read_to_string(path).unwrap_or_default();
+    contents.trim().parse::<u64>().unwrap_or(0)
+}
 
 fn write_sync_time(tag: &Tag) {
     let path = path_for_tag(tag).join(".last_sync");
-
-    let mut file = File::create(path).unwrap();
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs();
-    file.write_all(now.to_string().as_bytes()).unwrap();
+
+    // Write atomically (temp file + rename) so a crash mid-write cannot leave
+    // a truncated .last_sync behind.
+    let tmp_path = path.with_extension("last_sync.tmp");
+    {
+        let mut file = File::create(&tmp_path).unwrap();
+        file.write_all(now.to_string().as_bytes()).unwrap();
+        file.sync_all().unwrap();
+    }
+    fs::rename(&tmp_path, &path).unwrap();
 }
 
 
@@ -267,14 +269,14 @@ impl<'a> IndexCache<'a> {
         self.tag_cache.add(&item.hash);
 
         // Add to rev_tags
-        let mut rev_tags = Self::read_rev_tags(item.hash);
+        let mut rev_tags = self.read_rev_tags(item.hash);
         let tag_str = self.tag_str();
         let hash_str = hash_string(item.hash);
         if !rev_tags.contains_key(hash_str.as_str()) {
             rev_tags.insert(hash_str.clone(), Vec::new());
         }
         rev_tags.get_mut(hash_str.as_str()).unwrap().push(tag_str);
-        Self::write_rev_tags(item.hash, &rev_tags);
+        self.write_rev_tags(item.hash, rev_tags);
     }
 
     fn global_remove(&mut self, item: &ObjDescription) {
@@ -282,19 +284,19 @@ impl<'a> IndexCache<'a> {
         self.tag_cache.remove(&item.hash);
 
         // Remove from rev_tags
-        let mut rev_tags = Self::read_rev_tags(item.hash);
+        let mut rev_tags = self.read_rev_tags(item.hash);
         let hash_str = hash_string(item.hash);
         if rev_tags.contains_key(hash_str.as_str()) {
             rev_tags.remove(hash_str.as_str());
         }
-        Self::write_rev_tags(item.hash, &rev_tags);
+        self.write_rev_tags(item.hash, rev_tags);
     }
 
     fn local_remove(&mut self, item: &ObjDescription) {
         self.tag_cache.remove(&item.hash);
 
         // Remove from rev_tags
-        let mut rev_tags = Self::read_rev_tags(item.hash);
+        let mut rev_tags = self.read_rev_tags(item.hash);
         let tag_str = self.tag_str();
         let hash_str = hash_string(item.hash);
         if rev_tags.contains_key(hash_str.as_str()) {
@@ -305,7 +307,7 @@ impl<'a> IndexCache<'a> {
                 rev_tags.remove(hash_str.as_str());
             }
         }
-        Self::write_rev_tags(item.hash, &rev_tags);
+        self.write_rev_tags(item.hash, rev_tags);
     }
 
     fn global_contains(&mut self, hash: &[u8; ITEM_SIZE]) -> bool {
@@ -316,8 +318,8 @@ impl<'a> IndexCache<'a> {
     //     self.tag_cache.contains(hash)
     // }
 
-    fn get_rev_tags(hash: &[u8; ITEM_SIZE]) -> Vec<String> {
-        let mut rev_tags = Self::read_rev_tags(*hash);
+    fn get_rev_tags(&self, hash: &[u8; ITEM_SIZE]) -> Vec<String> {
+        let mut rev_tags = self.read_rev_tags(*hash);
         let hash_str = hash_string(*hash);
         if rev_tags.contains_key(hash_str.as_str()) {
             rev_tags.remove(hash_str.as_str()).unwrap()
@@ -400,7 +402,7 @@ pub fn sync(
             continue;
         }
         if index_cache.global_contains(&item.hash) {
-            if IndexCache::get_rev_tags(&item.hash).len() <= 1 {
+            if index_cache.get_rev_tags(&item.hash).len() <= 1 {
                 // If it's cached only for this tag, remove it from the global cache as well
                 index_cache.global_remove(&item);
                 let hash = hash_string(item.hash);

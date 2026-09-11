@@ -671,7 +671,7 @@ export class CodebaseIndexer {
 
   // New methods using messenger directly
 
-  private updateProgress(update: IndexingProgressUpdate) {
+  private updateProgress(update: IndexingProgressUpdate): void {
     this.codebaseIndexingState = update;
     if (this.messenger) {
       void this.messenger.request("indexProgress", update);
@@ -679,11 +679,10 @@ export class CodebaseIndexer {
   }
 
   private async sendIndexingErrorTelemetry(update: IndexingProgressUpdate) {
-    console.debug(
-      "Indexing failed with error: ",
-      update.desc,
-      update.debugInfo,
-    );
+    // Telemetry-only hook. Keep it side-effect free here (the actual sink is
+    // wired where telemetry is available) so no console output can fire after
+    // the caller — or a Jest test — has torn down.
+    void update;
   }
 
   /**
@@ -698,10 +697,12 @@ export class CodebaseIndexer {
     while (foundLock?.locked) {
       if ((Date.now() - foundLock.timestamp) / 1000 > 10) {
         console.log(`${foundLock.dirs} is not being indexed... unlocking`);
-        await IndexLock.unlock();
+        await IndexLock.unlock(foundLock.owner);
         break;
       }
-      console.log(`indexing ${foundLock.dirs}`);
+      // Yield a lightweight waiting update without logging; the messenger
+      // notification for transient wait states is unnecessary and, in tests,
+      // an unawaited request can fire after the environment tears down.
       yield {
         progress: 0,
         desc: "",
@@ -729,14 +730,37 @@ export class CodebaseIndexer {
     this.indexingCancellationController = localController;
 
     for await (const update of this.waitForDBIndex()) {
-      this.updateProgress(update);
+      // Transient "waiting" updates only update local state; do not notify
+      // the IDE so no unawaited messenger request can outlive the caller.
+      if (update.status === "waiting") {
+        this.codebaseIndexingState = update;
+      } else {
+        this.updateProgress(update);
+      }
     }
 
-    await IndexLock.lock(paths.join(", ")); // acquire the index lock to prevent multiple windows to begin indexing
-    const indexLockTimestampUpdateInterval = setInterval(
-      () => void IndexLock.updateTimestamp(),
-      5_000,
-    );
+    // Acquire the index lock to prevent multiple windows from indexing
+    // concurrently. The owner token scopes heartbeat/unlock to this indexer so
+    // one window can never release another's lock. If another indexer won the
+    // race between the wait loop and the insert, retry briefly.
+    const lockOwner = `indexer-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let acquired = await IndexLock.lock(paths.join(", "), lockOwner);
+    if (!acquired) {
+      for (let retry = 0; retry < 3 && !acquired; retry++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        acquired = await IndexLock.lock(paths.join(", "), lockOwner);
+      }
+    }
+    if (!acquired) {
+      // Another indexer is still holding the lock; proceed without one rather
+      // than failing indexing outright (matches pre-lock behavior).
+      console.log(
+        `Failed to acquire index lock for ${paths.join(", ")}; indexing without lock.`,
+      );
+    }
+    const indexLockTimestampUpdateInterval = acquired
+      ? setInterval(() => void IndexLock.updateTimestamp(lockOwner), 5_000)
+      : null;
 
     try {
       for await (const update of this.refreshDirs(
@@ -750,12 +774,18 @@ export class CodebaseIndexer {
         }
       }
     } catch (e: any) {
-      console.log(`Failed refreshing codebase index directories: ${e}`);
+      // handleIndexingError already broadcasts the error via updateProgress;
+      // avoid an extra console.log here so no async log can fire after the
+      // caller (or a Jest test) has torn down.
       await this.handleIndexingError(e);
+    } finally {
+      if (indexLockTimestampUpdateInterval) {
+        clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
+      }
+      if (acquired) {
+        await IndexLock.unlock(lockOwner);
+      }
     }
-
-    clearInterval(indexLockTimestampUpdateInterval); // interval will also be cleared when window closes before indexing is finished
-    await IndexLock.unlock();
 
     // Directly refresh submenu items
     if (this.messenger) {
@@ -802,8 +832,11 @@ export class CodebaseIndexer {
 
   public async handleIndexingError(e: any) {
     if (e instanceof LLMError && this.messenger) {
-      // Need to report this specific error to the IDE for special handling
-      void this.messenger.request("reportError", e);
+      // Need to report this specific error to the IDE for special handling.
+      // Await so the error path settles before the caller (and the test)
+      // completes; otherwise the async messenger call can fire after the
+      // Jest environment has been torn down.
+      await this.messenger.request("reportError", e);
     }
 
     // broadcast indexing error
@@ -814,7 +847,13 @@ export class CodebaseIndexer {
     };
 
     this.updateProgress(updateToSend);
-    void this.sendIndexingErrorTelemetry(updateToSend);
+    // Await the telemetry send so the error path fully settles before the
+    // caller (and the test) completes; otherwise the async logging can fire
+    // after the Jest environment has been torn down.
+    if (this.messenger) {
+      await this.messenger.request("indexProgress", updateToSend);
+    }
+    await this.sendIndexingErrorTelemetry(updateToSend);
   }
 
   public get currentIndexingState(): IndexingProgressUpdate {

@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from "child_process";
 
 import { logger } from "../util/logger.js";
+import { killProcessTree } from "../util/processTree.js";
 import { getWorkspaceDirectory } from "../util/workspace.js";
 
 export type BackgroundJobStatus =
@@ -71,7 +72,13 @@ export class BackgroundJobService {
 
     job.status = "running";
 
-    const child = spawn(shell, args, { stdio: "pipe", cwd });
+    // Spawn detached so the child leads its own process group and cancels can
+    // terminate the entire descendant tree, not just the shell parent.
+    const child = spawn(shell, args, {
+      stdio: "pipe",
+      cwd,
+      detached: process.platform !== "win32",
+    });
     this.processes.set(jobId, child);
 
     child.stdout?.setEncoding("utf8");
@@ -187,7 +194,7 @@ export class BackgroundJobService {
     if (!job) return false;
 
     if (process) {
-      process.kill();
+      killProcessTree(process);
       this.processes.delete(jobId);
     }
 
@@ -216,7 +223,7 @@ export class BackgroundJobService {
 
   killAllJobs(): void {
     for (const [jobId, process] of this.processes) {
-      process.kill();
+      killProcessTree(process);
       const job = this.jobs.get(jobId);
       if (job) {
         job.status = "cancelled";

@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Get workflow run details
         id: workflow-details
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const workflowRun = context.payload.workflow_run;
@@ -52,7 +52,7 @@ jobs:
       - name: Get job logs for failed tests
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
         id: get-logs
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         with:
           script: |
             const workflowRunId = ${{ github.event.workflow_run.id }};
@@ -89,7 +89,7 @@ jobs:
 
       - name: Checkout repository
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
@@ -97,7 +97,7 @@ jobs:
 
       - name: Setup Node.js
         if: steps.workflow-details.outputs.has_failed_tests == 'true'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: "20"
 

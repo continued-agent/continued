@@ -13,6 +13,11 @@ const mockClient = {
   close: vi.fn(() => Promise.resolve()),
 };
 
+vi.mock("@continuedev/fetch", () => ({
+  assertPublicUrl: vi.fn(async (url: string | URL) => new URL(url)),
+  publicDnsLookup: vi.fn(),
+}));
+
 vi.mock("@modelcontextprotocol/sdk/client/index.js", () => ({
   Client: vi.fn(() => mockClient),
 }));

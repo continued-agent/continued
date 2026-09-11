@@ -7,7 +7,11 @@ import {
   decodeSecretLocation,
   getTemplateVariables,
 } from "@continuedev/config-yaml";
-import { isPrivateNetworkAddress } from "@continuedev/fetch";
+import {
+  assertPublicUrl,
+  isPrivateNetworkAddress,
+  publicDnsLookup,
+} from "@continuedev/fetch";
 import {
   SSEClientTransport,
   SseError,
@@ -35,6 +39,9 @@ import { getEnvPathFromUserShell } from "../../util/shellPath";
 import { getOauthToken } from "./MCPOauth";
 
 const DEFAULT_MCP_TIMEOUT = 20_000; // 20 seconds
+
+/** Maximum bytes of stderr we retain per connection for error reporting. */
+const MAX_STDERR_BUFFER_BYTES = 64 * 1024;
 
 /**
  * Validates a network MCP server URL before a connection is attempted.
@@ -85,6 +92,24 @@ function assertSafeMcpServerUrl(rawUrl: string): URL {
     );
   }
 
+  return url;
+}
+
+/**
+ * Validates a network MCP server URL and resolves its hostname up front. The
+ * returned URL is only useful for the hostname check; the actual transports
+ * pin DNS resolution with {@link publicDnsLookup} so a DNS answer cannot
+ * change between validation and socket creation (DNS rebinding).
+ */
+async function assertSafeMcpServerUrlWithDns(rawUrl: string): Promise<URL> {
+  const url = assertSafeMcpServerUrl(rawUrl);
+  if (process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS === "true") {
+    return url;
+  }
+  // Reuse the fetch package's public-only DNS validation (hostname resolution
+  // + blocklist) so MCP transports get the same guarantees as the URL
+  // fetcher.
+  await assertPublicUrl(url);
   return url;
 }
 
@@ -151,6 +176,7 @@ class MCPConnection {
     stdout: "",
     stderr: "",
   };
+  private _requiresApproval = false;
 
   constructor(
     public options: InternalMcpOptions,
@@ -177,6 +203,11 @@ class MCPConnection {
     await this.client.close();
     await this.transport.close();
     this.status = disable ? "disabled" : "not-connected";
+    this._requiresApproval = false;
+  }
+
+  setRequiresApproval(requires: boolean) {
+    this._requiresApproval = requires;
   }
 
   getStatus(): MCPServerStatus {
@@ -207,6 +238,7 @@ class MCPConnection {
       tools: this.tools,
       status: this.status,
       isProtectedResource: this.isProtectedResource,
+      requiresApproval: this._requiresApproval,
     };
   }
 
@@ -235,6 +267,7 @@ class MCPConnection {
     this.errors = [];
     this.infos = [];
     this.stdioOutput = { stdout: "", stderr: "" };
+    this._requiresApproval = false;
 
     this.abortController.abort();
     this.abortController = new AbortController();
@@ -330,15 +363,19 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
               } else {
                 // SSE/HTTP: if type isn't explicit: try http and fall back to sse
                 if (this.options.type === "sse") {
-                  const transport = this.constructSseTransport(this.options);
+                  const transport = await this.constructSseTransport(
+                    this.options,
+                  );
                   await this.client.connect(transport, {});
                   this.transport = transport;
                 } else if (this.options.type === "streamable-http") {
-                  const transport = this.constructHttpTransport(this.options);
+                  const transport = await this.constructHttpTransport(
+                    this.options,
+                  );
                   await this.client.connect(transport, {});
                   this.transport = transport;
                 } else if (this.options.type === "websocket") {
-                  const transport = this.constructWebsocketTransport(
+                  const transport = await this.constructWebsocketTransport(
                     this.options,
                   );
                   await this.client.connect(transport, {});
@@ -349,7 +386,7 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
                   );
                 } else {
                   try {
-                    const transport = this.constructHttpTransport({
+                    const transport = await this.constructHttpTransport({
                       ...this.options,
                       type: "streamable-http",
                     });
@@ -357,7 +394,7 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
                     this.transport = transport;
                   } catch (e) {
                     try {
-                      const transport = this.constructSseTransport({
+                      const transport = await this.constructSseTransport({
                         ...this.options,
                         type: "sse",
                       });
@@ -582,17 +619,21 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
     return cwd;
   }
 
-  private constructWebsocketTransport(
+  private async constructWebsocketTransport(
     options: InternalWebsocketMcpOptions,
-  ): WebSocketClientTransport {
-    const url = assertSafeMcpServerUrl(options.url);
+  ): Promise<WebSocketClientTransport> {
+    // The SDK's WebSocket transport uses the global WebSocket (undici), which
+    // does not accept a custom DNS lookup. Resolve and validate the hostname
+    // immediately before connecting so the validation-to-connect window is as
+    // small as possible.
+    const url = await assertSafeMcpServerUrlWithDns(options.url);
     return new WebSocketClientTransport(url);
   }
 
-  private constructSseTransport(
+  private async constructSseTransport(
     options: InternalSseMcpOptions,
-  ): SSEClientTransport {
-    const url = assertSafeMcpServerUrl(options.url);
+  ): Promise<SSEClientTransport> {
+    const url = await assertSafeMcpServerUrlWithDns(options.url);
     const sseAgent =
       options.requestOptions?.verifySsl === false
         ? new HttpsAgent({ rejectUnauthorized: false })
@@ -614,19 +655,27 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
               ...headers,
             },
             ...(sseAgent && { agent: sseAgent }),
+            // Reuse the fetch package's public-only DNS lookup so the
+            // connection cannot be re-pointed at a private address.
+            ...(process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS !== "true" && {
+              lookup: publicDnsLookup,
+            }),
           }),
       },
       requestInit: {
         headers,
         ...(sseAgent && { agent: sseAgent }),
+        ...(process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS !== "true" && {
+          lookup: publicDnsLookup,
+        }),
       },
     });
   }
 
-  private constructHttpTransport(
+  private async constructHttpTransport(
     options: InternalStreamableHttpMcpOptions,
-  ): StreamableHTTPClientTransport {
-    const url = assertSafeMcpServerUrl(options.url);
+  ): Promise<StreamableHTTPClientTransport> {
+    const url = await assertSafeMcpServerUrlWithDns(options.url);
     const { requestOptions } = options;
     const streamableAgent =
       requestOptions?.verifySsl === false
@@ -643,6 +692,9 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
       requestInit: {
         headers,
         ...(streamableAgent && { agent: streamableAgent }),
+        ...(process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS !== "true" && {
+          lookup: publicDnsLookup,
+        }),
       },
     });
   }
@@ -698,9 +750,23 @@ Org-level secrets can only be used for MCP by Background Agents (https://docs.co
       stderr: "pipe",
     });
 
-    // Capture stdio output for better error reporting
+    // Capture stdio output for better error reporting. Bound the buffer so a
+    // noisy or hostile MCP server cannot grow memory without limit.
     transport.stderr?.on("data", (data: Buffer) => {
-      this.stdioOutput.stderr += data.toString();
+      const chunk = data.toString();
+      if (
+        this.stdioOutput.stderr.length + chunk.length >
+        MAX_STDERR_BUFFER_BYTES
+      ) {
+        const remaining =
+          MAX_STDERR_BUFFER_BYTES - this.stdioOutput.stderr.length;
+        if (remaining > 0) {
+          this.stdioOutput.stderr += chunk.slice(0, remaining);
+        }
+        this.stdioOutput.stderr += "\n[stderr truncated]";
+      } else {
+        this.stdioOutput.stderr += chunk;
+      }
     });
 
     return transport;

@@ -138,6 +138,7 @@ export type ToCoreFromIdeOrWebviewProtocol = {
     void,
   ];
   "mcp/setServerEnabled": [{ id: string; enabled: boolean }, void];
+  "mcp/approveServer": [{ id: string }, void];
   "mcp/getPrompt": [
     {
       serverName: string;

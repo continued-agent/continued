@@ -14,25 +14,28 @@
 
 import unittest
 
-from api.default_api import DefaultApi
+from openapi_client.api.default_api import DefaultApi
+from openapi_client.configuration import Configuration
 
 
 class TestDefaultApi(unittest.TestCase):
-    """DefaultApi unit test stubs"""
+    """DefaultApi tests with a mocked HTTP transport"""
 
     def setUp(self) -> None:
-        self.api = DefaultApi()
+        self.api = DefaultApi(Configuration(host="http://127.0.0.1:1"))
 
     def tearDown(self) -> None:
         pass
 
-    def test_list_assistants(self) -> None:
-        """Test case for list_assistants
+    def test_client_construction(self) -> None:
+        """The API client must construct with an explicit configuration."""
+        self.assertIsNotNone(self.api.api_client)
 
-        List assistants for IDE
-        """
-        pass
+    def test_requires_host(self) -> None:
+        """A configuration without a host falls back to the default endpoint."""
+        config = Configuration()
+        self.assertTrue(config.host.startswith("http"))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -39,14 +39,18 @@ export function getDefaultToolPolicies(
   return policies;
 }
 
-// Plan mode: Complete override - exclude all write operations, allow only reads and bash
+// Plan mode: Complete override - exclude all write operations and anything
+// that could mutate state. Bash is ask so mutating commands are gated on
+// explicit user consent, and unknown tools (including MCP tools) are excluded
+// unless explicitly allowed above.
 export const PLAN_MODE_POLICIES: ToolPermissionPolicy[] = [
   { tool: "Edit", permission: "exclude" },
   { tool: "MultiEdit", permission: "exclude" },
   { tool: "Write", permission: "exclude" },
 
-  // TODO address bash read only concerns, maybe make permissions more granular
-  { tool: "Bash", permission: "allow" },
+  // Bash can mutate the filesystem and run arbitrary commands, so it must be
+  // gated on explicit user approval even in Plan mode.
+  { tool: "Bash", permission: "ask" },
   { tool: "CheckBackgroundJob", permission: "allow" },
   { tool: "AskQuestion", permission: "allow" },
   { tool: "Checklist", permission: "allow" },
@@ -61,8 +65,9 @@ export const PLAN_MODE_POLICIES: ToolPermissionPolicy[] = [
   { tool: "Status", permission: "allow" },
   { tool: "UploadArtifact", permission: "allow" },
 
-  // Allow MCP tools
-  { tool: "*", permission: "allow" },
+  // Do not allow unknown tools (e.g. MCP tools) in Plan mode: they can
+  // perform arbitrary external mutations.
+  { tool: "*", permission: "exclude" },
 ];
 
 // Auto mode: Complete override - allow everything without asking

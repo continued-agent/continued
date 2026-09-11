@@ -54,6 +54,13 @@ export type GlobalContextType = {
       codeVerifier?: string;
     };
   };
+  /**
+   * Explicit user approvals for stdio MCP servers declared inside a workspace
+   * (e.g. `.continue/mcpServers/*.json` in a cloned repository). Keyed by a
+   * fingerprint of the full transport configuration so that any change to the
+   * command/args/env/cwd requires approval again.
+   */
+  approvedWorkspaceMcpServers: Record<string, unknown>;
 };
 
 /**

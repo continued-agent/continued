@@ -1,5 +1,6 @@
 import { Agent as HttpsAgent } from "https";
 
+import { assertPublicUrl, publicDnsLookup } from "@continuedev/fetch";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
@@ -23,6 +24,24 @@ export const MCP_ENV_ALLOWLIST = [
   "TMP",
 ] as const;
 
+/** Maximum bytes of stderr we retain per connection for error reporting. */
+const MAX_STDERR_BUFFER_BYTES = 64 * 1024;
+
+const ALLOW_PRIVATE_MCP_SERVERS =
+  process.env.CONTINUE_ALLOW_PRIVATE_MCP_SERVERS === "true";
+
+/**
+ * Validate a network MCP server URL (scheme, credentials, DNS) before any
+ * connection is attempted. Mirrors the core's MCPConnection checks so the CLI
+ * gets the same SSRF protection.
+ */
+export async function assertSafeMcpServerUrl(rawUrl: string): Promise<URL> {
+  if (ALLOW_PRIVATE_MCP_SERVERS) {
+    return new URL(rawUrl);
+  }
+  return await assertPublicUrl(rawUrl);
+}
+
 export function buildMcpEnvironment(
   configuredEnv?: Record<string, string>,
 ): Record<string, string> {
@@ -37,10 +56,11 @@ export function buildMcpEnvironment(
   };
 }
 
-export function constructSseTransport(
+export async function constructSseTransport(
   serverConfig: SseMcpServer,
   apiKey: string | undefined,
-): SSEClientTransport {
+): Promise<SSEClientTransport> {
+  const url = await assertSafeMcpServerUrl(serverConfig.url);
   const sseAgent =
     serverConfig.requestOptions?.verifySsl === false
       ? new HttpsAgent({ rejectUnauthorized: false })
@@ -53,7 +73,7 @@ export function constructSseTransport(
     }),
   };
 
-  return new SSEClientTransport(new URL(serverConfig.url), {
+  return new SSEClientTransport(url, {
     eventSourceInit: {
       fetch: (input, init) =>
         fetch(input, {
@@ -63,19 +83,22 @@ export function constructSseTransport(
             ...headers,
           },
           ...(sseAgent && { agent: sseAgent }),
+          ...(!ALLOW_PRIVATE_MCP_SERVERS && { lookup: publicDnsLookup }),
         }),
     },
     requestInit: {
       headers,
       ...(sseAgent && { agent: sseAgent }),
+      ...(!ALLOW_PRIVATE_MCP_SERVERS && { lookup: publicDnsLookup }),
     },
   });
 }
 
-export function constructHttpTransport(
+export async function constructHttpTransport(
   serverConfig: HttpMcpServer,
   apiKey: string | undefined,
-): StreamableHTTPClientTransport {
+): Promise<StreamableHTTPClientTransport> {
+  const url = await assertSafeMcpServerUrl(serverConfig.url);
   const streamableAgent =
     serverConfig.requestOptions?.verifySsl === false
       ? new HttpsAgent({ rejectUnauthorized: false })
@@ -88,10 +111,11 @@ export function constructHttpTransport(
     }),
   };
 
-  return new StreamableHTTPClientTransport(new URL(serverConfig.url), {
+  return new StreamableHTTPClientTransport(url, {
     requestInit: {
       headers,
       ...(streamableAgent && { agent: streamableAgent }),
+      ...(!ALLOW_PRIVATE_MCP_SERVERS && { lookup: publicDnsLookup }),
     },
   });
 }
@@ -112,11 +136,30 @@ export function constructStdioTransport(
 
   const stderrStream = transport.stderr;
   if (stderrStream) {
+    let bufferedBytes = 0;
+    let truncated = false;
     stderrStream.on("data", (data: Buffer) => {
-      const stderrOutput = data.toString().trim();
-      if (stderrOutput) {
-        connection.warnings.push(stderrOutput);
+      if (truncated) {
+        return;
       }
+      const stderrOutput = data.toString().trim();
+      if (!stderrOutput) {
+        return;
+      }
+      bufferedBytes += Buffer.byteLength(stderrOutput);
+      if (bufferedBytes > MAX_STDERR_BUFFER_BYTES) {
+        const remaining = Math.max(
+          0,
+          MAX_STDERR_BUFFER_BYTES -
+            (bufferedBytes - Buffer.byteLength(stderrOutput)),
+        );
+        connection.warnings.push(
+          `${stderrOutput.slice(0, remaining)}\n[stderr truncated]`,
+        );
+        truncated = true;
+        return;
+      }
+      connection.warnings.push(stderrOutput);
     });
   }
 

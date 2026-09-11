@@ -31,8 +31,9 @@ describe("ToolPermissionService - Mode Functionality", () => {
       expect(
         policies.some((p) => p.tool === "Edit" && p.permission === "exclude"),
       ).toBe(true);
+      // Bash must be gated on explicit approval (it can mutate state)
       expect(
-        policies.some((p) => p.tool === "Bash" && p.permission === "allow"),
+        policies.some((p) => p.tool === "Bash" && p.permission === "ask"),
       ).toBe(true);
 
       // Should have specific policies for read tools (allowed)
@@ -46,9 +47,9 @@ describe("ToolPermissionService - Mode Functionality", () => {
         policies.some((p) => p.tool === "List" && p.permission === "allow"),
       ).toBe(true);
 
-      // Plan mode allows all other tools (including MCP) with wildcard
+      // Plan mode excludes unknown tools (including MCP) by default
       expect(
-        policies.some((p) => p.tool === "*" && p.permission === "allow"),
+        policies.some((p) => p.tool === "*" && p.permission === "exclude"),
       ).toBe(true);
     });
 
@@ -265,8 +266,9 @@ describe("ToolPermissionService - Mode Functionality", () => {
       expect(
         policies.some((p) => p.tool === "Edit" && p.permission === "exclude"),
       ).toBe(true);
+      // Bash is gated on explicit approval even when the user allowed it
       expect(
-        policies.some((p) => p.tool === "Bash" && p.permission === "allow"),
+        policies.some((p) => p.tool === "Bash" && p.permission === "ask"),
       ).toBe(true);
 
       // Read tools should be allowed
@@ -300,9 +302,9 @@ describe("ToolPermissionService - Mode Functionality", () => {
       // Mode policies should come first, and there should be policies
       expect(policies.length).toBeGreaterThan(0);
 
-      // Plan mode has wildcard allow policy for MCP and other tools
+      // Plan mode excludes unknown tools (including MCP) by default
       expect(
-        policies.some((p) => p.tool === "*" && p.permission === "allow"),
+        policies.some((p) => p.tool === "*" && p.permission === "exclude"),
       ).toBe(true);
     });
   });

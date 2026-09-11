@@ -26,7 +26,10 @@ import { MCPManagerSingleton } from "../../context/mcp/MCPManagerSingleton";
 import TransformersJsEmbeddingsProvider from "../../llm/llms/TransformersJsEmbeddingsProvider";
 import { getAllPromptFiles } from "../../promptFiles/getPromptFiles";
 import { GlobalContext } from "../../util/GlobalContext";
+import { getConfigJsPath } from "../../util/paths";
+import { localPathToUri } from "../../util/pathToUri";
 import { modifyAnyConfigWithSharedConfig } from "../sharedConfig";
+import { buildConfigTsandReadConfigJs } from "../load";
 
 import { convertPromptBlockToSlashCommand } from "../../commands/slash/promptBlockSlashCommand";
 import { slashCommandFromPromptFile } from "../../commands/slash/promptFileSlashCommand";
@@ -426,14 +429,53 @@ export async function loadContinueConfigFromYaml(options: {
       llmLogger,
     });
 
+  // Apply config.ts (and remote config.js) the same way the JSON loader does,
+  // so user customizations like `systemMessage` are not silently dropped when
+  // a config.yaml is present.
+  let finalConfig = continueConfig;
+  try {
+    const configJsContents = await buildConfigTsandReadConfigJs(
+      ide,
+      ideInfo.ideType,
+    );
+    if (configJsContents) {
+      const configJsPath = getConfigJsPath();
+      let module: any;
+      try {
+        module = await import(configJsPath);
+      } catch (e) {
+        module = await import(localPathToUri(configJsPath));
+      }
+      if (typeof require !== "undefined") {
+        delete require.cache[require.resolve(configJsPath)];
+      }
+      if (module.modifyConfig) {
+        const modified = module.modifyConfig(finalConfig);
+        if (modified) {
+          finalConfig = modified;
+        }
+      }
+    }
+  } catch (e) {
+    console.log("Error loading config.ts in YAML config path: ", e);
+  }
+
+  // Mirror the JSON loader: a systemMessage set by config.ts / remote config
+  // is surfaced as a rule so it is not dropped.
+  const systemMessage = (finalConfig as { systemMessage?: string })
+    .systemMessage;
+  if (systemMessage) {
+    finalConfig.rules.unshift({
+      rule: systemMessage,
+      source: "json-systemMessage",
+    });
+  }
+
   // Apply shared config
   // TODO: override several of these values with user/org shared config
   // Don't try catch this - has security implications and failure should be fatal
   const sharedConfig = new GlobalContext().getSharedConfig();
-  const withShared = modifyAnyConfigWithSharedConfig(
-    continueConfig,
-    sharedConfig,
-  );
+  const withShared = modifyAnyConfigWithSharedConfig(finalConfig, sharedConfig);
   if (withShared.allowAnonymousTelemetry === undefined) {
     withShared.allowAnonymousTelemetry = true;
   }

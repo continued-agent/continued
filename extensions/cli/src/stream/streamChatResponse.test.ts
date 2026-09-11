@@ -534,10 +534,32 @@ describe("processStreamingResponse - content preservation", () => {
 });
 
 // Tests for preprocessStreamedToolCalls function
-describe.skip("preprocessStreamedToolCalls", () => {
+describe("preprocessStreamedToolCalls", () => {
   // Mock dependencies
   beforeEach(async () => {
-    // Mock setup would go here but is currently causing issues
+    // Register the services the tool pipeline depends on (model service is
+    // consulted to decide Edit vs MultiEdit availability).
+    const { serviceContainer } = await import(
+      "../services/ServiceContainer.js"
+    );
+    const { SERVICE_NAMES } = await import("../services/types.js");
+    serviceContainer.register(
+      SERVICE_NAMES.MODEL,
+      async () => ({
+        model: { provider: "test", name: "test", model: "test" },
+      }),
+      [],
+    );
+    serviceContainer.register(
+      SERVICE_NAMES.MCP,
+      async () => ({
+        connections: [],
+        tools: [],
+        prompts: [],
+        mcpService: null,
+      }),
+      [],
+    );
   });
 
   afterEach(() => {
@@ -549,8 +571,8 @@ describe.skip("preprocessStreamedToolCalls", () => {
       {
         id: "call_123",
         name: "Read",
-        arguments: { filepath: "/path/to/file.txt" },
-        argumentsStr: '{"filepath": "/path/to/file.txt"}',
+        arguments: { filepath: "package.json" },
+        argumentsStr: '{"filepath": "package.json"}',
         startNotified: false,
       },
     ];
@@ -608,10 +630,11 @@ describe.skip("preprocessStreamedToolCalls", () => {
     expect(errorChatEntries[0].content).toContain("Missing required argument");
 
     // Callbacks should be called for errors
-    expect(callbacks.onToolStart).toHaveBeenCalledWith("Read", {});
+    expect(callbacks.onToolStart).toHaveBeenCalledWith("Read", {}, "call_456");
     expect(callbacks.onToolError).toHaveBeenCalledWith(
       expect.stringContaining("Missing required argument"),
       "Read",
+      "call_456",
     );
   });
 
@@ -639,17 +662,30 @@ describe.skip("preprocessStreamedToolCalls", () => {
 });
 
 // Tests for executeStreamedToolCalls function
-describe.skip("executeStreamedToolCalls", () => {
-  beforeEach(() => {
+describe("executeStreamedToolCalls", () => {
+  beforeEach(async () => {
     // Reset spies
     vi.spyOn(toolPermissionManager, "requestPermission").mockReset();
     vi.spyOn(toolPermissionManager, "on").mockReset();
     vi.spyOn(toolPermissionManager, "off").mockReset();
+
+    // Register the permission service the executor consults.
+    const { serviceContainer } = await import(
+      "../services/ServiceContainer.js"
+    );
+    const { SERVICE_NAMES } = await import("../services/types.js");
+    serviceContainer.register(
+      SERVICE_NAMES.TOOL_PERMISSIONS,
+      async () => ({ permissions: { policies: [] } }),
+      [],
+    );
   });
 
   it("executes tool calls with allowed permissions", async () => {
     // Setup spies instead of mocks
-    const permissionsModule = await import("../permissions/index.js");
+    const permissionsModule = await import(
+      "../permissions/permissionChecker.js"
+    );
     vi.spyOn(permissionsModule, "checkToolPermission").mockReturnValue({
       permission: "allow",
     });
@@ -685,20 +721,30 @@ describe.skip("executeStreamedToolCalls", () => {
     // Verify results
     expect(chatHistoryEntries).toHaveLength(1);
     expect(chatHistoryEntries[0].content).toBe("Tool execution successful");
-    expect(callbacks.onToolStart).toHaveBeenCalledWith("read_file", {
-      filepath: "/test.txt",
-    });
+    expect(callbacks.onToolStart).toHaveBeenCalledWith(
+      "Read",
+      {
+        filepath: "/test.txt",
+      },
+      "call_123",
+    );
     expect(callbacks.onToolResult).toHaveBeenCalledWith(
       "Tool execution successful",
       "Read",
       "done",
+      "call_123",
     );
-    expect(mockedExecuteToolCall).toHaveBeenCalledWith(preprocessedCalls[0]);
+    expect(mockedExecuteToolCall).toHaveBeenCalledWith(
+      preprocessedCalls[0],
+      expect.objectContaining({ parallelToolCallCount: 1 }),
+    );
   });
 
   it("handles permission denied correctly", async () => {
     // Setup permission to ask
-    const permissionsModule = await import("../permissions/index.js");
+    const permissionsModule = await import(
+      "../permissions/permissionChecker.js"
+    );
     vi.spyOn(permissionsModule, "checkToolPermission").mockReturnValue({
       permission: "ask",
     });
@@ -759,33 +805,40 @@ describe.skip("executeStreamedToolCalls", () => {
       callbacks,
     );
 
-    // Verify results
+    // Verify results: the first call is denied; subsequent calls run
+    // independently (the executor no longer cancels the rest of the batch).
     expect(hasRejection).toEqual(true);
     expect(chatHistoryEntries).toHaveLength(2);
     expect(chatHistoryEntries[0].content).toBe("Permission denied by user");
-    expect(chatHistoryEntries[1].content).toBe(
-      "Cancelled due to previous tool rejection",
+    expect(chatHistoryEntries[1].content).toBe("Permission denied by user");
+    expect(callbacks.onToolStart).toHaveBeenCalledWith(
+      "Write",
+      {
+        filepath: "/test.txt",
+        content: "data",
+      },
+      "call_456",
     );
-    expect(callbacks.onToolStart).toHaveBeenCalledWith("Write", {
-      filepath: "/test.txt",
-      content: "data",
-    });
     expect(callbacks.onToolResult).toHaveBeenCalledWith(
       "Permission denied by user",
       "Write",
       "canceled",
+      "call_456",
     );
     expect(callbacks.onToolPermissionRequest).toHaveBeenCalledWith(
       "Write",
       { filepath: "/test.txt", content: "data" },
       "req_123",
       undefined,
+      "call_456",
     );
   });
 
   it("handles tool execution errors", async () => {
     // Setup spies
-    const permissionsModule = await import("../permissions/index.js");
+    const permissionsModule = await import(
+      "../permissions/permissionChecker.js"
+    );
     vi.spyOn(permissionsModule, "checkToolPermission").mockReturnValue({
       permission: "allow",
     });
@@ -823,14 +876,19 @@ describe.skip("executeStreamedToolCalls", () => {
       "Error executing tool search_code",
     );
     expect(chatHistoryEntries[0].content).toContain("Execution failed");
-    expect(callbacks.onToolStart).toHaveBeenCalledWith("search_code", {
-      pattern: "test",
-    });
+    expect(callbacks.onToolStart).toHaveBeenCalledWith(
+      "search_code",
+      {
+        pattern: "test",
+      },
+      "call_789",
+    );
     expect(callbacks.onToolError).toHaveBeenCalledWith(
       expect.stringContaining(
         "Error executing tool search_code: Execution failed",
       ),
       "search_code",
+      "call_789",
     );
   });
 });
