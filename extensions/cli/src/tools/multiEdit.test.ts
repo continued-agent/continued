@@ -31,6 +31,8 @@ vi.mock("fs", async () => {
     readFileSync: vi.fn(),
     writeFileSync: vi.fn(),
     openSync: vi.fn(() => 3),
+    ftruncateSync: vi.fn(),
+    writeSync: vi.fn(),
     closeSync: vi.fn(),
     unlinkSync: vi.fn(),
     realpathSync: vi.fn(),
@@ -48,6 +50,8 @@ describe("multiEditTool CLI specific", () => {
     vi.mocked(fs.readFileSync).mockReturnValue(originalContent);
     vi.mocked(fs.writeFileSync).mockImplementation(() => {});
     vi.mocked(fs.openSync).mockReturnValue(3);
+    vi.mocked(fs.ftruncateSync).mockImplementation(() => {});
+    vi.mocked(fs.writeSync).mockImplementation(() => 0);
     vi.mocked(fs.closeSync).mockImplementation(() => {});
     vi.mocked(fs.realpathSync).mockImplementation((path) => path.toString());
 
@@ -162,7 +166,7 @@ describe("multiEditTool CLI specific", () => {
       expect(result).toBe(
         `Successfully edited ${testFilePath} with 1 edit\nDiff:\nmocked diff`,
       );
-      expect(fs.writeFileSync).toHaveBeenCalledWith(3, newContent, "utf-8");
+      expect(fs.writeSync).toHaveBeenCalledWith(3, newContent, 0, "utf-8");
       expect(fs.openSync).toHaveBeenCalled();
     });
 
@@ -182,7 +186,7 @@ describe("multiEditTool CLI specific", () => {
     });
 
     it("should throw error if file write fails", async () => {
-      vi.mocked(fs.writeFileSync).mockImplementation(() => {
+      vi.mocked(fs.writeSync).mockImplementation(() => {
         throw new Error("Write failed");
       });
 
