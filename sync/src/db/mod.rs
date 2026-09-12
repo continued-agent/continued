@@ -104,6 +104,15 @@ pub fn create_database() -> Result<(), String> {
     )
     .map_err(|error| format!("Failed to create tags table: {}", error))?;
 
+    for statement in [
+        "CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag)",
+        "CREATE INDEX IF NOT EXISTS idx_tags_chunk_hash ON tags(chunk_hash)",
+        "CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(hash)",
+    ] {
+        conn.execute(statement, ())
+            .map_err(|error| format!("Failed to create sync index: {}", error))?;
+    }
+
     Ok(())
 }
 

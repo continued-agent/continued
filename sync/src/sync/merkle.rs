@@ -3,7 +3,7 @@ use ignore::{Walk, WalkBuilder};
 use serde::{Deserialize, Serialize};
 use sha1::{Digest, Sha1};
 use std::{
-    io::{Read, Result, Write},
+    io::{Error, ErrorKind, Read, Result, Write},
     path::{Path, PathBuf},
 };
 
@@ -213,36 +213,59 @@ impl Tree {
         result
     }
 
-    fn obj_from_jsonl(lines: &mut std::str::Lines, first_line: Option<SerializeableNode>) -> Self {
-        let root_node =
-            first_line.unwrap_or_else(|| serde_json::from_str(lines.next().unwrap()).unwrap());
+    fn obj_from_jsonl(
+        lines: &mut std::str::Lines,
+        first_line: Option<SerializeableNode>,
+    ) -> Result<Self> {
+        let root_node = match first_line {
+            Some(node) => node,
+            None => serde_json::from_str(
+                lines
+                    .next()
+                    .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Merkle cache is empty"))?,
+            )
+            .map_err(|error| Error::new(ErrorKind::InvalidData, error))?,
+        };
 
-        let children = root_node
-            .children
-            .unwrap()
-            .into_iter()
-            .map(|_child_hash| {
-                let child_jsonl = lines.next().unwrap();
-                let child_node: SerializeableNode = serde_json::from_str(child_jsonl).unwrap();
-                if child_node.children.is_some() {
-                    Self::obj_from_jsonl(lines, Some(child_node)).into()
-                } else {
+        let child_hashes = root_node.children.ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidData,
+                "Merkle cache root unexpectedly contains a blob",
+            )
+        })?;
+        let mut children = Vec::with_capacity(child_hashes.len());
+        for expected_hash in child_hashes {
+            let child_jsonl = lines
+                .next()
+                .ok_or_else(|| Error::new(ErrorKind::InvalidData, "Merkle cache is truncated"))?;
+            let child_node: SerializeableNode = serde_json::from_str(child_jsonl)
+                .map_err(|error| Error::new(ErrorKind::InvalidData, error))?;
+            if child_node.hash != expected_hash {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "Merkle cache child hash does not match its parent",
+                ));
+            }
+            if child_node.children.is_some() {
+                children.push(Self::obj_from_jsonl(lines, Some(child_node))?.into());
+            } else {
+                children.push(
                     Blob {
                         parent: child_node.parent,
                         hash: child_node.hash,
                         path: child_node.path,
                     }
-                    .into()
-                }
-            })
-            .collect();
+                    .into(),
+                );
+            }
+        }
 
-        Self {
+        Ok(Self {
             parent: root_node.parent,
             children,
             hash: root_node.hash,
             path: root_node.path,
-        }
+        })
     }
 
     /// Persist the tree to disk as JSONL, atomically (temp file + rename) so a
@@ -267,7 +290,7 @@ impl Tree {
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         let mut lines = contents.lines();
-        Ok(Self::obj_from_jsonl(&mut lines, None))
+        Self::obj_from_jsonl(&mut lines, None)
     }
 
     // pub fn empty() -> Self {
@@ -688,5 +711,14 @@ mod tests {
 
         temp_dir.close().expect("Failed to clean up temp dir");
         temp_dir2.close().expect("Failed to clean up temp dir");
+    }
+
+    #[test]
+    fn test_load_rejects_corrupted_cache() {
+        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let cache_path = temp_dir.path().join("tree.jsonl");
+        fs::write(&cache_path, "{not valid json}\n").expect("Failed to write cache");
+
+        assert!(Tree::load(&cache_path).is_err());
     }
 }
