@@ -145,6 +145,24 @@ describe("MCPConnection", () => {
         status: "not-connected",
       });
     });
+
+    it("does not expose MCP environment values in status", () => {
+      const options = {
+        name: "test-mcp",
+        id: "test-id",
+        type: "stdio" as const,
+        command: "test",
+        args: [],
+        requestOptions: {
+          env: { API_KEY: "secret-value" },
+        },
+      } as any;
+
+      const status = new MCPConnection(options).getStatus();
+
+      expect(status).not.toHaveProperty("requestOptions.env");
+      expect(JSON.stringify(status)).not.toContain("secret-value");
+    });
   });
 
   describe("resolveCwd", () => {

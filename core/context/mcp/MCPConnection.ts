@@ -219,14 +219,18 @@ class MCPConnection {
     const sanitizedOptions = {
       ...rest,
       ...(apiKey ? { apiKey: "<redacted>" } : {}),
-      requestOptions: requestOptions
-        ? {
-            ...requestOptions,
-            headers: requestOptions.headers
-              ? redactSensitiveHeaders(requestOptions.headers)
-              : undefined,
-          }
-        : undefined,
+      requestOptions: (() => {
+        if (!requestOptions) {
+          return undefined;
+        }
+        const { env: _env, ...safeRequestOptions } = requestOptions as any;
+        return {
+          ...safeRequestOptions,
+          headers: requestOptions.headers
+            ? redactSensitiveHeaders(requestOptions.headers)
+            : undefined,
+        };
+      })(),
     };
     return {
       ...sanitizedOptions,
