@@ -53,6 +53,7 @@ import { stringifyMcpPrompt } from "./commands/slash/mcpSlashCommand";
 import { createNewAssistantFile } from "./config/createNewAssistantFile";
 import {
   isColocatedRulesFile,
+  isAuthorizedConfigDeletion,
   isContinueAgentConfigFile,
   isContinueConfigRelatedUri,
 } from "./config/loadLocalAssistants";
@@ -406,10 +407,7 @@ export class Core {
     on("config/deleteRule", async (msg) => {
       try {
         const filepath = msg.data.filepath;
-        if (
-          !isColocatedRulesFile(filepath) &&
-          !isContinueConfigRelatedUri(filepath)
-        ) {
+        if (!(await isAuthorizedConfigDeletion(this.ide, filepath))) {
           throw new Error("Only rule files can be deleted");
         }
         const fileExists = await this.ide.fileExists(filepath);
