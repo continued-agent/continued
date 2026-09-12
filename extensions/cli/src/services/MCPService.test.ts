@@ -150,6 +150,40 @@ describe("MCPService", () => {
         "Tool unknown-tool not found",
       );
     });
+
+    it("routes same-named tools to the qualified server", async () => {
+      const firstClient = { callTool: vi.fn().mockResolvedValue("first") };
+      const secondClient = { callTool: vi.fn().mockResolvedValue("second") };
+      (mcpService as any).connections = new Map([
+        [
+          "first",
+          {
+            config: { name: "first" },
+            status: "connected",
+            client: firstClient,
+            tools: [{ name: "search" }],
+          },
+        ],
+        [
+          "second",
+          {
+            config: { name: "second" },
+            status: "connected",
+            client: secondClient,
+            tools: [{ name: "search" }],
+          },
+        ],
+      ]);
+
+      await mcpService.runTool("search", {}, undefined, "second");
+
+      expect(firstClient.callTool).not.toHaveBeenCalled();
+      expect(secondClient.callTool).toHaveBeenCalledWith(
+        { name: "search", arguments: {} },
+        undefined,
+        { signal: undefined },
+      );
+    });
   });
 
   describe("shutdown", () => {

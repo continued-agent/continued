@@ -11,7 +11,7 @@ import {
 } from "../services/index.js";
 import type {
   MCPServiceState,
-  MCPTool,
+  CliMCPTool,
   ModelServiceState,
 } from "../services/types.js";
 import { telemetryService } from "../telemetry/telemetryService.js";
@@ -195,10 +195,11 @@ export function convertToolToChatCompletionTool(
   };
 }
 
-export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
+export function convertMcpToolToContinueTool(mcpTool: CliMCPTool): Tool {
+  const qualifiedName = `${mcpTool.serverName}_${mcpTool.originalName}`;
   return {
-    name: mcpTool.name,
-    displayName: mcpTool.name,
+    name: qualifiedName,
+    displayName: `${mcpTool.serverName}: ${mcpTool.originalName}`,
     description: mcpTool.description ?? "",
     parameters: {
       type: "object",
@@ -212,9 +213,10 @@ export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
     isBuiltIn: false,
     run: async (args: any, context?: ToolRunContext) => {
       const result = await services.mcp?.runTool(
-        mcpTool.name,
+        mcpTool.originalName,
         args,
         context?.signal,
+        mcpTool.serverName,
       );
       return JSON.stringify(result?.content) ?? "";
     },

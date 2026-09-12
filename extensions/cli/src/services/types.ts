@@ -64,6 +64,10 @@ export interface ModelServiceState {
 
 export type MCPServerStatus = "idle" | "connecting" | "connected" | "error";
 export type MCPTool = Awaited<ReturnType<Client["listTools"]>>["tools"][number];
+export type CliMCPTool = MCPTool & {
+  serverName: string;
+  originalName: string;
+};
 export type MCPPrompt = Awaited<
   ReturnType<Client["listPrompts"]>
 >["prompts"][number];
@@ -83,7 +87,7 @@ export interface MCPConnectionInfo {
 export interface MCPServiceState {
   mcpService: MCPService | null;
   connections: Array<MCPConnectionInfo>;
-  tools: MCPTool[];
+  tools: CliMCPTool[];
   prompts: MCPPrompt[];
 }
 
