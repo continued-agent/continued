@@ -129,7 +129,19 @@ export class Continue {
       throw new Error(`Assistant ${options.assistant} not found`);
     }
 
-    const assistant = new Assistant(assistantRes.configResult.config);
+    const configResult = assistantRes.configResult;
+    const config = configResult.config as { models?: unknown } | null;
+    if (
+      configResult.configLoadInterrupted ||
+      !config ||
+      !Array.isArray(config.models)
+    ) {
+      throw new Error(
+        `Assistant ${options.assistant} returned an incomplete configuration`,
+      );
+    }
+
+    const assistant = new Assistant(configResult.config);
 
     const client = createOpenAIClient({
       models: assistant.config.models,
