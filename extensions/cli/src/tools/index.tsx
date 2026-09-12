@@ -17,6 +17,12 @@ import type {
 import { telemetryService } from "../telemetry/telemetryService.js";
 import { logger } from "../util/logger.js";
 
+import {
+  firePostToolUse,
+  firePostToolUseFailure,
+  firePreToolUse,
+} from "../hooks/fireHook.js";
+
 import { ALL_BUILT_IN_TOOLS } from "./allBuiltIns.js";
 import { askQuestionTool } from "./askQuestion.js";
 import { checkBackgroundJobTool } from "./checkBackgroundJob.js";
@@ -222,6 +228,9 @@ export async function executeToolCall(
   },
 ): Promise<string> {
   const startTime = Date.now();
+  const toolInput = toolCall.preprocessResult?.args ?? toolCall.arguments;
+  let toolResult: string | undefined;
+  let toolError: unknown;
 
   try {
     logger.debug("Executing tool", {
@@ -233,6 +242,18 @@ export async function executeToolCall(
     // Track edits if Git AI is enabled (no-op if not enabled)
     await services.gitAiIntegration.trackToolUse(toolCall, "PreToolUse");
 
+    const preToolUseResult = await firePreToolUse(
+      toolCall.name,
+      toolInput,
+      toolCall.id,
+    );
+    if (preToolUseResult.blocked) {
+      throw new ContinueError(
+        ContinueErrorReason.Unspecified,
+        preToolUseResult.blockReason || "Blocked by PreToolUse hook",
+      );
+    }
+
     const context: ToolRunContext = {
       toolCallId: toolCall.id,
       parallelToolCallCount: options.parallelToolCallCount,
@@ -242,9 +263,10 @@ export async function executeToolCall(
     // IMPORTANT: if preprocessed args are present, uses preprocessed args instead of original args
     // Preprocessed arg names may be different
     const result = await toolCall.tool.run(
-      toolCall.preprocessResult?.args ?? toolCall.arguments,
+      preToolUseResult.updatedInput ?? toolInput,
       context,
     );
+    toolResult = result;
     const duration = Date.now() - startTime;
 
     // Track edits if Git AI is enabled (no-op if not enabled)
@@ -263,6 +285,7 @@ export async function executeToolCall(
 
     return result;
   } catch (error) {
+    toolError = error;
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorReason =
@@ -279,6 +302,35 @@ export async function executeToolCall(
       toolParameters: JSON.stringify(toolCall.arguments),
     });
     throw error;
+  } finally {
+    if (toolError) {
+      try {
+        await firePostToolUseFailure(
+          toolCall.name,
+          toolInput,
+          toolCall.id,
+          toolError instanceof Error ? toolError.message : String(toolError),
+        );
+      } catch (hookError) {
+        logger.warn("Failed to fire PostToolUseFailure hook", hookError);
+      }
+    }
+
+    try {
+      await firePostToolUse(
+        toolCall.name,
+        toolInput,
+        toolResult ?? {
+          error:
+            toolError instanceof Error
+              ? toolError.message
+              : String(toolError ?? ""),
+        },
+        toolCall.id,
+      );
+    } catch (hookError) {
+      logger.warn("Failed to fire PostToolUse hook", hookError);
+    }
   }
 }
 
