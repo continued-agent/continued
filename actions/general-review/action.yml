@@ -121,7 +121,7 @@ runs:
       run: |
         # Create directory for scripts
         mkdir -p .continue-action-scripts
-        
+
         # Check if we're running in the Continue repo itself (scripts exist locally)
         if [ -f "actions/general-review/scripts/buildPrompt.js" ] && [ -f "actions/general-review/scripts/writeMarkdown.js" ]; then
           echo "Running in Continue repo - using local scripts from current checkout"
@@ -132,25 +132,29 @@ runs:
           
           # Download scripts from Continue repo
           echo "Downloading buildPrompt.js..."
-          curl -sSL https://raw.githubusercontent.com/continuedev/continue/main/actions/general-review/scripts/buildPrompt.js \
+          curl -sSL https://raw.githubusercontent.com/continuedev/continue/5522c6f44ca0ac3528b37244818fbfa39b5af470/actions/general-review/scripts/buildPrompt.js \
             -o .continue-action-scripts/buildPrompt.js
           
           echo "Downloading writeMarkdown.js..."
-          curl -sSL https://raw.githubusercontent.com/continuedev/continue/main/actions/general-review/scripts/writeMarkdown.js \
+          curl -sSL https://raw.githubusercontent.com/continuedev/continue/5522c6f44ca0ac3528b37244818fbfa39b5af470/actions/general-review/scripts/writeMarkdown.js \
             -o .continue-action-scripts/writeMarkdown.js
+
+          echo "Verifying downloaded script checksums..."
+          echo "56f4d9ac4efcf7de56b3cedc5fb140f819cdfca7656be31e2fcf04641bb52108  .continue-action-scripts/buildPrompt.js" | sha256sum -c -
+          echo "ad44b1d9675f6235cf5d416941077561346d2cac8a1fbdbe62edd4835b037199  .continue-action-scripts/writeMarkdown.js" | sha256sum -c -
         fi
-        
+
         # Verify scripts exist
         if [ ! -f .continue-action-scripts/buildPrompt.js ]; then
           echo "Error: buildPrompt.js not found"
           exit 1
         fi
-        
+
         if [ ! -f .continue-action-scripts/writeMarkdown.js ]; then
           echo "Error: writeMarkdown.js not found"
           exit 1
         fi
-        
+
         echo "Scripts ready:"
         ls -lh .continue-action-scripts/
 
