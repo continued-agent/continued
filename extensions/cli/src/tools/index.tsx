@@ -5,13 +5,18 @@ import { ChatCompletionTool } from "openai/resources.mjs";
 import { isModelCapable } from "src/utils/modelCapability.js";
 
 import {
+  firePostToolUse,
+  firePostToolUseFailure,
+  firePreToolUse,
+} from "../hooks/fireHook.js";
+import {
   SERVICE_NAMES,
   serviceContainer,
   services,
 } from "../services/index.js";
 import type {
   MCPServiceState,
-  MCPTool,
+  CliMCPTool,
   ModelServiceState,
 } from "../services/types.js";
 import { telemetryService } from "../telemetry/telemetryService.js";
@@ -189,10 +194,11 @@ export function convertToolToChatCompletionTool(
   };
 }
 
-export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
+export function convertMcpToolToContinueTool(mcpTool: CliMCPTool): Tool {
+  const qualifiedName = `${mcpTool.serverName}_${mcpTool.originalName}`;
   return {
-    name: mcpTool.name,
-    displayName: mcpTool.name,
+    name: qualifiedName,
+    displayName: `${mcpTool.serverName}: ${mcpTool.originalName}`,
     description: mcpTool.description ?? "",
     parameters: {
       type: "object",
@@ -206,9 +212,10 @@ export function convertMcpToolToContinueTool(mcpTool: MCPTool): Tool {
     isBuiltIn: false,
     run: async (args: any, context?: ToolRunContext) => {
       const result = await services.mcp?.runTool(
-        mcpTool.name,
+        mcpTool.originalName,
         args,
         context?.signal,
+        mcpTool.serverName,
       );
       return JSON.stringify(result?.content) ?? "";
     },
@@ -222,6 +229,9 @@ export async function executeToolCall(
   },
 ): Promise<string> {
   const startTime = Date.now();
+  const toolInput = toolCall.preprocessResult?.args ?? toolCall.arguments;
+  let toolResult: string | undefined;
+  let toolError: unknown;
 
   try {
     logger.debug("Executing tool", {
@@ -233,6 +243,18 @@ export async function executeToolCall(
     // Track edits if Git AI is enabled (no-op if not enabled)
     await services.gitAiIntegration.trackToolUse(toolCall, "PreToolUse");
 
+    const preToolUseResult = await firePreToolUse(
+      toolCall.name,
+      toolInput,
+      toolCall.id,
+    );
+    if (preToolUseResult.blocked) {
+      throw new ContinueError(
+        ContinueErrorReason.Unspecified,
+        preToolUseResult.blockReason || "Blocked by PreToolUse hook",
+      );
+    }
+
     const context: ToolRunContext = {
       toolCallId: toolCall.id,
       parallelToolCallCount: options.parallelToolCallCount,
@@ -242,9 +264,10 @@ export async function executeToolCall(
     // IMPORTANT: if preprocessed args are present, uses preprocessed args instead of original args
     // Preprocessed arg names may be different
     const result = await toolCall.tool.run(
-      toolCall.preprocessResult?.args ?? toolCall.arguments,
+      preToolUseResult.updatedInput ?? toolInput,
       context,
     );
+    toolResult = result;
     const duration = Date.now() - startTime;
 
     // Track edits if Git AI is enabled (no-op if not enabled)
@@ -263,6 +286,7 @@ export async function executeToolCall(
 
     return result;
   } catch (error) {
+    toolError = error;
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorReason =
@@ -279,6 +303,35 @@ export async function executeToolCall(
       toolParameters: JSON.stringify(toolCall.arguments),
     });
     throw error;
+  } finally {
+    if (toolError) {
+      try {
+        await firePostToolUseFailure(
+          toolCall.name,
+          toolInput,
+          toolCall.id,
+          toolError instanceof Error ? toolError.message : String(toolError),
+        );
+      } catch (hookError) {
+        logger.warn("Failed to fire PostToolUseFailure hook", hookError);
+      }
+    }
+
+    try {
+      await firePostToolUse(
+        toolCall.name,
+        toolInput,
+        toolResult ?? {
+          error:
+            toolError instanceof Error
+              ? toolError.message
+              : String(toolError ?? ""),
+        },
+        toolCall.id,
+      );
+    } catch (hookError) {
+      logger.warn("Failed to fire PostToolUse hook", hookError);
+    }
   }
 }
 

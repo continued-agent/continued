@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveMcpAppToolPolicy } from "./MCPAppRenderer";
+import { buildCspMetaContent, resolveMcpAppToolPolicy } from "./MCPAppRenderer";
 
 describe("resolveMcpAppToolPolicy", () => {
   const targetTool = {
@@ -29,5 +29,26 @@ describe("resolveMcpAppToolPolicy", () => {
         [targetTool],
       ),
     ).toBe("allowedWithPermission");
+  });
+});
+
+describe("buildCspMetaContent", () => {
+  it("rejects private-network and non-web ports", () => {
+    const csp = buildCspMetaContent({
+      resourceDomains: [
+        "http://127.0.0.1/",
+        "http://169.254.169.254/",
+        "https://public.example/",
+      ],
+      connectDomains: [
+        "https://public.example/",
+        "https://public.example:5432/",
+      ],
+    });
+
+    expect(csp).toContain("https://public.example");
+    expect(csp).not.toContain("127.0.0.1");
+    expect(csp).not.toContain("169.254.169.254");
+    expect(csp).not.toContain(":5432");
   });
 });

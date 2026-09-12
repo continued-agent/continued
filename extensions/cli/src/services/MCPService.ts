@@ -15,6 +15,7 @@ import { isAuthError } from "./mcpUtils.js";
 import { serviceContainer } from "./ServiceContainer.js";
 import {
   MCPConnectionInfo,
+  CliMCPTool,
   MCPServerConfig,
   MCPServiceState,
   SERVICE_NAMES,
@@ -111,7 +112,13 @@ export class MCPService
     const connectedServers = connections.filter(
       (c) => c.status === "connected",
     );
-    const tools = connectedServers.flatMap((s) => s.tools);
+    const tools: CliMCPTool[] = connectedServers.flatMap((s) =>
+      s.tools.map((tool) => ({
+        ...tool,
+        serverName: s.config.name,
+        originalName: tool.name,
+      })),
+    );
     const prompts = connectedServers.flatMap((s) => s.prompts);
 
     const newState: MCPServiceState = {
@@ -184,8 +191,12 @@ export class MCPService
     name: string,
     args: Record<string, any>,
     signal?: AbortSignal,
+    serverName?: string,
   ) {
     for (const connection of this.connections.values()) {
+      if (serverName && connection.config?.name !== serverName) {
+        continue;
+      }
       if (connection.status === "connected" && connection.client) {
         const tool = connection.tools.find((t) => t.name === name);
         if (tool) {

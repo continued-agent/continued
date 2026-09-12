@@ -1,25 +1,25 @@
-name: 'Setup Component'
-description: 'Cache and install dependencies for a specific component'
+name: "Setup Component"
+description: "Cache and install dependencies for a specific component"
 inputs:
   component:
-    description: 'Component name (core, gui, vscode, binary)'
+    description: "Component name (core, gui, vscode, binary)"
     required: true
   include-packages:
-    description: 'Whether to include packages cache (default: true)'
+    description: "Whether to include packages cache (default: true)"
     required: false
-    default: 'true'
+    default: "true"
   include-root:
-    description: 'Whether to include root cache (default: false)'
-    required: false  
-    default: 'false'
+    description: "Whether to include root cache (default: false)"
+    required: false
+    default: "false"
 
 runs:
-  using: 'composite'
+  using: "composite"
   steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version-file: ".nvmrc"
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
       with:
         path: ~/.npm
         key: ${{ runner.os }}-npm-cache-${{ inputs.component }}-${{ hashFiles(inputs.component == 'vscode' && 'extensions/vscode/package-lock.json' || format('{0}/package-lock.json', inputs.component)) }}

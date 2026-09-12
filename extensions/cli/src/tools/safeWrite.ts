@@ -23,10 +23,7 @@ export function writeFileNoFollow(
 
   let fd: number | undefined;
   try {
-    fd = fs.openSync(
-      filePath,
-      fs.constants.O_WRONLY | fs.constants.O_TRUNC | noFollow,
-    );
+    fd = fs.openSync(filePath, fs.constants.O_RDWR | noFollow);
 
     // Verify the file still contains what the preview was based on. A symlink
     // swap would either fail the open above (ELOOP) or point at a different
@@ -44,7 +41,10 @@ export function writeFileNoFollow(
       );
     }
 
-    fs.writeFileSync(fd, newContent, "utf-8");
+    fs.ftruncateSync(fd, 0);
+    if (newContent.length > 0) {
+      fs.writeSync(fd, newContent, 0, "utf-8");
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ELOOP") {
       throw new ContinueError(

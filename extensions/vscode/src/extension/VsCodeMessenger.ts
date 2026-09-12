@@ -293,9 +293,12 @@ export class VsCodeMessenger {
         });
     });
 
-    this.onWebviewOrCore("getIdeSettings", async (msg) => {
-      return ide.getIdeSettings();
+    this.onWebview("getIdeSettings", async () => {
+      const { userToken: _userToken, ...safeSettings } =
+        await ide.getIdeSettings();
+      return safeSettings as any;
     });
+    this.onCore("getIdeSettings", () => ide.getIdeSettings());
     this.onWebviewOrCore("getDiff", async (msg) => {
       return ide.getDiff(msg.data.includeUnstaged);
     });

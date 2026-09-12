@@ -8,9 +8,9 @@ import {
 } from "../indexing/ignore";
 import { walkDir } from "../indexing/walkDir";
 import { RULES_MARKDOWN_FILENAME } from "../llm/rules/constants";
-import { getGlobalFolderWithName } from "../util/paths";
+import { getContinueGlobalPath, getGlobalFolderWithName } from "../util/paths";
 import { localPathToUri } from "../util/pathToUri";
-import { getUriPathBasename, joinPathsToUri } from "../util/uri";
+import { findUriInDirs, getUriPathBasename, joinPathsToUri } from "../util/uri";
 import { SYSTEM_PROMPT_DOT_FILE } from "./getWorkspaceContinueRuleDotFiles";
 import { SUPPORTED_AGENT_FILES } from "./markdown";
 export function isContinueConfigRelatedUri(uri: string): boolean {
@@ -45,6 +45,34 @@ export function isContinueAgentConfigFile(uri: string): boolean {
 
 export function isColocatedRulesFile(uri: string): boolean {
   return getUriPathBasename(uri) === RULES_MARKDOWN_FILENAME;
+}
+
+/**
+ * Check that a user-requested config deletion is inside a directory that
+ * Continued actually owns. The filename checks above are intentionally broad
+ * because they are also used for file-watch events; deletion must additionally
+ * enforce directory containment so an arbitrary `/tmp/rules.md` cannot be
+ * removed through the protocol.
+ */
+export async function isAuthorizedConfigDeletion(
+  ide: IDE,
+  uri: string,
+): Promise<boolean> {
+  const workspaceDirs = await ide.getWorkspaceDirs();
+  const isRulesFile = isColocatedRulesFile(uri);
+  const isConfigFile = isContinueConfigRelatedUri(uri);
+  if (!isRulesFile && !isConfigFile) {
+    return false;
+  }
+
+  const authorizedDirs = isRulesFile
+    ? workspaceDirs
+    : [
+        ...workspaceDirs.map((dir) => joinPathsToUri(dir, ".continue")),
+        localPathToUri(getContinueGlobalPath()),
+      ];
+  const { foundInDir } = findUriInDirs(uri, authorizedDirs);
+  return foundInDir !== null;
 }
 
 async function getDefinitionFilesInDir(

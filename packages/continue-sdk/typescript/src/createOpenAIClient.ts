@@ -55,8 +55,16 @@ export function createOpenAIClient({
       const modifiedInit = init ? { ...init } : {};
 
       if (init?.method === "POST" && init?.body) {
+        let body: Record<string, any> | undefined;
         try {
-          const body = JSON.parse(init.body as string);
+          body = JSON.parse(init.body as string);
+        } catch {
+          // Non-JSON requests cannot carry Continue model metadata. Preserve
+          // the original request and let the upstream client handle it.
+          body = undefined;
+        }
+
+        if (body) {
 
           const modelName = body.model;
 
@@ -91,8 +99,6 @@ export function createOpenAIClient({
             ...body,
             continueProperties,
           });
-        } catch (e) {
-          // If parsing fails, proceed with the original body
         }
       }
 

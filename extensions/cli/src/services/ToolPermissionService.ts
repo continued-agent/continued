@@ -209,21 +209,20 @@ export class ToolPermissionService
     const modePolicies = this.generateModePolicies();
 
     let allPolicies: ToolPermissionPolicy[];
-    if (this.currentState.currentMode === "review") {
-      // Review workers must not inherit repository-provided agent policies.
+    if (
+      this.currentState.currentMode === "review" ||
+      this.currentState.currentMode === "plan" ||
+      this.currentState.currentMode === "auto"
+    ) {
+      // Review, plan, and auto modes are absolute overrides. Repository-provided
+      // agent policies must not weaken their guarantees.
       allPolicies = [...modePolicies];
     } else if (agentFileServiceState?.agentFile) {
-      // Agent file policies take full precedence on init
+      // Agent file policies take precedence in normal mode only.
       allPolicies = this.generateAgentFilePolicies(
         agentFileServiceState,
         mcpServiceState,
       );
-    } else if (
-      this.currentState.currentMode === "plan" ||
-      this.currentState.currentMode === "auto"
-    ) {
-      // For plan and auto modes, use ONLY mode policies (absolute override)
-      allPolicies = [...modePolicies];
     } else {
       // Normal mode: combine headless + mode policies with user configuration
       const compiledPolicies = resolvePermissionPrecedence({

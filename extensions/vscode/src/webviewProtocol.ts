@@ -7,6 +7,33 @@ import { IMessenger } from "../../../core/protocol/messenger";
 
 import { handleLLMError } from "./util/errorHandling";
 
+const SENSITIVE_FIELD =
+  /(?:api[_-]?key|token|secret|password|authorization|cookie)/i;
+
+function redactSensitiveData(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(redactSensitiveData);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, nestedValue]) => [
+        key,
+        SENSITIVE_FIELD.test(key)
+          ? "<redacted>"
+          : redactSensitiveData(nestedValue),
+      ]),
+    );
+  }
+  return value;
+}
+
+function redactSensitiveText(value: string): string {
+  return value.replace(
+    /((?:api[_-]?key|token|secret|password|authorization|cookie)\s*[:=]\s*)([^\s,;}]+)/gi,
+    "$1<redacted>",
+  );
+}
+
 export class VsCodeWebviewProtocol
   implements IMessenger<FromWebviewProtocol, ToWebviewProtocol>
 {
@@ -96,9 +123,13 @@ export class VsCodeWebviewProtocol
           let message = e.message;
           respond({ done: true, error: message, status: "error" });
 
-          const stringified = JSON.stringify({ msg }, null, 2);
+          const stringified = JSON.stringify(
+            redactSensitiveData({ msg }),
+            null,
+            2,
+          );
           console.error(
-            `Error handling webview message: ${stringified}\n\n${e}`,
+            `Error handling webview message: ${stringified}\n\n${redactSensitiveText(String(e))}`,
           );
 
           if (

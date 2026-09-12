@@ -15,6 +15,14 @@ vi.mock("../services/index.js", () => ({
   serviceContainer: {},
 }));
 
+vi.mock("../hooks/fireHook.js", () => ({
+  firePreToolUse: vi.fn().mockResolvedValue({ blocked: false, results: [] }),
+  firePostToolUse: vi.fn().mockResolvedValue({ blocked: false, results: [] }),
+  firePostToolUseFailure: vi
+    .fn()
+    .mockResolvedValue({ blocked: false, results: [] }),
+}));
+
 // Mock telemetry services
 vi.mock("../telemetry/telemetryService.js", () => ({
   telemetryService: {
@@ -292,6 +300,87 @@ describe("Git AI Integration - executeToolCall", () => {
       expect(mockGitAiService.trackToolUse).toHaveBeenCalledWith(
         toolCall,
         "PreToolUse",
+      );
+    });
+  });
+
+  describe("Hook integration", () => {
+    it("blocks a tool before execution when PreToolUse requests it", async () => {
+      const { firePreToolUse } = await import("../hooks/fireHook.js");
+      vi.mocked(firePreToolUse).mockResolvedValueOnce({
+        blocked: true,
+        blockReason: "blocked by policy",
+        results: [],
+      });
+      const mockTool = { run: vi.fn().mockResolvedValue("should not run") };
+      const toolCall: PreprocessedToolCall = {
+        id: "blocked-tool-id",
+        name: "Bash",
+        arguments: { command: "rm -rf /" },
+        argumentsStr: JSON.stringify({ command: "rm -rf /" }),
+        startNotified: false,
+        tool: mockTool as any,
+      };
+
+      await expect(executeToolCall(toolCall)).rejects.toThrow(
+        "blocked by policy",
+      );
+      expect(mockTool.run).not.toHaveBeenCalled();
+    });
+
+    it("fires completion hooks after a successful tool execution", async () => {
+      const hooks = await import("../hooks/fireHook.js");
+      const mockTool = { run: vi.fn().mockResolvedValue("tool result") };
+      const toolCall: PreprocessedToolCall = {
+        id: "successful-tool-id",
+        name: "Read",
+        arguments: { filepath: "file.txt" },
+        argumentsStr: JSON.stringify({ filepath: "file.txt" }),
+        startNotified: false,
+        tool: mockTool as any,
+      };
+
+      await executeToolCall(toolCall);
+
+      expect(hooks.firePreToolUse).toHaveBeenCalledWith(
+        "Read",
+        { filepath: "file.txt" },
+        "successful-tool-id",
+      );
+      expect(hooks.firePostToolUse).toHaveBeenCalledWith(
+        "Read",
+        { filepath: "file.txt" },
+        "tool result",
+        "successful-tool-id",
+      );
+    });
+
+    it("fires failure and post hooks when tool execution fails", async () => {
+      const hooks = await import("../hooks/fireHook.js");
+      const toolCall: PreprocessedToolCall = {
+        id: "failed-tool-id",
+        name: "Bash",
+        arguments: { command: "false" },
+        argumentsStr: JSON.stringify({ command: "false" }),
+        startNotified: false,
+        tool: {
+          run: vi.fn().mockRejectedValue(new Error("tool failed")),
+        } as any,
+      };
+
+      await expect(executeToolCall(toolCall)).rejects.toThrow("tool failed");
+
+      expect(hooks.firePostToolUseFailure).toHaveBeenCalledWith(
+        "Bash",
+        { command: "false" },
+        "failed-tool-id",
+        "tool failed",
+      );
+      expect(hooks.firePostToolUse).toHaveBeenCalledWith(
+        "Bash",
+        { command: "false" },
+        { error: "tool failed" },
+        "failed-tool-id",
       );
     });
   });
