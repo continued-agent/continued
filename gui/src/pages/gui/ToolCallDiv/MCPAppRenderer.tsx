@@ -8,6 +8,7 @@ import { AppBridge } from "@modelcontextprotocol/ext-apps/app-bridge";
 import type { ToolPolicy } from "@continuedev/terminal-security";
 import type { Tool, ToolCallState } from "core";
 import { getToolNameFromMCPServer } from "core/tools/mcpToolName";
+import { isBlockedUrl } from "core/util/urlSecurity";
 import { generateOpenAIToolCallId } from "core/tools/systemMessageTools/systemToolUtils";
 import { renderContextItems } from "core/util/messageContent";
 import {
@@ -26,7 +27,7 @@ import { streamResponseThunk } from "../../../redux/thunks/streamResponse";
  * Build a CSP meta tag content string from McpUiResourceCsp configuration.
  * This allows the iframe to make network requests to the specified domains.
  */
-function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
+export function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
   const resourceDomains = csp?.resourceDomains ?? [];
   const connectDomains = csp?.connectDomains ?? [];
 
@@ -41,7 +42,9 @@ function buildCspMetaContent(csp: McpUiResourceCsp | undefined): string {
         !parsed.password &&
         parsed.pathname === "/" &&
         !parsed.search &&
-        !parsed.hash
+        !parsed.hash &&
+        !isBlockedUrl(parsed) &&
+        ["80", "443", ""].includes(parsed.port)
       );
     } catch {
       return false;
