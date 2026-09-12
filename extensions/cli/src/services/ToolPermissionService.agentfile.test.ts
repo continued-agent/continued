@@ -61,6 +61,32 @@ describe("ToolPermissionService - Agent File Integration", () => {
     });
   });
 
+  describe("mode precedence", () => {
+    it("keeps plan mode restrictions when an agent file is active", () => {
+      const agentFileState: AgentFileServiceState = {
+        agentFile: { name: "test-agent" } as any,
+        slug: "test-slug",
+        agentFileModel: null,
+        parsedTools: null,
+        parsedRules: null,
+      };
+
+      const state = service.initializeSync({ mode: "plan" }, agentFileState);
+
+      expect(state.permissions.policies).toEqual(
+        expect.arrayContaining([
+          { tool: "Write", permission: "exclude" },
+          { tool: "Edit", permission: "exclude" },
+          { tool: "*", permission: "exclude" },
+        ]),
+      );
+      expect(state.permissions.policies).not.toContainEqual({
+        tool: "*",
+        permission: "allow",
+      });
+    });
+  });
+
   describe("generateAgentFilePolicies - With MCP servers", () => {
     it("should allow specific MCP tools when explicitly listed", () => {
       const agentFileState: AgentFileServiceState = {
