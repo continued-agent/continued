@@ -451,21 +451,40 @@ export default class DocsService {
 
     // First, if indexing is already in process, don't attempt
     // This queue is necessary because indexAndAdd is invoked circularly by config edits
-    // TODO shouldn't really be a gap between adding and checking in queue but probably fine
     if (this.docsIndexingQueue.has(startUrl)) {
       return;
     }
+    // Reserve synchronously before any await so concurrent config events cannot
+    // start two crawls for the same URL.
+    this.docsIndexingQueue.add(startUrl);
 
-    const { provider } = await this.getEmbeddingsProvider();
+    let provider;
+    try {
+      ({ provider } = await this.getEmbeddingsProvider());
+    } catch (error) {
+      this.docsIndexingQueue.delete(startUrl);
+      throw error;
+    }
     if (!provider) {
       console.warn("@docs indexAndAdd: no embeddings provider found");
+      this.docsIndexingQueue.delete(startUrl);
       return;
     }
 
     const startedWithEmbedder = provider.embeddingId;
 
     // Check if doc has been successfully indexed with the given embedder
-    const indexExists = await this.hasMetadata(startUrl);
+    let indexExists: boolean;
+    try {
+      indexExists = await this.hasMetadata(startUrl);
+    } catch (error) {
+      this.docsIndexingQueue.delete(startUrl);
+      throw error;
+    }
+    const stagingStartUrl =
+      forceReindex && indexExists
+        ? `${startUrl}#continue-reindex-${Date.now()}`
+        : startUrl;
 
     // Build status update - most of it is fixed values
     const fixedStatus: Omit<
@@ -494,6 +513,7 @@ export default class DocsService {
           status: "failed",
           progress: 1,
         });
+        this.docsIndexingQueue.delete(startUrl);
         return;
       }
     }
@@ -506,6 +526,7 @@ export default class DocsService {
         status: "complete",
         debugInfo: "Already indexed",
       });
+      this.docsIndexingQueue.delete(startUrl);
       return;
     }
 
@@ -526,17 +547,11 @@ export default class DocsService {
         progress: 1,
       });
       console.error("Failed to test embeddings connection", e);
+      this.docsIndexingQueue.delete(startUrl);
       return;
     }
 
     try {
-      this.docsIndexingQueue.add(startUrl);
-
-      // Clear current indexes if reIndexing
-      if (indexExists && forceReindex) {
-        await this.deleteIndexes(startUrl);
-      }
-
       this.addToConfig(siteIndexingConfig);
 
       this.handleStatusUpdate({
@@ -680,12 +695,6 @@ export default class DocsService {
         progress: 0.8,
       });
 
-      // Delete indexed docs if re-indexing
-      if (forceReindex && indexExists) {
-        console.log("Deleting old embeddings");
-        await this.deleteIndexes(startUrl);
-      }
-
       const favicon =
         faviconUrl ||
         (await fetchFavicon(new URL(siteIndexingConfig.startUrl)));
@@ -701,11 +710,21 @@ export default class DocsService {
       });
 
       await this.add({
-        siteIndexingConfig,
+        siteIndexingConfig:
+          stagingStartUrl === startUrl
+            ? siteIndexingConfig
+            : { ...siteIndexingConfig, startUrl: stagingStartUrl },
         chunks,
         embeddings,
         favicon,
       });
+
+      if (stagingStartUrl !== startUrl) {
+        // The new generation is complete before the old generation is
+        // touched. This keeps a failed crawl/embedding run from deleting a
+        // working index.
+        await this.promoteStagedIndex(stagingStartUrl, startUrl);
+      }
 
       this.handleStatusUpdate({
         ...fixedStatus,
@@ -1287,6 +1306,34 @@ export default class DocsService {
   private async deleteIndexes(startUrl: string) {
     await this.deleteEmbeddingsFromLance(startUrl);
     await this.deleteMetadataFromSqlite(startUrl);
+  }
+
+  private async promoteStagedIndex(
+    stagingStartUrl: string,
+    startUrl: string,
+  ): Promise<void> {
+    await this.deleteIndexes(startUrl);
+    const escapedStagingUrl = escapeLanceFilterValue(stagingStartUrl);
+    for (const tableName of this.lanceTableNamesSet) {
+      const lance = await this.initLanceDb();
+      if (!lance) {
+        throw new Error("LanceDB not available on this platform");
+      }
+      const conn = await lance.connect(getLanceDbPath());
+      const table = await conn.openTable(tableName);
+      await table.update({
+        where: `starturl = '${escapedStagingUrl}'`,
+        values: { starturl: startUrl },
+      });
+    }
+
+    const db = await this.getOrCreateSqliteDb();
+    await db.run(
+      `UPDATE ${DocsService.sqlitebTableName} SET startUrl = ? WHERE startUrl = ? AND embeddingsProviderId = ?`,
+      startUrl,
+      stagingStartUrl,
+      this.config.selectedModelByRole.embed?.embeddingId,
+    );
   }
 
   async delete(startUrl: string) {
