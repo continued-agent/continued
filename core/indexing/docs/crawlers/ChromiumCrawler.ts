@@ -2,6 +2,7 @@ import * as fs from "fs";
 import { URL } from "node:url";
 
 import { Handler, HTTPResponse, Page } from "puppeteer";
+import { assertPublicUrl } from "@continuedev/fetch";
 
 // @ts-ignore
 // @prettier-ignore
@@ -17,7 +18,11 @@ import { PageData } from "./DocsCrawler";
 
 export class ChromiumCrawler {
   private readonly LINK_GROUP_SIZE = 2;
+  private readonly MAX_LINKS_PER_PAGE = 1000;
+  private readonly MAX_PAGE_BYTES = 5 * 1024 * 1024;
+  private readonly MAX_TOTAL_BYTES = 50 * 1024 * 1024;
   private curCrawlCount = 0;
+  private totalBytes = 0;
 
   constructor(
     private readonly startUrl: URL,
@@ -53,6 +58,12 @@ export class ChromiumCrawler {
         executablePath: stats.executablePath,
       });
       const page = await browser.newPage();
+      await page.setRequestInterception(true);
+      page.on("request", (request: import("puppeteer").HTTPRequest) => {
+        void assertPublicUrl(request.url())
+          .then(() => request.continue())
+          .catch(() => request.abort());
+      });
 
       try {
         yield* this.crawlSitePages(page, this.startUrl, 0);
@@ -119,6 +130,14 @@ export class ChromiumCrawler {
     await this.gotoPageAndHandleRedirects(page, urlStr);
 
     const htmlContent = await page.content();
+    const pageBytes = Buffer.byteLength(htmlContent, "utf8");
+    if (
+      pageBytes > this.MAX_PAGE_BYTES ||
+      this.totalBytes + pageBytes > this.MAX_TOTAL_BYTES
+    ) {
+      throw new Error("Crawl exceeds response size limit");
+    }
+    this.totalBytes += pageBytes;
     const linkGroups = await this.getLinkGroupsFromPage(page, curUrl);
     this.curCrawlCount++;
 
@@ -138,7 +157,7 @@ export class ChromiumCrawler {
         // console.log({ enqueuedLinkCount, url: this.startUrl.toString() });
         if (
           enqueuedLinkCount <= this.maxRequestsPerCrawl &&
-          depth <= this.maxDepth
+          depth + 1 <= this.maxDepth
         ) {
           yield* this.crawlSitePages(
             page,
@@ -180,7 +199,10 @@ export class ChromiumCrawler {
       )
       .map((newUrl) => (newUrl as URL).href);
 
-    const dedupedLinks = Array.from(new Set(cleanedLinks));
+    const dedupedLinks = Array.from(new Set(cleanedLinks)).slice(
+      0,
+      this.MAX_LINKS_PER_PAGE,
+    );
 
     return dedupedLinks;
   }

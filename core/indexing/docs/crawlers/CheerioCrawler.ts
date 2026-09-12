@@ -1,10 +1,22 @@
 import { URL } from "node:url";
 
 import * as cheerio from "cheerio";
+import { assertPublicUrl, fetchPublicUrl } from "@continuedev/fetch";
 
 import { PageData } from "./DocsCrawler";
+import { readResponseTextLimited } from "./readResponseTextLimited";
+
+export async function validateCrawlRedirect(
+  currentUrl: URL,
+  location: string,
+): Promise<URL> {
+  return assertPublicUrl(new URL(location, currentUrl));
+}
 
 export default class CheerioCrawler {
+  private readonly MAX_LINKS_PER_PAGE = 1000;
+  private readonly MAX_TOTAL_BYTES = 50 * 1024 * 1024;
+  private totalBytes = 0;
   private readonly IGNORE_PATHS_ENDING_IN = [
     "favicon.ico",
     "robots.txt",
@@ -88,11 +100,12 @@ export default class CheerioCrawler {
   private async getLinksFromUrl(url: string, path: string) {
     const baseUrl = new URL(url);
     const location = new URL(path, url);
+    await assertPublicUrl(location);
     let response;
 
     try {
       // Bound each request so a hanging page cannot stall the whole crawl.
-      response = await fetch(location.toString(), {
+      response = await fetchPublicUrl(location, {
         signal: AbortSignal.timeout(30_000),
       });
     } catch (error: unknown) {
@@ -111,9 +124,21 @@ export default class CheerioCrawler {
       return { html: "", links: [] };
     }
     if (!response.ok) {
+      if (response.status >= 300 && response.status < 400) {
+        const redirect = response.headers.get("location");
+        if (redirect) {
+          // fetchPublicUrl disables automatic redirects. Validate every hop
+          // before a future crawl implementation follows it.
+          await validateCrawlRedirect(location, redirect);
+        }
+      }
       return { html: "", links: [] };
     }
-    const html = await response.text();
+    const html = await readResponseTextLimited(response);
+    this.totalBytes += Buffer.byteLength(html, "utf8");
+    if (this.totalBytes > this.MAX_TOTAL_BYTES) {
+      throw new Error("Crawl exceeds total response size limit");
+    }
     let links: string[] = [];
 
     if (url.includes("github.com")) {
@@ -140,6 +165,7 @@ export default class CheerioCrawler {
         !this.IGNORE_PATHS_ENDING_IN.some((ending) => link.endsWith(ending))
       );
     });
+    links = links.slice(0, this.MAX_LINKS_PER_PAGE);
     return { html, links };
   }
 

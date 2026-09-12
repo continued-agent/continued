@@ -1,4 +1,5 @@
 import { URL } from "node:url";
+import { assertPublicUrl } from "@continuedev/fetch";
 
 import { ContinueConfig, IDE } from "../../..";
 
@@ -43,6 +44,7 @@ class DocsCrawler {
   async *crawl(
     startUrl: URL,
   ): AsyncGenerator<PageData, DocsCrawlerType, undefined> {
+    await assertPublicUrl(startUrl);
     if (startUrl.host === this.GITHUB_HOST) {
       yield* new GitHubCrawler(startUrl, this.githubToken).crawl();
       return "github";
