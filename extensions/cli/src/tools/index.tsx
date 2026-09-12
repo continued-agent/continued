@@ -5,6 +5,11 @@ import { ChatCompletionTool } from "openai/resources.mjs";
 import { isModelCapable } from "src/utils/modelCapability.js";
 
 import {
+  firePostToolUse,
+  firePostToolUseFailure,
+  firePreToolUse,
+} from "../hooks/fireHook.js";
+import {
   SERVICE_NAMES,
   serviceContainer,
   services,
@@ -16,12 +21,6 @@ import type {
 } from "../services/types.js";
 import { telemetryService } from "../telemetry/telemetryService.js";
 import { logger } from "../util/logger.js";
-
-import {
-  firePostToolUse,
-  firePostToolUseFailure,
-  firePreToolUse,
-} from "../hooks/fireHook.js";
 
 import { ALL_BUILT_IN_TOOLS } from "./allBuiltIns.js";
 import { askQuestionTool } from "./askQuestion.js";
