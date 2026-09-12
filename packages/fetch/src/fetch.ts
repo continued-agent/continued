@@ -76,7 +76,7 @@ function logRequest(
 
   // Log body
   if (body) {
-    console.log(`Body: ${body}`);
+    console.log("Body: <redacted>");
   }
 
   // Generate equivalent curl command
@@ -85,7 +85,7 @@ function logRequest(
     curlCommand += ` -H '${key}: ${redactHeader(key, value)}'`;
   }
   if (body) {
-    curlCommand += ` -d '${body}'`;
+    curlCommand += " -d '<redacted>'";
   }
   if (proxy && !shouldBypass) {
     curlCommand += ` --proxy '${proxy}'`;
