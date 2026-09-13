@@ -14,6 +14,7 @@ import http from "http";
 import url from "url";
 import { v4 as uuidv4 } from "uuid";
 import { GlobalContext, GlobalContextType } from "../../util/GlobalContext";
+import { assertSafeMcpServerUrlWithDns } from "./mcpUrlValidation";
 
 // Use a Map keyed by the OAuth `state` parameter to support concurrent
 // authentications. Keying by URL is unsafe: two flows to the same server URL
@@ -72,6 +73,28 @@ const createServerForOAuth = () =>
 
 type MCPOauthStorage = GlobalContextType["mcpOauthStorage"][string];
 type MCPOauthStorageKey = keyof MCPOauthStorage;
+
+async function validateOauthServerUrl(rawUrl: string): Promise<URL> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid MCP server URL: ${rawUrl}`);
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(
+      `Unsupported OAuth server URL scheme: ${parsedUrl.protocol}`,
+    );
+  }
+
+  const validated = await assertSafeMcpServerUrlWithDns(rawUrl);
+  if (validated.protocol !== "http:" && validated.protocol !== "https:") {
+    throw new Error(
+      `Unsupported OAuth server URL scheme: ${validated.protocol}`,
+    );
+  }
+  return validated;
+}
 
 class MCPConnectionOauthProvider implements OAuthClientProvider {
   private globalContext: GlobalContext;
@@ -242,6 +265,7 @@ class MCPConnectionOauthProvider implements OAuthClientProvider {
 }
 
 export async function getOauthToken(mcpServerUrl: string, ide: IDE) {
+  await validateOauthServerUrl(mcpServerUrl);
   const authProvider = new MCPConnectionOauthProvider(mcpServerUrl, ide);
   const tokens = await authProvider.tokens();
   return tokens?.access_token;
@@ -252,6 +276,10 @@ export async function getOauthToken(mcpServerUrl: string, ide: IDE) {
  * if not, starts the authentication process by opening a webpage url
  */
 export async function performAuth(serverId: string, url: string, ide: IDE) {
+  // The OAuth flow is triggered by an IDE/CLI message whose `serverUrl` is
+  // attacker-influenceable, so validate it against the same public-only policy
+  // used by the MCP network transports before contacting the OAuth provider.
+  await validateOauthServerUrl(url);
   const authProvider = new MCPConnectionOauthProvider(url, ide);
   // Ensure redirect URL is ready before starting auth
   await authProvider.ensureRedirectUrl();

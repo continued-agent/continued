@@ -224,12 +224,12 @@ export class ToolPermissionService
         mcpServiceState,
       );
     } else {
-      // Normal mode: combine headless + mode policies with user configuration
+      // Normal mode: combine mode policies with user configuration
       const compiledPolicies = resolvePermissionPrecedence({
         commandLineFlags: runtimeOverrides,
         personalSettings: true, // Enable loading from ~/.continue/permissions.yaml
-        useDefaults: true,
         isHeadless: this.currentState.isHeadless,
+        useDefaults: true,
       });
       allPolicies = [...compiledPolicies];
     }

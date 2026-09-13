@@ -22,6 +22,10 @@ const getServerStatusDisplay = (conn: MCPConnectionInfo) => {
   if (conn.status === "connecting") {
     icon = "🟡";
     color = "yellow";
+  } else if (conn.status === "requires-approval") {
+    icon = "🔒";
+    color = "yellow";
+    statusText = "requires approval" as MCPServerStatus;
   } else if (conn.status === "error") {
     icon = "🔴";
     color = "red";
@@ -136,9 +140,14 @@ export const MCPSelector: React.FC<MCPSelectorProps> = ({ onCancel }) => {
     );
     if (!serverInfo) return [];
 
-    const items: MCPMenuItem[] = [
-      { label: "🔄 Restart server", value: "restart" },
-    ];
+    const items: MCPMenuItem[] = [];
+
+    // Workspace/shared stdio servers must be approved before they can start.
+    if (serverInfo.status === "requires-approval") {
+      items.push({ label: "✅ Approve and start", value: "approve" });
+    }
+
+    items.push({ label: "🔄 Restart server", value: "restart" });
 
     // Only show stop server if it's connected
     if (serverInfo.status === "connected") {
@@ -164,6 +173,19 @@ export const MCPSelector: React.FC<MCPSelectorProps> = ({ onCancel }) => {
               🚫 Error:
             </Text>
             <Text color="red">{serverInfo.error}</Text>
+          </Box>
+        )}
+
+        {/* Workspace/shared servers are held until explicitly approved */}
+        {serverInfo.status === "requires-approval" && (
+          <Box flexDirection="column" marginBottom={1}>
+            <Text color="yellow" bold>
+              🔒 Approval required:
+            </Text>
+            <Text color="yellow">
+              {serverInfo.error ??
+                "This server comes from the workspace or a shared assistant and must be approved before it can start."}
+            </Text>
           </Box>
         )}
 
@@ -300,6 +322,13 @@ export const MCPSelector: React.FC<MCPSelectorProps> = ({ onCancel }) => {
   const handleServerAction = async (action: string) => {
     try {
       switch (action) {
+        case "approve":
+          if (!selectedServer) {
+            return;
+          }
+          await mcpService?.approveServer(selectedServer);
+          setMessage(`Server "${selectedServer}" approved and started`);
+          break;
         case "restart":
           if (!selectedServer) {
             return;

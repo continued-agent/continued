@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { Session } from "..";
 import { NEW_SESSION_TITLE } from "./constants";
 import historyManager from "./history";
-import { getSessionFilePath } from "./paths";
+import { getSessionFilePath, isValidSessionId } from "./paths";
 
 const sessionId = uuidv4();
 const testSession: Session = {
@@ -219,5 +219,43 @@ describe("Many sessions created", () => {
     }
     sessions = historyManager.list({});
     expect(sessions.length).toBe(0);
+  });
+});
+
+describe("Session id validation", () => {
+  test("accepts UUIDs and storage/agent identifiers", () => {
+    expect(isValidSessionId(uuidv4())).toBe(true);
+    expect(isValidSessionId("agent-89b73f5f-66a4-413c-874c-a06b10cdb21b")).toBe(
+      true,
+    );
+    expect(isValidSessionId("session_123")).toBe(true);
+  });
+
+  test("rejects path traversal and separators", () => {
+    for (const bad of [
+      "../../package",
+      "..",
+      ".",
+      "a/b",
+      "a\\b",
+      "C:evil",
+      "",
+      "x".repeat(256),
+    ]) {
+      expect(isValidSessionId(bad)).toBe(false);
+    }
+  });
+
+  test("getSessionFilePath rejects ids that escape the sessions directory", () => {
+    expect(() => getSessionFilePath("../../package")).toThrow(
+      /Invalid session id/,
+    );
+    expect(() => getSessionFilePath("a/b")).toThrow(/Invalid session id/);
+  });
+
+  test("getSessionFilePath keeps valid ids inside the sessions directory", () => {
+    const id = uuidv4();
+    const filePath = getSessionFilePath(id);
+    expect(filePath.endsWith(`${id}.json`)).toBe(true);
   });
 });

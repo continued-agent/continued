@@ -20,7 +20,15 @@ program.action(async () => {
   try {
     let messenger: IMessenger<ToCoreProtocol, FromCoreProtocol>;
     if (process.env.CONTINUE_DEVELOPMENT === "true") {
-      messenger = new TcpMessenger<ToCoreProtocol, FromCoreProtocol>();
+      // The TCP transport accepts arbitrary JSON messages against the Core, so
+      // require an explicit shared secret in addition to the dev flag.
+      const devToken = process.env.CONTINUE_DEVELOPMENT_TOKEN;
+      if (!devToken) {
+        throw new Error(
+          "CONTINUE_DEVELOPMENT_TOKEN must be set when CONTINUE_DEVELOPMENT=true",
+        );
+      }
+      messenger = new TcpMessenger<ToCoreProtocol, FromCoreProtocol>(devToken);
       console.log("[binary] Waiting for connection");
       await (
         messenger as TcpMessenger<ToCoreProtocol, FromCoreProtocol>

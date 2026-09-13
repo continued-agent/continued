@@ -8,6 +8,7 @@ import {
   getSessionFilePath,
   getSessionsFolderPath,
   getSessionsListPath,
+  setSessionFilePermissions,
 } from "./paths.js";
 function safeParseArray<T>(
   value: string,
@@ -132,6 +133,7 @@ export class HistoryManager {
       getSessionFilePath(session.sessionId),
       JSON.stringify(orderedSession, undefined, 2),
     );
+    setSessionFilePermissions(getSessionFilePath(session.sessionId));
 
     // Read and update the sessions list
     const sessionsListFilePath = getSessionsListPath();

@@ -117,6 +117,31 @@ describe("MCPOauth", () => {
       );
       expect(result).toBe("AUTHORIZED");
     });
+
+    test("rejects private/local server URLs before contacting the provider", async () => {
+      const { auth } = await import("@modelcontextprotocol/sdk/client/auth.js");
+      const mockAuth = vi.mocked(auth);
+
+      await expect(
+        performAuth(mockMcpServerId, "http://localhost:9999", mockIde),
+      ).rejects.toThrow(/private or local network/i);
+      await expect(
+        performAuth(mockMcpServerId, "http://169.254.169.254", mockIde),
+      ).rejects.toThrow(/private or local network/i);
+      await expect(
+        performAuth(mockMcpServerId, "file:///etc/passwd", mockIde),
+      ).rejects.toThrow(/scheme/i);
+      await expect(
+        performAuth(mockMcpServerId, "wss://oauth.example.com", mockIde),
+      ).rejects.toThrow(/OAuth server URL scheme/i);
+      expect(mockAuth).not.toHaveBeenCalled();
+    });
+
+    test("rejects private server URLs in getOauthToken", async () => {
+      await expect(
+        getOauthToken("http://127.0.0.1:8000", mockIde),
+      ).rejects.toThrow(/private or local network/i);
+    });
   });
 
   describe("removeMCPAuth", () => {
@@ -286,15 +311,14 @@ describe("MCPOauth", () => {
       expect(result).toBe("AUTHORIZED");
     });
 
-    test("should handle missing server URL", async () => {
+    test("rejects an invalid/empty server URL", async () => {
       const { auth } = await import("@modelcontextprotocol/sdk/client/auth.js");
       const mockAuth = vi.mocked(auth);
-      mockAuth.mockResolvedValue("AUTHORIZED");
 
-      await performAuth("invalid-id", "", mockIde);
-
-      // Should still attempt auth with empty URL
-      expect(mockAuth).toHaveBeenCalled();
+      await expect(performAuth("invalid-id", "", mockIde)).rejects.toThrow(
+        /Invalid MCP server URL/,
+      );
+      expect(mockAuth).not.toHaveBeenCalled();
     });
   });
 });

@@ -15,6 +15,7 @@ import {
 } from "../telemetry/utils.js";
 import { backgroundSignalManager } from "../util/backgroundSignalManager.js";
 import { emitBashToolEnded, emitBashToolStarted } from "../util/cli.js";
+import { logger } from "../util/logger.js";
 import { killProcessTreeWithEscalation } from "../util/processTree.js";
 import {
   parseEnvNumber,
@@ -246,6 +247,17 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
 
       const moveToBackground = () => {
         if (isResolved) return;
+
+        // Check capacity BEFORE tearing down foreground tracking. Otherwise a
+        // full job queue would leave the process running with no stdout/stderr
+        // listeners, no timeout, and no abort handler attached.
+        if (!backgroundJobService.canAcceptJob()) {
+          logger.warn(
+            "Cannot move command to background: background job limit reached",
+          );
+          return;
+        }
+
         isResolved = true;
 
         if (timeoutId) {
@@ -278,8 +290,11 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
             `Command moved to background. Job ID: ${job.id}\nOutput so far:\n${outputSoFar}\nUse CheckBackgroundJob("${job.id}") to check status.`,
           );
         } else {
+          // Lost a race with another job after the capacity check. Never leave
+          // the process unmanaged: stop it rather than orphaning it.
+          killProcessTreeWithEscalation(child);
           resolve(
-            `Failed to move to background (job limit reached). Command continues in foreground.\nOutput so far: ${stdout}`,
+            `Failed to move to background (job limit reached). The command was stopped.\nOutput so far: ${stdout}`,
           );
         }
       };

@@ -24,6 +24,28 @@ export interface BackgroundJob {
 
 const MAX_CONCURRENT_JOBS = 5;
 const MAX_OUTPUT_LINES = 1000;
+// A single very long line can still consume a lot of memory, so cap retained
+// output by size as well as by line count.
+const MAX_OUTPUT_BYTES = 256 * 1024;
+// Completed jobs are kept briefly so `CheckBackgroundJob` can still read their
+// result, then pruned so a long-lived process does not accumulate them.
+const MAX_COMPLETED_JOBS = 50;
+const COMPLETED_JOB_TTL_MS = 30 * 60 * 1000;
+
+function truncateUtf8Suffix(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value, "utf8");
+  if (bytes.length <= maxBytes) {
+    return value;
+  }
+
+  let start = bytes.length - maxBytes;
+  // Avoid starting in the middle of a UTF-8 continuation sequence. Advancing
+  // can only make the retained suffix smaller than the byte limit.
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) {
+    start++;
+  }
+  return bytes.subarray(start).toString("utf8");
+}
 
 /**
  * Service for managing background job execution and lifecycle
@@ -42,6 +64,8 @@ export class BackgroundJobService {
       );
       return null;
     }
+
+    this.pruneCompletedJobs();
 
     const id = `bg-${++this.jobCounter}-${Date.now()}`;
     const job: BackgroundJob = {
@@ -116,6 +140,8 @@ export class BackgroundJobService {
       return null;
     }
 
+    this.pruneCompletedJobs();
+
     const id = `bg-${++this.jobCounter}-${Date.now()}`;
     const job: BackgroundJob = {
       id,
@@ -161,6 +187,10 @@ export class BackgroundJobService {
       if (lines.length > MAX_OUTPUT_LINES) {
         job.output = lines.slice(-MAX_OUTPUT_LINES).join("\n");
       }
+      // A single oversized line must not bypass the line cap.
+      if (Buffer.byteLength(job.output, "utf8") > MAX_OUTPUT_BYTES) {
+        job.output = truncateUtf8Suffix(job.output, MAX_OUTPUT_BYTES);
+      }
     }
   }
 
@@ -174,6 +204,7 @@ export class BackgroundJobService {
       job.exitCode = exitCode;
       job.endTime = new Date();
       this.processes.delete(jobId);
+      this.pruneCompletedJobs();
     }
   }
 
@@ -184,6 +215,42 @@ export class BackgroundJobService {
       job.error = error;
       job.endTime = new Date();
       this.processes.delete(jobId);
+      this.pruneCompletedJobs();
+    }
+  }
+
+  /**
+   * Drop finished jobs that are older than the TTL, then enforce a hard cap on
+   * retained history. `jobs` otherwise grows for the lifetime of the process.
+   */
+  private pruneCompletedJobs(): void {
+    const now = Date.now();
+    const isFinished = (job: BackgroundJob) =>
+      job.status === "completed" ||
+      job.status === "failed" ||
+      job.status === "cancelled";
+
+    for (const [id, job] of this.jobs) {
+      if (
+        isFinished(job) &&
+        job.endTime !== null &&
+        now - job.endTime.getTime() > COMPLETED_JOB_TTL_MS
+      ) {
+        this.jobs.delete(id);
+      }
+    }
+
+    const finished = Array.from(this.jobs.values())
+      .filter(isFinished)
+      .sort((a, b) => {
+        const aTime = a.endTime?.getTime() ?? 0;
+        const bTime = b.endTime?.getTime() ?? 0;
+        return aTime - bTime;
+      });
+
+    const excess = finished.length - MAX_COMPLETED_JOBS;
+    for (let i = 0; i < excess; i++) {
+      this.jobs.delete(finished[i].id);
     }
   }
 
@@ -219,6 +286,16 @@ export class BackgroundJobService {
 
   getRunningJobCount(): number {
     return this.getRunningJobs().length;
+  }
+
+  /**
+   * Whether a new job can be registered right now. Callers that would have to
+   * detach their own listeners before registering (e.g. moving a foreground
+   * command to the background) must check this first so they never leave a
+   * process running with no tracking.
+   */
+  canAcceptJob(): boolean {
+    return this.getRunningJobCount() < MAX_CONCURRENT_JOBS;
   }
 
   killAllJobs(): void {

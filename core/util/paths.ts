@@ -78,9 +78,29 @@ export function getContinueGlobalPath(): string {
 export function getSessionsFolderPath(): string {
   const sessionsPath = path.join(getContinueGlobalPath(), "sessions");
   if (!fs.existsSync(sessionsPath)) {
-    fs.mkdirSync(sessionsPath);
+    // Sessions can contain chat history, code snippets, and secrets. Keep the
+    // directory private (0700) on Unix so other users cannot read it.
+    fs.mkdirSync(sessionsPath, { mode: 0o700, recursive: true });
+  }
+  if (os.platform() !== "win32") {
+    try {
+      fs.chmodSync(sessionsPath, 0o700);
+    } catch (error) {
+      console.warn(`Failed to set permissions on ${sessionsPath}:`, error);
+    }
   }
   return sessionsPath;
+}
+
+/**
+ * Session identifiers come from clients (the `history/*` protocol messages and
+ * `cn serve --id`) and are used directly as a file name. Reject anything that
+ * could escape the sessions directory or be interpreted as a path.
+ */
+export function isValidSessionId(sessionId: unknown): sessionId is string {
+  return (
+    typeof sessionId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(sessionId)
+  );
 }
 
 export function getIndexFolderPath(): string {
@@ -100,7 +120,24 @@ export function getSharedConfigFilePath(): string {
 }
 
 export function getSessionFilePath(sessionId: string): string {
-  return path.join(getSessionsFolderPath(), `${sessionId}.json`);
+  if (!isValidSessionId(sessionId)) {
+    throw new Error("Invalid session id");
+  }
+  const root = path.resolve(getSessionsFolderPath());
+  const filePath = path.resolve(root, `${sessionId}.json`);
+  const relative = path.relative(root, filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Session path escapes storage directory");
+  }
+  return filePath;
+}
+
+/**
+ * Sessions may include chat history and secrets, so restrict them to the owner
+ * on Unix. Mirrors `setConfigFilePermissions`, which already protects config.
+ */
+export function setSessionFilePermissions(filePath: string): void {
+  setConfigFilePermissions(filePath);
 }
 
 export function getSessionsListPath(): string {
@@ -108,6 +145,7 @@ export function getSessionsListPath(): string {
   if (!fs.existsSync(filepath)) {
     fs.writeFileSync(filepath, JSON.stringify([]));
   }
+  setSessionFilePermissions(filepath);
   return filepath;
 }
 

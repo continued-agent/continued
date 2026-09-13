@@ -258,11 +258,15 @@ export class CoreBinaryTcpMessenger<
   typeListeners = new Map<keyof ToProtocol, ((message: Message) => any)[]>();
   idListeners = new Map<string, (message: Message) => any>();
 
-  constructor() {
+  constructor(private readonly authToken: string) {
     super();
     const socket = net.createConnection(this.port, "localhost");
 
     this.socket = socket;
+    socket.on("connect", () => {
+      // The TCP core transport requires an auth handshake as the first line.
+      socket.write(JSON.stringify({ token: this.authToken }) + "\r\n");
+    });
     socket.on("data", (data: Buffer) => {
       // console.log("[info] Received data from core:", data.toString() + "\n");
       this._handleData(data);

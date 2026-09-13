@@ -1,6 +1,11 @@
 import { decodeFQSN, getTemplateVariables } from "@continuedev/config-yaml";
 import { type AssistantConfig } from "@continuedev/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import {
+  approveWorkspaceMcpServer,
+  isWorkspaceMcpServerApproved,
+} from "core/context/mcp/workspaceMcpApproval.js";
+import type { InternalStdioMcpOptions } from "core/index.js";
 
 import { getErrorString } from "../util/error.js";
 import { logger } from "../util/logger.js";
@@ -82,9 +87,10 @@ export class MCPService
       await connectionInit;
 
       if (isHeadless) {
-        // With headless or agent, throw error if any MCP server failed to connect
+        // With headless or agent, throw error if any MCP server failed to
+        // connect or is held for approval (there is no one to approve it).
         const failedConnections = Array.from(this.connections.values()).filter(
-          (c) => c.status === "error",
+          (c) => c.status === "error" || c.status === "requires-approval",
         );
         if (failedConnections.length > 0) {
           const errorMessages = failedConnections.map(
@@ -255,6 +261,67 @@ export class MCPService
     await this.connectServer(serverConfig);
   }
 
+  /**
+   * Build the subset of an InternalMcpOptions used by the shared workspace MCP
+   * approval fingerprint (command/args/env/cwd).
+   */
+  private toApprovalOptions(
+    serverConfig: MCPServerConfig,
+  ): InternalStdioMcpOptions {
+    const stdio = serverConfig as {
+      name: string;
+      command: string;
+      args?: string[];
+      env?: Record<string, string>;
+      cwd?: string;
+      sourceFile?: string;
+    };
+    return {
+      id: stdio.name,
+      name: stdio.name,
+      type: "stdio",
+      command: stdio.command,
+      args: stdio.args,
+      env: stdio.env,
+      cwd: stdio.cwd,
+      sourceFile: stdio.sourceFile,
+    };
+  }
+
+  /**
+   * A stdio MCP server requires approval when it carries provenance (declared
+   * by a workspace/shared config rather than the user's own explicit config)
+   * and has not been approved in the shared store yet.
+   */
+  private requiresApproval(serverConfig: MCPServerConfig): boolean {
+    if (!("command" in serverConfig)) {
+      return false;
+    }
+    if (process.env.CONTINUE_ALLOW_UNAPPROVED_MCP === "true") {
+      return false;
+    }
+    const provenance = serverConfig as {
+      sourceFile?: string;
+      sourceSlug?: string;
+    };
+    if (!provenance.sourceFile && !provenance.sourceSlug) {
+      return false;
+    }
+    return !isWorkspaceMcpServerApproved(this.toApprovalOptions(serverConfig));
+  }
+
+  /**
+   * Record explicit approval for a stdio MCP server, then (re)connect it.
+   */
+  public async approveServer(serverName: string): Promise<void> {
+    const connection = this.connections.get(serverName);
+    if (!connection || !("command" in connection.config)) {
+      throw new Error(`MCP server "${serverName}" cannot be approved`);
+    }
+    approveWorkspaceMcpServer(this.toApprovalOptions(connection.config));
+    await this.connectServer(connection.config);
+  }
+
   private async connectServer(serverConfig: MCPServerConfig) {
     const connection: ServerConnection = {
       config: serverConfig,
@@ -267,6 +334,19 @@ export class MCPService
     const serverName = serverConfig.name;
     this.connections.set(serverName, connection);
     this.updateState();
+
+    // Workspace/remote-supplied stdio servers can execute arbitrary commands,
+    // so they must be explicitly approved before we spawn them. Core applies
+    // the same gate to workspace `.continue/mcpServers` configs; the CLI
+    // honors the same shared approval store for servers that carry provenance.
+    if (this.requiresApproval(serverConfig)) {
+      connection.status = "requires-approval";
+      connection.requiresApproval = true;
+      connection.error = `MCP server "${serverName}" comes from the workspace or a shared assistant and has not been approved yet. Approve it in the MCP settings, or set CONTINUE_ALLOW_UNAPPROVED_MCP=true to allow it.`;
+      logger.warn("MCP server requires approval", { name: serverName });
+      this.updateState();
+      return;
+    }
 
     const vars = getTemplateVariables(JSON.stringify(serverConfig));
     const secretVars = vars.filter((v) => v.startsWith("secrets."));

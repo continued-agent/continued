@@ -1,5 +1,6 @@
 import { IProtocol } from "core/protocol";
 import { IMessenger, Message } from "core/protocol/messenger";
+import { timingSafeEqual } from "node:crypto";
 import net from "net";
 import { v4 as uuidv4 } from "uuid";
 
@@ -11,13 +12,28 @@ export class TcpMessenger<
   private port: number = 3000;
   private host: string = "127.0.0.1";
   private socket: net.Socket | null = null;
+  private authenticated = false;
 
   typeListeners = new Map<keyof ToProtocol, ((message: Message) => any)[]>();
   idListeners = new Map<string, (message: Message) => any>();
 
-  constructor() {
+  /**
+   * @param authToken Shared secret required as the first line sent by a
+   * client. The TCP transport is development-only and processes arbitrary
+   * JSON messages against the Core, so any local process must prove it knows
+   * the token before its messages are handled.
+   */
+  constructor(private readonly authToken: string) {
     const server = net.createServer((socket) => {
+      // This development transport has one Core client. Do not let a second
+      // local process replace the authenticated connection or inherit its
+      // authentication state.
+      if (this.socket && !this.socket.destroyed) {
+        socket.destroy();
+        return;
+      }
       this.socket = socket;
+      this.authenticated = false;
 
       socket.on("connect", () => {
         console.log("Connected to server");
@@ -28,6 +44,7 @@ export class TcpMessenger<
       });
 
       socket.on("end", () => {
+        this.authenticated = false;
         console.log("Disconnected from server");
       });
 
@@ -53,7 +70,41 @@ export class TcpMessenger<
     }
   }
 
+  /**
+   * Consume the authentication handshake. The first line on a connection must
+   * be `{"token": "<shared secret>"}`; anything else is rejected.
+   */
+  private _authenticate(line: string): void {
+    try {
+      const parsed = JSON.parse(line);
+      const provided = Buffer.from(
+        typeof parsed?.token === "string" ? parsed.token : "",
+        "utf8",
+      );
+      const expected = Buffer.from(this.authToken, "utf8");
+      if (
+        provided.length !== expected.length ||
+        !timingSafeEqual(
+          provided as unknown as Uint8Array<ArrayBuffer>,
+          expected as unknown as Uint8Array<ArrayBuffer>,
+        )
+      ) {
+        console.error("Rejected TCP client with invalid auth token");
+        this.socket?.destroy();
+        return;
+      }
+      this.authenticated = true;
+    } catch {
+      console.error("Rejected TCP client without an auth handshake");
+      this.socket?.destroy();
+    }
+  }
+
   private _handleLine(line: string) {
+    if (!this.authenticated) {
+      this._authenticate(line);
+      return;
+    }
     try {
       const msg: Message = JSON.parse(line);
       if (msg.messageType === undefined || msg.messageId === undefined) {

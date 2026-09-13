@@ -22,6 +22,7 @@ import {
   updateConfigUri,
 } from "./auth/workos.js";
 import { CLIPlatformClient } from "./CLIPlatformClient.js";
+import { markMcpServerProvenance } from "./configMcpProvenance.js";
 import { env } from "./env.js";
 
 export interface ConfigLoadResult {
@@ -105,6 +106,7 @@ export async function loadConfiguration(
     apiClient,
     injectBlocks,
   );
+  markMcpServerProvenance(config, configSource);
 
   // Step 3: Save config URI for session continuity
   const uri = getUriFromSource(configSource);

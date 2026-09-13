@@ -16,36 +16,47 @@ const SENSITIVE_LOG_HEADERS = new Set([
   "x-goog-api-key",
   "proxy-authorization",
   "cookie",
+  "set-cookie",
+  "set-cookie2",
+  "www-authenticate",
+  "proxy-authenticate",
+  "x-auth-token",
+  "x-csrf-token",
+  "x-amz-security-token",
 ]);
 
-function redactHeader(key: string, value: string): string {
+export function redactHeader(key: string, value: string): string {
   return SENSITIVE_LOG_HEADERS.has(key.toLowerCase()) ? "<redacted>" : value;
 }
 
 /** Strips sensitive query params from a URL before it reaches any log. */
-function sanitizeUrlForLogging(url: string): string {
+export function sanitizeUrlForLogging(url: string): string {
   try {
     const parsed = new URL(url);
     parsed.username = "";
     parsed.password = "";
-    for (const key of [
+    const sensitiveQueryKeys = new Set([
       "key",
       "api_key",
       "apikey",
       "token",
       "access_token",
+      "refresh_token",
+      "client_secret",
       "sig",
       "signature",
       "credential",
-    ]) {
-      if (parsed.searchParams.has(key)) {
+      "password",
+    ]);
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (sensitiveQueryKeys.has(key.toLowerCase())) {
         parsed.searchParams.delete(key);
       }
     }
     return parsed.toString();
   } catch {
     return url.replace(
-      /([?&](?:key|api_key|apikey|token|sig|access_token)=)[^&#]*/gi,
+      /([?&](?:key|api_key|apikey|token|access_token|refresh_token|client_secret|sig|signature|credential|password)=)[^&#]*/gi,
       "$1<redacted>",
     );
   }
@@ -71,7 +82,7 @@ function logRequest(
 
   // Log proxy information
   if (proxy && !shouldBypass) {
-    console.log(`Proxy: ${proxy}`);
+    console.log(`Proxy: ${sanitizeUrlForLogging(proxy)}`);
   }
 
   // Log body
@@ -88,9 +99,9 @@ function logRequest(
     curlCommand += " -d '<redacted>'";
   }
   if (proxy && !shouldBypass) {
-    curlCommand += ` --proxy '${proxy}'`;
+    curlCommand += ` --proxy '${sanitizeUrlForLogging(proxy)}'`;
   }
-  curlCommand += ` '${url.toString()}'`;
+  curlCommand += ` '${sanitizeUrlForLogging(url.toString())}'`;
   console.log(`Equivalent curl: ${curlCommand}`);
   console.log("=====================");
 }
@@ -100,7 +111,7 @@ async function logResponse(resp: Response) {
   console.log(`Status: ${resp.status} ${resp.statusText}`);
   console.log("Response Headers:");
   resp.headers.forEach((value, key) => {
-    console.log(`  ${key}: ${value}`);
+    console.log(`  ${key}: ${redactHeader(key, value)}`);
   });
 
   // TODO: For streamed responses, this caused the response to be consumed and the connection would just hang open

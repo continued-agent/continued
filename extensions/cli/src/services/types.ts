@@ -62,7 +62,12 @@ export interface ModelServiceState {
   authConfig: AuthConfig | null;
 }
 
-export type MCPServerStatus = "idle" | "connecting" | "connected" | "error";
+export type MCPServerStatus =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "error"
+  | "requires-approval";
 export type MCPTool = Awaited<ReturnType<Client["listTools"]>>["tools"][number];
 export type CliMCPTool = MCPTool & {
   serverName: string;
@@ -82,6 +87,8 @@ export interface MCPConnectionInfo {
   prompts: MCPPrompt[];
   error?: string;
   warnings: string[];
+  /** Set when a workspace/remote-supplied stdio server awaits approval. */
+  requiresApproval?: boolean;
 }
 
 export interface MCPServiceState {

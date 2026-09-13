@@ -40,6 +40,11 @@ vi.mock("https", () => ({
   })),
 }));
 
+vi.mock("core/context/mcp/workspaceMcpApproval.js", () => ({
+  isWorkspaceMcpServerApproved: vi.fn(() => false),
+  approveWorkspaceMcpServer: vi.fn(),
+}));
+
 describe("MCPService", () => {
   let mcpService: MCPService;
   let mockAssistant: AssistantConfig;
@@ -457,5 +462,44 @@ describe("MCPService", () => {
       );
       expect(HttpsAgent).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe("MCPService workspace MCP approval", () => {
+  it("holds workspace-supplied stdio servers until approved", async () => {
+    const { isWorkspaceMcpServerApproved, approveWorkspaceMcpServer } =
+      await import("core/context/mcp/workspaceMcpApproval.js");
+    vi.mocked(isWorkspaceMcpServerApproved).mockReturnValue(false);
+
+    const service = new MCPService();
+    const assistant = {
+      name: "Test Config",
+      version: "1.0.0",
+      mcpServers: [
+        {
+          name: "workspace-server",
+          command: "echo",
+          args: ["hi"],
+          sourceFile: "file:///repo/.continuerc.json",
+        },
+      ],
+    } as unknown as AssistantConfig;
+
+    await service.initialize(assistant);
+
+    const connection = service
+      .getState()
+      .connections.find((c) => c.config.name === "workspace-server");
+    expect(connection?.status).toBe("requires-approval");
+    expect(connection?.requiresApproval).toBe(true);
+    expect(mockClient.connect).not.toHaveBeenCalled();
+
+    // Explicit approval records the fingerprint and starts the server.
+    vi.mocked(isWorkspaceMcpServerApproved).mockReturnValue(true);
+    await service.approveServer("workspace-server");
+    expect(approveWorkspaceMcpServer).toHaveBeenCalled();
+    expect(mockClient.connect).toHaveBeenCalled();
+
+    await service.cleanup();
   });
 });

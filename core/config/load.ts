@@ -16,7 +16,6 @@ import {
   Config,
   ContextProviderWithParams,
   ContinueConfig,
-  ContinueRcJson,
   CustomContextProvider,
   EmbeddingsProviderDescription,
   IDE,
@@ -62,6 +61,7 @@ import CustomContextProviderClass from "../context/providers/CustomContextProvid
 import { getBaseToolDefinitions, serializeTool } from "../tools";
 import { resolveRelativePathInDir } from "../util/ideUtils";
 import { getWorkspaceRcConfigs } from "./json/loadRcConfigs";
+import type { WorkspaceRcConfig } from "./json/loadRcConfigs";
 import { loadConfigContextProviders } from "./loadContextProviders";
 import { modifyAnyConfigWithSharedConfig } from "./sharedConfig";
 import {
@@ -110,7 +110,7 @@ const configMergeKeys = {
 };
 
 function loadSerializedConfig(
-  workspaceConfigs: ContinueRcJson[],
+  workspaceConfigs: WorkspaceRcConfig[],
   ideSettings: IdeSettings,
   ideType: IdeType,
   overrideConfigJson: SerializedContinueConfig | undefined,
@@ -150,7 +150,7 @@ function loadSerializedConfig(
     }
   }
 
-  for (const workspaceConfig of workspaceConfigs) {
+  for (const { config: workspaceConfig } of workspaceConfigs) {
     config = mergeJson(
       config,
       workspaceConfig,
@@ -532,6 +532,9 @@ async function intermediateToFinalConfig({
           : undefined,
         config.requestOptions,
       ),
+      // Workspace `.continuerc.json` servers carry their source file so they
+      // are held for explicit approval instead of starting automatically.
+      sourceFile: (server as { sourceFile?: string }).sourceFile,
       ...server.transport,
     }));
     const { errors: jsonMcpErrors, mcpServers } = await loadJsonMcpConfigs(

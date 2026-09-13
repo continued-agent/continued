@@ -52,7 +52,10 @@ export function resolvePermissionPrecedence(
 
   // Layer 3: Default policies (lowest precedence)
   if (sources.useDefaults !== false) {
-    const defaultPolicies = getDefaultToolPolicies(sources.isHeadless);
+    // Keep the headless source in the resolver contract for callers and
+    // diagnostics. `ask` remains the safe default in both interactive and
+    // headless modes; headless callers simply cannot satisfy an ask prompt.
+    const defaultPolicies = getDefaultToolPolicies();
     policies.push(...defaultPolicies);
   }
 
