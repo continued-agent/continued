@@ -75,6 +75,18 @@ type MCPOauthStorage = GlobalContextType["mcpOauthStorage"][string];
 type MCPOauthStorageKey = keyof MCPOauthStorage;
 
 async function validateOauthServerUrl(rawUrl: string): Promise<URL> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+  } catch {
+    throw new Error(`Invalid MCP server URL: ${rawUrl}`);
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error(
+      `Unsupported OAuth server URL scheme: ${parsedUrl.protocol}`,
+    );
+  }
+
   const validated = await assertSafeMcpServerUrlWithDns(rawUrl);
   if (validated.protocol !== "http:" && validated.protocol !== "https:") {
     throw new Error(
