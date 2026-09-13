@@ -75,14 +75,22 @@ describe("ProviderConnectionForm", () => {
     await vi.waitFor(() => expect(lastFrame()).toContain("•••"));
     stdin.write("\r");
     await vi.waitFor(() => expect(lastFrame()).toContain("● API base URL:"));
-    stdin.write("https://localhost/v1");
-    await vi.waitFor(() =>
-      expect(lastFrame()).toContain("https://localhost/v1"),
-    );
+    const apiBase = "https://localhost/v1";
+    for (const [index, character] of [...apiBase].entries()) {
+      stdin.write(character);
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain(apiBase.slice(0, index + 1)),
+      );
+    }
     stdin.write("\r");
     await vi.waitFor(() => expect(lastFrame()).toContain("● Model name:"));
-    stdin.write("my-model");
-    await vi.waitFor(() => expect(lastFrame()).toContain("my-model"));
+    const model = "my-model";
+    for (const [index, character] of [...model].entries()) {
+      stdin.write(character);
+      await vi.waitFor(() =>
+        expect(lastFrame()).toContain(model.slice(0, index + 1)),
+      );
+    }
     stdin.write("\r");
     await vi.waitFor(() => expect(onConnect).toHaveBeenCalledOnce());
 
