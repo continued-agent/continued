@@ -754,12 +754,13 @@ export async function resolveBlock(
 
   // Add source slug for mcp servers
   const parsed = parseMarkdownRuleOrAssistantUnrolled(templatedYaml, id);
-  if (
-    id.uriType === "slug" &&
-    "mcpServers" in parsed &&
-    parsed.mcpServers?.[0]
-  ) {
-    parsed.mcpServers[0].sourceSlug = `${id.fullSlug.ownerSlug}/${id.fullSlug.packageSlug}`;
+  if (id.uriType === "slug" && "mcpServers" in parsed) {
+    const sourceSlug = `${id.fullSlug.ownerSlug}/${id.fullSlug.packageSlug}`;
+    for (const server of parsed.mcpServers ?? []) {
+      if (server) {
+        server.sourceSlug = sourceSlug;
+      }
+    }
   }
 
   return parsed;

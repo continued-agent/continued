@@ -51,6 +51,28 @@ describe("defaultPolicies", () => {
     expect(catchAllPolicy?.permission).toBe("ask");
   });
 
+  it("should not auto-approve Bash or unknown tools in headless mode", () => {
+    // Headless mode has no interactive approver, so `ask` tools are excluded.
+    // Bash and unknown (MCP/external) tools must therefore remain `ask` and
+    // require an explicit --allow/--auto opt-in.
+    const permissions = { policies: DEFAULT_TOOL_POLICIES };
+
+    expect(
+      checkToolPermission({ name: "Bash", arguments: {} }, permissions)
+        .permission,
+    ).toBe("ask");
+    expect(
+      checkToolPermission({ name: "unknown_tool", arguments: {} }, permissions)
+        .permission,
+    ).toBe("ask");
+    expect(
+      checkToolPermission(
+        { name: "mcp__server__tool", arguments: {} },
+        permissions,
+      ).permission,
+    ).toBe("ask");
+  });
+
   it("should include MultiEdit policy", () => {
     const multiEditPolicy = DEFAULT_TOOL_POLICIES.find(
       (p) => p.tool === "MultiEdit",

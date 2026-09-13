@@ -10,6 +10,7 @@ import type {
   Usage,
 } from "core/index.js";
 import historyManager from "core/util/history.js";
+import { isValidSessionId } from "core/util/paths.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { DEFAULT_SESSION_TITLE } from "./constants/session.js";
@@ -39,7 +40,8 @@ function getSessionDir(): string {
 
     // Create directory if it doesn't exist
     if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir, { recursive: true });
+      // Sessions can contain chat history and secrets; keep them private.
+      fs.mkdirSync(sessionDir, { mode: 0o700, recursive: true });
     }
 
     return sessionDir;
@@ -52,7 +54,7 @@ function getSessionDir(): string {
 
   // Create directory if it doesn't exist
   if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.mkdirSync(sessionDir, { mode: 0o700, recursive: true });
   }
 
   return sessionDir;
@@ -63,8 +65,16 @@ function getSessionDir(): string {
  */
 export function getSessionFilePath(): string {
   const sessionId = getCurrentSessionId();
-  const sessionDir = getSessionDir();
-  return path.join(sessionDir, `${sessionId}.json`);
+  if (!isValidSessionId(sessionId)) {
+    throw new Error("Invalid session id");
+  }
+  const sessionDir = path.resolve(getSessionDir());
+  const filePath = path.resolve(sessionDir, `${sessionId}.json`);
+  const relative = path.relative(sessionDir, filePath);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error("Session path escapes storage directory");
+  }
+  return filePath;
 }
 
 // Singleton for current session management

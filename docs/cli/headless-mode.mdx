@@ -46,6 +46,18 @@ cn -p "Fix the type errors in src/" --allow Write --allow Edit
 cn -p "Set up the project" --allow "*"
 ```
 
+Workspace or shared-assistant MCP servers that use `stdio` are additionally
+held until explicitly approved in the MCP selector. For unattended runs, only
+opt into starting those servers when the configuration is trusted:
+
+```bash
+CONTINUE_ALLOW_UNAPPROVED_MCP=true cn -p "Inspect the configured services"
+```
+
+This opt-in launches the configured `command` with its `args`, environment, and
+working directory; keep it disabled for repositories or assistants you do not
+trust.
+
 See [tool permissions](/cli/tool-permissions) for the full policy system.
 
 ## Resume in headless mode

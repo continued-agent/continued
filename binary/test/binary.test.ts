@@ -219,7 +219,9 @@ describe("Test Suite", () => {
     }
 
     if (USE_TCP) {
-      messenger = new CoreBinaryTcpMessenger<ToIdeProtocol, FromIdeProtocol>();
+      messenger = new CoreBinaryTcpMessenger<ToIdeProtocol, FromIdeProtocol>(
+        process.env.CONTINUE_DEVELOPMENT_TOKEN ?? "test-dev-token",
+      );
     } else {
       try {
         subprocess = spawn(binaryPath, {

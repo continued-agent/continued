@@ -3,11 +3,16 @@ import { ToolPermissionPolicy } from "./types.js";
 /**
  * Default permission policies for all built-in tools.
  * These policies are applied in order - first match wins.
+ *
+ * Bash and unknown tools (MCP, external) default to `ask` regardless of mode.
+ * In headless mode there is no interactive approver, so `ask` tools are
+ * excluded from the agent's toolset: an unattended run must explicitly opt in
+ * with `--allow Bash`, `--allow "*"`, or `--auto`. This matches the documented
+ * headless behavior and prevents prompt injection from silently executing
+ * arbitrary commands.
  */
-export function getDefaultToolPolicies(
-  isHeadless = false,
-): ToolPermissionPolicy[] {
-  const policies: ToolPermissionPolicy[] = [
+export function getDefaultToolPolicies(): ToolPermissionPolicy[] {
+  return [
     // Write tools
     { tool: "Edit", permission: "ask" },
     { tool: "MultiEdit", permission: "ask" },
@@ -25,18 +30,11 @@ export function getDefaultToolPolicies(
     { tool: "Status", permission: "allow" },
     { tool: "ReportFailure", permission: "allow" },
     { tool: "UploadArtifact", permission: "allow" },
+    // Bash and unknown (MCP/external) tools require an explicit grant. In
+    // headless mode `ask` tools are excluded, so unattended runs must opt in.
+    { tool: "Bash", permission: "ask" },
+    { tool: "*", permission: "ask" },
   ];
-
-  // MCP and Bash are ask in TUI mode, auto in headless
-  if (isHeadless) {
-    policies.push({ tool: "Bash", permission: "allow" });
-    policies.push({ tool: "*", permission: "allow" });
-  } else {
-    policies.push({ tool: "Bash", permission: "ask" });
-    policies.push({ tool: "*", permission: "ask" });
-  }
-
-  return policies;
 }
 
 // Plan mode: Complete override - exclude all write operations and anything

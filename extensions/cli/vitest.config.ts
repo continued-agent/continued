@@ -9,6 +9,24 @@ export default defineConfig({
     exclude: ["**/node_modules/**", "**/dist/**", "**/*.e2e.*", "**/e2e/**"],
     coverage: {
       reporter: ["text", "json", "html"],
+      // Keep a small, enforceable floor on security-sensitive CLI boundaries
+      // rather than allowing coverage to silently regress as the codebase
+      // grows. Broader package coverage remains available on demand.
+      include: [
+        "src/permissions/defaultPolicies.ts",
+        "src/permissions/precedenceResolver.ts",
+        "src/services/BackgroundJobService.ts",
+        "src/services/MCPService.ts",
+        "src/commands/serveAuth.ts",
+        "src/commands/serveOptions.ts",
+      ],
+      thresholds: {
+        perFile: true,
+        lines: 40,
+        functions: 30,
+        branches: 25,
+        statements: 40,
+      },
       exclude: [
         "node_modules/",
         "dist/",
