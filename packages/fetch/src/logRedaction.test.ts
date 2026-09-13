@@ -22,7 +22,7 @@ describe("verbose fetch log redaction", () => {
 
   it("strips credentials and sensitive query params from logged URLs", () => {
     const sanitized = sanitizeUrlForLogging(
-      "https://user:pass@example.com/api?token=abc&api_key=def&ok=1",
+      "https://user:pass@example.com/api?TOKEN=abc&api_key=def&ok=1",
     );
     expect(sanitized).not.toContain("user");
     expect(sanitized).not.toContain("pass");

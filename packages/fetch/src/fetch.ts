@@ -35,24 +35,28 @@ export function sanitizeUrlForLogging(url: string): string {
     const parsed = new URL(url);
     parsed.username = "";
     parsed.password = "";
-    for (const key of [
+    const sensitiveQueryKeys = new Set([
       "key",
       "api_key",
       "apikey",
       "token",
       "access_token",
+      "refresh_token",
+      "client_secret",
       "sig",
       "signature",
       "credential",
-    ]) {
-      if (parsed.searchParams.has(key)) {
+      "password",
+    ]);
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (sensitiveQueryKeys.has(key.toLowerCase())) {
         parsed.searchParams.delete(key);
       }
     }
     return parsed.toString();
   } catch {
     return url.replace(
-      /([?&](?:key|api_key|apikey|token|sig|access_token)=)[^&#]*/gi,
+      /([?&](?:key|api_key|apikey|token|access_token|refresh_token|client_secret|sig|signature|credential|password)=)[^&#]*/gi,
       "$1<redacted>",
     );
   }
@@ -78,7 +82,7 @@ function logRequest(
 
   // Log proxy information
   if (proxy && !shouldBypass) {
-    console.log(`Proxy: ${proxy}`);
+    console.log(`Proxy: ${sanitizeUrlForLogging(proxy)}`);
   }
 
   // Log body
@@ -95,7 +99,7 @@ function logRequest(
     curlCommand += " -d '<redacted>'";
   }
   if (proxy && !shouldBypass) {
-    curlCommand += ` --proxy '${proxy}'`;
+    curlCommand += ` --proxy '${sanitizeUrlForLogging(proxy)}'`;
   }
   curlCommand += ` '${sanitizeUrlForLogging(url.toString())}'`;
   console.log(`Equivalent curl: ${curlCommand}`);
