@@ -43,4 +43,18 @@ describe("BackgroundJobService", () => {
       256 * 1024,
     );
   });
+
+  it("keeps UTF-8 output valid while enforcing the byte cap", () => {
+    const service = new BackgroundJobService();
+    const job = service.createJob("cat unicode");
+    expect(job).not.toBeNull();
+
+    service.appendOutput(job!.id, "🙂".repeat(200_000));
+
+    const stored = service.getJob(job!.id);
+    expect(Buffer.byteLength(stored!.output, "utf8")).toBeLessThanOrEqual(
+      256 * 1024,
+    );
+    expect(stored!.output).not.toContain("�");
+  });
 });

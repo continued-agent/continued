@@ -32,6 +32,21 @@ const MAX_OUTPUT_BYTES = 256 * 1024;
 const MAX_COMPLETED_JOBS = 50;
 const COMPLETED_JOB_TTL_MS = 30 * 60 * 1000;
 
+function truncateUtf8Suffix(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value, "utf8");
+  if (bytes.length <= maxBytes) {
+    return value;
+  }
+
+  let start = bytes.length - maxBytes;
+  // Avoid starting in the middle of a UTF-8 continuation sequence. Advancing
+  // can only make the retained suffix smaller than the byte limit.
+  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) {
+    start++;
+  }
+  return bytes.subarray(start).toString("utf8");
+}
+
 /**
  * Service for managing background job execution and lifecycle
  * Handles spawning, tracking, and cleanup of background processes
@@ -174,7 +189,7 @@ export class BackgroundJobService {
       }
       // A single oversized line must not bypass the line cap.
       if (Buffer.byteLength(job.output, "utf8") > MAX_OUTPUT_BYTES) {
-        job.output = job.output.slice(-MAX_OUTPUT_BYTES);
+        job.output = truncateUtf8Suffix(job.output, MAX_OUTPUT_BYTES);
       }
     }
   }
