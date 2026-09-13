@@ -188,7 +188,13 @@ export function SessionSelector({
 
       {/* Right side: Preview panel */}
       {showPreview && (
-        <Box marginLeft={1} flexGrow={1} flexShrink={1} minWidth={0}>
+        <Box
+          marginLeft={1}
+          flexBasis={0}
+          flexGrow={1}
+          flexShrink={1}
+          minWidth={0}
+        >
           {previewSession ? (
             <SessionPreview
               chatHistory={previewSession.history}
