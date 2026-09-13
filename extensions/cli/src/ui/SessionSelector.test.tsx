@@ -145,6 +145,14 @@ describe("SessionSelector", () => {
 
     expect(frame).toContain("Preview");
     expect(widestRow).toBeLessThanOrEqual(120);
+
+    const lines = frame.split("\n");
+    const topBorder = lines[0];
+    const leftPanelEnd = topBorder.indexOf("╮");
+    const rightPanelStart = topBorder.indexOf("╭", leftPanelEnd + 1);
+
+    expect(rightPanelStart - leftPanelEnd).toBe(2);
+    expect(lines.every((line) => line.length === topBorder.length)).toBe(true);
   });
 
   it("does not crash when a session has an invalid date", () => {

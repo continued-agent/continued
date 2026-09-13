@@ -51,26 +51,20 @@ const ASCII_ART_WIDTH = Math.max(
 
 export const CONTINUE_ASCII_ART = mind.multiline(CONTINUE_ASCII_ART_SOURCE);
 
-const COMPACT_ASCII_ART = "✦ Continued CLI";
+const COMPACT_ASCII_ART = "  ✦ Continued CLI";
 
 // Account for the TUI's horizontal inset so
 // it does not wrap at the exact minimum terminal width.
 const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 2;
-const MIN_HEIGHT_FOR_ASCII_ART = CONTINUE_ASCII_ART_LINES.length + 16;
 
 /**
- * Returns the full ASCII art only when the terminal has enough width and height
- * to keep the intro from crowding the chat history. Otherwise, use the compact
- * branded version.
+ * Returns the full ASCII art whenever the terminal is wide enough to display
+ * it without wrapping. Narrow terminals use the compact branded version.
  */
 export function getDisplayableAsciiArt(): string {
   const terminalWidth = process.stdout.columns || 80;
-  const terminalHeight = process.stdout.rows;
 
-  if (
-    terminalWidth >= MIN_WIDTH_FOR_ASCII_ART &&
-    (terminalHeight === undefined || terminalHeight >= MIN_HEIGHT_FOR_ASCII_ART)
-  ) {
+  if (terminalWidth >= MIN_WIDTH_FOR_ASCII_ART) {
     return CONTINUE_ASCII_ART;
   }
 

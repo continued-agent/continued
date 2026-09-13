@@ -32,7 +32,7 @@ $script:FnmSha256 = "8183bed4348cb78fdfd8abb3d1247fbeab7b2082f941363929c61e747c0
 $script:ReleaseUrl = if ($env:CONTINUE_CLI_RELEASE_URL) {
     $env:CONTINUE_CLI_RELEASE_URL
 } else {
-    "https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz"
+    "https://github.com/continued-agent/continued/releases/download/cli-latest/continued-cli.tgz"
 }
 $script:ChecksumUrl = "$($script:ReleaseUrl).sha256"
 $script:FnmInstalled = $false
@@ -318,9 +318,9 @@ function Install-Cli {
         }
     }
 
-    $tempDir = Join-Path $env:TEMP ("continue-cli-" + [Guid]::NewGuid().ToString("N"))
-    $archivePath = Join-Path $tempDir "continue-cli.tgz"
-    $checksumPath = Join-Path $tempDir "continue-cli.tgz.sha256"
+    $tempDir = Join-Path $env:TEMP ("continued-cli-" + [Guid]::NewGuid().ToString("N"))
+    $archivePath = Join-Path $tempDir "continued-cli.tgz"
+    $checksumPath = Join-Path $tempDir "continued-cli.tgz.sha256"
 
     try {
         New-Item -ItemType Directory -Path $tempDir -Force | Out-Null

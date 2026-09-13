@@ -74,17 +74,17 @@ jobs:
         env:
           CONTINUE_RELEASE_BUILD: "true"
         run: |
-          rm -f "$RUNNER_TEMP"/continue-cli.tgz "$RUNNER_TEMP"/continue-cli.tgz.sha256
+          rm -f "$RUNNER_TEMP"/continued-cli.tgz "$RUNNER_TEMP"/continued-cli.tgz.sha256
           # Build metadata and source maps are useful locally but are not
           # runtime files and make the public artifact unnecessarily large.
           rm -f dist/meta.json dist/*.map
           npm pack --ignore-scripts --pack-destination "$RUNNER_TEMP"
           package_path="$(find "$RUNNER_TEMP" -maxdepth 1 -type f -name '*.tgz' -print -quit)"
           test -n "$package_path"
-          cp "$package_path" "$RUNNER_TEMP/continue-cli.tgz"
+          cp "$package_path" "$RUNNER_TEMP/continued-cli.tgz"
           (
             cd "$RUNNER_TEMP"
-            sha256sum continue-cli.tgz > continue-cli.tgz.sha256
+            sha256sum continued-cli.tgz > continued-cli.tgz.sha256
           )
 
       - name: Verify installed CLI artifact
@@ -93,7 +93,7 @@ jobs:
           smoke_dir="$(mktemp -d)"
           trap 'rm -rf "$smoke_dir"' EXIT
           npm install --prefix "$smoke_dir" \
-            "$RUNNER_TEMP/continue-cli.tgz" \
+            "$RUNNER_TEMP/continued-cli.tgz" \
             --ignore-scripts \
             --omit=dev
           "$smoke_dir/node_modules/.bin/cn" --version
@@ -104,15 +104,22 @@ jobs:
         shell: bash
         run: |
           release_tag="cli-latest"
-          release_title="Continue CLI (latest fork build)"
+          release_title="Continued CLI (latest fork build)"
 
           if gh release view "$release_tag" >/dev/null 2>&1; then
             # Upload before retagging so an upload failure leaves the existing
             # release/tag pair intact instead of pointing at missing assets.
             gh release upload "$release_tag" \
-              "$RUNNER_TEMP/continue-cli.tgz" \
-              "$RUNNER_TEMP/continue-cli.tgz.sha256" \
+              "$RUNNER_TEMP/continued-cli.tgz" \
+              "$RUNNER_TEMP/continued-cli.tgz.sha256" \
               --clobber
+            # Remove assets published by older fork builds so the mutable
+            # release contains one canonical name for each public artifact.
+            for legacy_asset in continue-cli.tgz continue-cli.tgz.sha256; do
+              if gh release view "$release_tag" --json assets --jq '.assets[].name' | grep -Fxq "$legacy_asset"; then
+                gh release delete-asset "$release_tag" "$legacy_asset" --yes
+              fi
+            done
             # cli-latest is intentionally mutable, but its tag must point at
             # the same commit as the assets to preserve provenance.
             gh api --method PATCH \
@@ -121,10 +128,10 @@ jobs:
               -F force=true
           else
             gh release create "$release_tag" \
-              "$RUNNER_TEMP/continue-cli.tgz" \
-              "$RUNNER_TEMP/continue-cli.tgz.sha256" \
+              "$RUNNER_TEMP/continued-cli.tgz" \
+              "$RUNNER_TEMP/continued-cli.tgz.sha256" \
               --target "$GITHUB_SHA" \
               --title "$release_title" \
-              --notes "Prebuilt Continue CLI artifact from the main branch. The installer downloads the assets from this release." \
+              --notes "Prebuilt Continued CLI artifact from the main branch. The installer downloads the assets from this release." \
               --prerelease
           fi
