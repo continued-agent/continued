@@ -36,7 +36,38 @@ describe("StaticChatContent", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const lines = (lastFrame() ?? "").split("\n");
-    expect(lines[0]).toBe(" › First message");
-    expect(lines[2]).toBe(" ● Second message");
+    expect(lines[0]).toBe("   › First message");
+    expect(lines[2]).toBe("   ● Second message");
+  });
+
+  it("separates intro metadata from the first chat message", async () => {
+    const { lastFrame } = render(
+      <Box marginX={1}>
+        <StaticChatContent
+          showIntroMessage
+          config={{ name: "Main Config", version: "1.0.0", rules: [] }}
+          model={{
+            name: "Google Gemini",
+            provider: "gemini",
+            model: "gemini-2.5-flash",
+          }}
+          chatHistory={[createMessage("user", "Salut")]}
+          renderMessage={(item, index) => (
+            <MemoizedMessage key={index} item={item} index={index} />
+          )}
+        />
+      </Box>,
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    const lines = (lastFrame() ?? "").split("\n");
+    const modelLine = lines.findIndex((line) =>
+      line.includes("Model: Google Gemini"),
+    );
+
+    expect(modelLine).toBeGreaterThanOrEqual(0);
+    expect(lines[modelLine + 1]).toBe("");
+    expect(lines[modelLine + 2]).toBe("   › Salut");
   });
 });

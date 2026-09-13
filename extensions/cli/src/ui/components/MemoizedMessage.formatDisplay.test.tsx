@@ -47,7 +47,7 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
       </Box>,
     );
 
-    expect(lastFrame()?.trimEnd()).toBe(" › Padded message");
+    expect(lastFrame()?.trimEnd()).toBe("   › Padded message");
   });
 
   it("separates consecutive chat messages while keeping their content aligned", () => {
@@ -68,7 +68,27 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     );
 
     expect(lastFrame()?.trimEnd()).toBe(
-      [" › Hello", "", " ● Hello! How can I help you today?"].join("\n"),
+      ["   › Hello", "", "   ● Hello! How can I help you today?"].join("\n"),
+    );
+  });
+
+  it("keeps multiline assistant responses aligned with the message column", () => {
+    const historyItem: ChatHistoryItem = {
+      message: {
+        role: "assistant",
+        content: "First line\nSecond line",
+      },
+      contextItems: [],
+    };
+
+    const { lastFrame } = render(
+      <Box marginX={1}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
+    );
+
+    expect(lastFrame()?.trimEnd()).toBe(
+      ["   ● First line", "     Second line"].join("\n"),
     );
   });
 

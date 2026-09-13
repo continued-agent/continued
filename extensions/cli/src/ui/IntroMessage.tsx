@@ -126,6 +126,9 @@ const IntroMessage: React.FC<IntroMessageProps> = ({
         {renderMcpPrompts()}
         {renderRules()}
         {renderMcpServers()}
+
+        {/* Keep one blank line between the intro metadata and chat history. */}
+        <Text> </Text>
       </Box>
     </Box>
   );

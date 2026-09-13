@@ -28,21 +28,24 @@ describe("asciiArt", () => {
   describe("getDisplayableAsciiArt", () => {
     it("should return full ASCII art when terminal is wide enough", () => {
       // Set process.stdout.columns to simulate wide terminal
-      process.stdout.columns = 80;
-      process.stdout.rows = 40;
+      process.stdout.columns = 120;
+      process.stdout.rows = 60;
 
       const result = getDisplayableAsciiArt();
 
       expect(result).toBe(CONTINUE_ASCII_ART);
+      expect(result).not.toContain("0.0.0-dev");
     });
 
-    it("should start the artwork on the first row", () => {
-      process.stdout.columns = 80;
-      process.stdout.rows = 40;
+    it("should preserve the artwork's top spacing", () => {
+      process.stdout.columns = 120;
+      process.stdout.rows = 60;
 
-      const firstLine = getDisplayableAsciiArt().split("\n")[0];
+      const firstArtworkLine = getDisplayableAsciiArt()
+        .split("\n")
+        .find((line) => line.length > 0);
 
-      expect(firstLine).toContain("#");
+      expect(firstArtworkLine).toContain("-=-=");
     });
 
     it("should return the compact brand when terminal is too narrow", () => {
@@ -53,48 +56,46 @@ describe("asciiArt", () => {
       const result = getDisplayableAsciiArt();
 
       expect(result).not.toBe(CONTINUE_ASCII_ART);
-      expect(result).toContain("v");
+      expect(result).toBe("✦ Continued CLI");
+      expect(result).not.toContain("v0.0.0-dev");
     });
 
     it("should return the compact brand when terminal is below threshold", () => {
-      // Test the edge case at exactly 41 columns (below our threshold of 42)
-      process.stdout.columns = 41;
+      // Test a terminal just below the new artwork's width threshold.
+      process.stdout.columns = 77;
       process.stdout.rows = 40;
 
       const result = getDisplayableAsciiArt();
 
       expect(result).not.toBe(CONTINUE_ASCII_ART);
-      expect(result).toContain("v");
+      expect(result).toBe("✦ Continued CLI");
     });
 
-    it("should return full ASCII art when terminal is exactly at threshold", () => {
-      // Test the edge case at exactly 42 columns (our threshold)
-      process.stdout.columns = 42;
-      process.stdout.rows = 40;
+    it("should return full ASCII art at the width threshold", () => {
+      process.stdout.columns = 78;
+      process.stdout.rows = 60;
 
       const result = getDisplayableAsciiArt();
 
       expect(result).toBe(CONTINUE_ASCII_ART);
     });
 
-    it("should default to full ASCII art when columns is undefined", () => {
-      // Set process.stdout.columns to undefined (should default to 80)
+    it("should return the compact brand when terminal is too short", () => {
+      process.stdout.columns = 120;
+      process.stdout.rows = 56;
+
+      const result = getDisplayableAsciiArt();
+
+      expect(result).toBe("✦ Continued CLI");
+    });
+
+    it("should default to 80 columns when columns is undefined", () => {
       delete (process.stdout as any).columns;
-      delete (process.stdout as any).rows;
+      process.stdout.rows = 60;
 
       const result = getDisplayableAsciiArt();
 
       expect(result).toBe(CONTINUE_ASCII_ART);
-    });
-
-    it("uses the compact brand when the terminal is too short", () => {
-      process.stdout.columns = 80;
-      process.stdout.rows = 24;
-
-      const result = getDisplayableAsciiArt();
-
-      expect(result).not.toBe(CONTINUE_ASCII_ART);
-      expect(result).toContain("Continued CLI");
     });
   });
 });
