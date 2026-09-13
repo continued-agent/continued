@@ -1,25 +1,47 @@
-import chalk from "chalk";
 import { mind } from "gradient-string";
 
-import { getVersion } from "./version.js";
-
-const d = chalk.dim;
-
 const CONTINUE_ASCII_ART_LINES = [
-  "           :##########+=.               ",
-  "          :##*-:::::::=##.              ",
-  "         .###-=+######++-###-*.         ",
-  "        -##+=##-....... :==:*##.        ",
-  "       -##++##- .-====-. =##=*##:       ",
-  "       :---##= .=-----:=. =##=*##.      ",
-  "       .*#*=- .+-=.  .+-+: =##-+##:     ",
-  "       .+**-. :=:=    =--: :**=-##=     ",
-  "       =**=*#: :=-+==+:=: -##++##-      ",
-  "       =##=+##: :++++++: :##+=##=       ",
-  "        +##-*##:        .**==##-        ",
-  "         -##++*:######*=:##*-#:         ",
-  "          -##+:++++++=-##-++=           ",
-  "           -##########=+-               ",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "                       -=-=---=-====-======.                               ",
+  "                     .*###################-:#:                             ",
+  "                     *###################::###:                            ",
+  "                   .#####+.              .#####:                           ",
+  "                  .#####+.+.+############=.###:-#####::-                   ",
+  "                 .#####+.*#*.+############=.#-=#####:-##=                  ",
+  "                .#####+.####*.-============: .===--:-####=                 ",
+  "               :#####=.#####+                .*####+ *####+                ",
+  "              :#####-:#####=                   *####+.#####+               ",
+  "             :#####-.#####=   .=+++++++++++=.  .*####+ +####*.             ",
+  "             .......#####-   .=+=..:::::..=+=.   +####*.+####*             ",
+  "            .#####=.###-   .=+=.-#-----#-.=+=.   +####*.+####*.            ",
+  "             .#####=.#-   .++=.-#.     .#-.=++.   =#####.=#####.           ",
+  "              .-----:     ... =*.       .*+ ...    ...... +#####.           ",
+  "              =#####:-    -+=:.#-       -*.:+=-   :#####-.#####=           ",
+  "             =#####.=#+    -++:.#=     =*.:++-   .#####-:#####-            ",
+  "            -*****.=###*.   -++-.*####*+ -++-   :#####-:#####-             ",
+  "            =+++++.*#####.   :++=:::::::=++:   :#####:-#####:              ",
+  "             .*####*.=#####.   :+++++++++++:   :#####::#####:              ",
+  "               +#####.=#####.                 -#####.-#####:               ",
+  "                +#####.=#####.               .:::::.-#####.                ",
+  "                 =#####:-###-:############*.-.*####+ *###.                ",
+  "                  =#####.-#-:############*.=#*.*####*.*#                  ",
+  "                   -#####: :************+ +####.*####*                    ",
+  "                    :#####**************+ +####.                          ",
+  "                     -####################.=#*.                           ",
+  "                      .####################.-                             ",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
+  "",
 ];
 
 const CONTINUE_ASCII_ART_SOURCE = CONTINUE_ASCII_ART_LINES.join("\n");
@@ -27,16 +49,14 @@ const ASCII_ART_WIDTH = Math.max(
   ...CONTINUE_ASCII_ART_LINES.map((line) => line.length),
 );
 
-export const CONTINUE_ASCII_ART = `${mind.multiline(CONTINUE_ASCII_ART_SOURCE)}\n${d(
-  ("v" + getVersion()).padStart(ASCII_ART_WIDTH),
-)}`;
+export const CONTINUE_ASCII_ART = mind.multiline(CONTINUE_ASCII_ART_SOURCE);
 
-const COMPACT_ASCII_ART = `✦ Continued CLI v${getVersion()}`;
+const COMPACT_ASCII_ART = "✦ Continued CLI";
 
-// The full mark is 40 columns wide. Account for the TUI's horizontal inset so
+// Account for the TUI's horizontal inset so
 // it does not wrap at the exact minimum terminal width.
 const MIN_WIDTH_FOR_ASCII_ART = ASCII_ART_WIDTH + 2;
-const MIN_HEIGHT_FOR_ASCII_ART = 30;
+const MIN_HEIGHT_FOR_ASCII_ART = CONTINUE_ASCII_ART_LINES.length + 16;
 
 /**
  * Returns the full ASCII art only when the terminal has enough width and height

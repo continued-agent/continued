@@ -36,7 +36,7 @@ describe("StaticChatContent", () => {
     await new Promise((resolve) => setImmediate(resolve));
 
     const lines = (lastFrame() ?? "").split("\n");
-    expect(lines[0]).toBe(" › First message");
-    expect(lines[2]).toBe(" ● Second message");
+    expect(lines[0]).toBe("   › First message");
+    expect(lines[2]).toBe("   ● Second message");
   });
 });
