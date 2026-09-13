@@ -72,6 +72,26 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     );
   });
 
+  it("keeps multiline assistant responses aligned with the message column", () => {
+    const historyItem: ChatHistoryItem = {
+      message: {
+        role: "assistant",
+        content: "First line\nSecond line",
+      },
+      contextItems: [],
+    };
+
+    const { lastFrame } = render(
+      <Box marginX={1}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
+    );
+
+    expect(lastFrame()?.trimEnd()).toBe(
+      ["   ● First line", "     Second line"].join("\n"),
+    );
+  });
+
   it("should wrap long messages inside the padded content width", () => {
     const historyItem = createTestHistoryItem(
       "A long message that should wrap instead of overflowing the terminal ".repeat(
