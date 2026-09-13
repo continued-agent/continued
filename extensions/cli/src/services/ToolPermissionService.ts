@@ -228,6 +228,7 @@ export class ToolPermissionService
       const compiledPolicies = resolvePermissionPrecedence({
         commandLineFlags: runtimeOverrides,
         personalSettings: true, // Enable loading from ~/.continue/permissions.yaml
+        isHeadless: this.currentState.isHeadless,
         useDefaults: true,
       });
       allPolicies = [...compiledPolicies];

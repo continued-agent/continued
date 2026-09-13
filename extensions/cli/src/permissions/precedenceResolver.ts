@@ -15,6 +15,7 @@ export interface PermissionSources {
   /** ~/.continue/permissions.yaml - third precedence */
   personalSettings?: boolean; // Whether to load from permissions.yaml
   /** Default policies - lowest precedence */
+  isHeadless?: boolean;
   useDefaults?: boolean;
 }
 
@@ -51,6 +52,9 @@ export function resolvePermissionPrecedence(
 
   // Layer 3: Default policies (lowest precedence)
   if (sources.useDefaults !== false) {
+    // Keep the headless source in the resolver contract for callers and
+    // diagnostics. `ask` remains the safe default in both interactive and
+    // headless modes; headless callers simply cannot satisfy an ask prompt.
     const defaultPolicies = getDefaultToolPolicies();
     policies.push(...defaultPolicies);
   }
