@@ -128,7 +128,7 @@ describe("fetchModels", () => {
   });
 
   test("lists installed Ollama models from the configured instance", async () => {
-    fetchWithRequestOptionsMock.mockResolvedValue(
+    fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
           models: [{ name: "llama3.2:latest" }],
@@ -145,15 +145,13 @@ describe("fetchModels", () => {
       ),
     ).resolves.toEqual([{ name: "llama3.2:latest" }]);
 
-    expect(fetchWithRequestOptionsMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       new URL("http://ollama.example/api/tags"),
-      expect.objectContaining({
-        method: "GET",
+      {
         headers: expect.objectContaining({
           Authorization: "Bearer ollama-secret",
         }),
-      }),
-      {},
+      },
     );
   });
 });
