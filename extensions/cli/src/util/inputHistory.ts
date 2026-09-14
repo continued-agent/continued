@@ -24,10 +24,11 @@ export class InputHistory {
     try {
       const dir = path.dirname(HISTORY_FILE);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(dir, { mode: 0o700, recursive: true });
       }
 
       if (fs.existsSync(HISTORY_FILE)) {
+        fs.chmodSync(HISTORY_FILE, 0o600);
         const data = fs.readFileSync(HISTORY_FILE, "utf8");
         this.history = JSON.parse(data);
       }
@@ -41,10 +42,13 @@ export class InputHistory {
     try {
       const dir = path.dirname(HISTORY_FILE);
       if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(dir, { mode: 0o700, recursive: true });
       }
 
-      fs.writeFileSync(HISTORY_FILE, JSON.stringify(this.history, null, 2));
+      fs.writeFileSync(HISTORY_FILE, JSON.stringify(this.history, null, 2), {
+        mode: 0o600,
+      });
+      fs.chmodSync(HISTORY_FILE, 0o600);
     } catch (error) {
       console.error("Failed to save input history:", error);
     }

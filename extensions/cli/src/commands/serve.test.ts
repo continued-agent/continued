@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMinimalTestContext } from "../test-helpers/ui-test-context.js";
 
 import { isServeRequestAuthorized, resolveServeToken } from "./serveAuth.js";
-import { isEnvironmentInstallAllowed } from "./serveOptions.js";
+import {
+  isEnvironmentInstallAllowed,
+  parseServeInteger,
+} from "./serveOptions.js";
 
 vi.mock("./serve.helpers.js", () => ({
   checkAgentComplete: vi.fn(() => false),
@@ -129,6 +132,20 @@ describe("serve command", () => {
     ).toBe(false);
     expect(isEnvironmentInstallAllowed({ allowEnvironmentInstall: true })).toBe(
       true,
+    );
+  });
+
+  it("rejects malformed and out-of-range server numeric options", () => {
+    expect(parseServeInteger(undefined, "port", 8000, 65_535)).toBe(8000);
+    expect(parseServeInteger("65535", "port", 8000, 65_535)).toBe(65_535);
+    expect(() => parseServeInteger("12abc", "port", 8000, 65_535)).toThrow(
+      "Invalid --port",
+    );
+    expect(() => parseServeInteger("0", "port", 8000, 65_535)).toThrow(
+      "Invalid --port",
+    );
+    expect(() => parseServeInteger("65536", "port", 8000, 65_535)).toThrow(
+      "Invalid --port",
     );
   });
 
