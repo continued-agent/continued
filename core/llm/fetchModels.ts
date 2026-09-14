@@ -179,3 +179,23 @@ export async function fetchModels(
       return fetchProviderModelsViaListModels(provider, apiKey, apiBase);
   }
 }
+
+/**
+ * Fetch models from the endpoint configured for a provider.
+ *
+ * The regular Ollama fetch is intentionally a public library catalogue used
+ * by the GUI's model browser. The CLI model selector must instead list models
+ * installed on the configured Ollama instance so every displayed model can be
+ * used immediately after selection.
+ */
+export async function fetchConfiguredModels(
+  provider: string,
+  apiKey?: string,
+  apiBase?: string,
+): Promise<FetchedModel[]> {
+  if (provider === "ollama") {
+    return fetchProviderModelsViaListModels(provider, apiKey, apiBase);
+  }
+
+  return fetchModels(provider, apiKey, apiBase);
+}

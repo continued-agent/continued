@@ -1,12 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-import { fetchModels } from "./fetchModels";
+const { fetchWithRequestOptionsMock } = vi.hoisted(() => ({
+  fetchWithRequestOptionsMock: vi.fn(),
+}));
+
+vi.mock("@continuedev/fetch", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@continuedev/fetch")>()),
+  fetchwithRequestOptions: fetchWithRequestOptionsMock,
+}));
+
+import { fetchConfiguredModels, fetchModels } from "./fetchModels";
 
 describe("fetchModels", () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
+    fetchWithRequestOptionsMock.mockReset();
   });
 
   afterEach(() => {
@@ -88,6 +98,62 @@ describe("fetchModels", () => {
 
     await expect(fetchModels("openrouter")).rejects.toThrow(
       "Failed to fetch OpenRouter models: 503",
+    );
+  });
+
+  test("lists models for OpenAI-compatible providers", async () => {
+    fetchWithRequestOptionsMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [{ id: "gpt-4.1-mini" }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      fetchModels("openai", "openai-secret", "https://api.example/v1/"),
+    ).resolves.toEqual([{ name: "gpt-4.1-mini" }]);
+
+    expect(fetchWithRequestOptionsMock).toHaveBeenCalledWith(
+      new URL("https://api.example/v1/models"),
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer openai-secret",
+        }),
+      }),
+      {},
+    );
+  });
+
+  test("lists installed Ollama models from the configured instance", async () => {
+    fetchWithRequestOptionsMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          models: [{ name: "llama3.2:latest" }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      fetchConfiguredModels(
+        "ollama",
+        "ollama-secret",
+        "http://ollama.example/",
+      ),
+    ).resolves.toEqual([{ name: "llama3.2:latest" }]);
+
+    expect(fetchWithRequestOptionsMock).toHaveBeenCalledWith(
+      new URL("http://ollama.example/api/tags"),
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({
+          Authorization: "Bearer ollama-secret",
+        }),
+      }),
+      {},
     );
   });
 });

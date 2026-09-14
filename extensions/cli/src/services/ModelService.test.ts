@@ -1,11 +1,11 @@
 import { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
-import { fetchRemoteModels as fetchModels } from "core/llm/fetchRemoteModels.js";
+import { fetchConfiguredModels as fetchModels } from "core/llm/fetchModels.js";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock dependencies before imports
 vi.mock("../config.js");
 vi.mock("../auth/workos.js");
-vi.mock("core/llm/fetchRemoteModels.js");
+vi.mock("core/llm/fetchModels.js");
 
 import * as workos from "../auth/workos.js";
 import { AuthConfig } from "../auth/workos.js";

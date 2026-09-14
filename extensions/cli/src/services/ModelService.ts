@@ -1,8 +1,8 @@
 import { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
 import {
-  fetchRemoteModels as fetchModels,
+  fetchConfiguredModels as fetchModels,
   type FetchedModel,
-} from "core/llm/fetchRemoteModels.js";
+} from "core/llm/fetchModels.js";
 
 import { AuthConfig, getModelName } from "../auth/workos.js";
 import { createLlmApi, getLlmApi } from "../config.js";
