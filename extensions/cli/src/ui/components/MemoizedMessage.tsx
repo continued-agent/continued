@@ -93,11 +93,17 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
           {/* Render assistant message content if any */}
           {message.content && (
             <Box marginBottom={1}>
-              <Text color="white">{hideBullet ? " " : "●"}</Text>
-              <Text> </Text>
-              <MarkdownRenderer
-                content={formatMessageContentForDisplay(message.content)}
-              />
+              <Box flexShrink={0}>
+                <Text color="white">{hideBullet ? " " : "●"}</Text>
+              </Box>
+              <Box flexShrink={0}>
+                <Text> </Text>
+              </Box>
+              <Box flexGrow={1} flexShrink={1} minWidth={0}>
+                <MarkdownRenderer
+                  content={formatMessageContentForDisplay(message.content)}
+                />
+              </Box>
             </Box>
           )}
 
@@ -170,17 +176,25 @@ export const MemoizedMessage = memo<MemoizedMessageProps>(
 
     return (
       <Box key={index} marginBottom={1} paddingLeft={2}>
-        <Text color={isUser ? "cyan" : "white"}>
-          {hideBullet ? " " : isUser ? "›" : "●"}
-        </Text>
-        <Text> </Text>
-        {isUser ? (
-          <Text>{formatMessageContentForDisplay(message.content)}</Text>
-        ) : (
-          <MarkdownRenderer
-            content={formatMessageContentForDisplay(message.content)}
-          />
-        )}
+        <Box flexShrink={0}>
+          <Text color={isUser ? "cyan" : "white"}>
+            {hideBullet ? " " : isUser ? "›" : "●"}
+          </Text>
+        </Box>
+        <Box flexShrink={0}>
+          <Text> </Text>
+        </Box>
+        <Box flexGrow={1} flexShrink={1} minWidth={0}>
+          {isUser ? (
+            <Text wrap="wrap">
+              {formatMessageContentForDisplay(message.content)}
+            </Text>
+          ) : (
+            <MarkdownRenderer
+              content={formatMessageContentForDisplay(message.content)}
+            />
+          )}
+        </Box>
         {isStreaming && <Text color="dim">▋</Text>}
       </Box>
     );

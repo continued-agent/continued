@@ -17,6 +17,7 @@ interface SelectorProps<T extends SelectorOption> {
   selectedIndex: number;
   loading: boolean;
   error: string | null;
+  warning?: string | null;
   loadingMessage?: string;
   currentId?: string | null;
   onSelect: (option: T) => void;
@@ -35,6 +36,7 @@ export function Selector<T extends SelectorOption>({
   selectedIndex,
   loading,
   error,
+  warning = null,
   loadingMessage = "Loading...",
   currentId,
   onSelect,
@@ -145,6 +147,11 @@ export function Selector<T extends SelectorOption>({
         {title}
       </Text>
       <Box flexDirection="column" marginTop={1} width="100%" minWidth={0}>
+        {warning && (
+          <Text color="yellow" wrap="truncate-end">
+            {warning}
+          </Text>
+        )}
         {options.map((option, index) => {
           const isSelected = index === selectedIndex;
           const isCurrent = currentId === option.id;

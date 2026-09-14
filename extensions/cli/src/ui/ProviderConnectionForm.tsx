@@ -1,5 +1,5 @@
 import { Box, Text, useInput } from "ink";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 
 import type { ProviderSetup } from "../onboarding.js";
 import type { OnboardingProvider } from "../onboardingProviders.js";
@@ -138,16 +138,26 @@ export function ProviderConnectionForm({
     [provider],
   );
   const [fields, setFields] = useState(initialFields);
+  const fieldsRef = useRef(initialFields);
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const updateFields = (
+    update: (current: ConnectionField[]) => ConnectionField[],
+  ) => {
+    const nextFields = update(fieldsRef.current);
+    fieldsRef.current = nextFields;
+    setFields(nextFields);
+  };
+
   const submit = async () => {
-    const missing = fields.find(
+    const currentFields = fieldsRef.current;
+    const missing = currentFields.find(
       (field) => field.required && !field.value.trim(),
     );
     if (missing) {
-      setFocusedIndex(fields.indexOf(missing));
+      setFocusedIndex(currentFields.indexOf(missing));
       setError(`${missing.label} is required.`);
       return;
     }
@@ -155,7 +165,7 @@ export function ProviderConnectionForm({
     setError(null);
     setIsSubmitting(true);
     try {
-      await onConnect(buildProviderSetup(provider, fields));
+      await onConnect(buildProviderSetup(provider, currentFields));
     } catch (connectionError) {
       setError(
         connectionError instanceof Error
@@ -201,7 +211,7 @@ export function ProviderConnectionForm({
     }
 
     if (key.backspace || key.delete) {
-      setFields((current) =>
+      updateFields((current) =>
         current.map((field, index) =>
           index === focusedIndex
             ? {
@@ -217,7 +227,7 @@ export function ProviderConnectionForm({
     }
 
     if (input && !key.ctrl && !key.meta) {
-      setFields((current) =>
+      updateFields((current) =>
         current.map((field, index) =>
           index === focusedIndex
             ? {

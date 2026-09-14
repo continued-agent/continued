@@ -1,4 +1,8 @@
 import { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
+import {
+  fetchConfiguredModels as fetchModels,
+  type FetchedModel,
+} from "core/llm/fetchRemoteModels.js";
 
 import { AuthConfig, getModelName } from "../auth/workos.js";
 import { createLlmApi, getLlmApi } from "../config.js";
@@ -6,6 +10,11 @@ import { logger } from "../util/logger.js";
 
 import { BaseService, ServiceWithDependencies } from "./BaseService.js";
 import { AgentFileServiceState, ModelServiceState } from "./types.js";
+
+export interface RefreshChatModelsResult {
+  errors: string[];
+  fetched: boolean;
+}
 
 /**
  * Service for managing LLM and model state
@@ -181,6 +190,86 @@ export class ModelService
   }
 
   /**
+   * Fetch the current model catalogue for each configured chat provider.
+   * Configured models remain available when a provider cannot be queried.
+   */
+  async refreshAvailableChatModels(): Promise<RefreshChatModelsResult> {
+    const assistant = this.getState().assistant || this.assistant;
+    const configuredModels = this.getChatModels(assistant);
+    const errors: string[] = [];
+    const fetchedModels: ModelConfig[] = [];
+    const providers = new Map<
+      string,
+      { base: ModelConfig; models: ModelConfig[] }
+    >();
+
+    for (const model of configuredModels) {
+      const key = `${model.provider}\u0000${model.apiBase ?? ""}\u0000${model.apiKey ?? ""}`;
+      const provider = providers.get(key);
+      if (provider) {
+        provider.models.push(model);
+      } else {
+        providers.set(key, { base: model, models: [model] });
+      }
+    }
+
+    let fetched = false;
+    await Promise.all(
+      [...providers.values()].map(
+        async ({ base, models: configuredProviderModels }) => {
+          try {
+            const models = await fetchModels(
+              base.provider,
+              base.apiKey,
+              base.apiBase,
+            );
+
+            if (models.length === 0) {
+              throw new Error("the provider returned no chat models");
+            }
+
+            fetched = true;
+            fetchedModels.push(
+              ...models.map((fetchedModel) =>
+                this.createFetchedModelConfig(base, fetchedModel),
+              ),
+            );
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            errors.push(`${base.provider}: ${message}`);
+            fetchedModels.push(...configuredProviderModels);
+          }
+        },
+      ),
+    );
+
+    fetchedModels.sort((left, right) => {
+      const providerOrder = left.provider.localeCompare(right.provider);
+      return providerOrder || left.model.localeCompare(right.model);
+    });
+    errors.sort();
+    this.availableModels = fetchedModels;
+
+    return {
+      errors,
+      fetched,
+    };
+  }
+
+  private createFetchedModelConfig(
+    configuredModel: ModelConfig,
+    fetchedModel: FetchedModel,
+  ): ModelConfig {
+    const modelId = fetchedModel.modelId || fetchedModel.name;
+    return {
+      ...configuredModel,
+      name: modelId,
+      model: modelId,
+    };
+  }
+
+  /**
    * Switch to a different chat model by index
    */
   async switchModel(modelIndex: number): Promise<ModelServiceState> {
@@ -216,8 +305,10 @@ export class ModelService
       throw new Error("ModelService not initialized - assistant data missing");
     }
 
-    // Get available models from assistant in state
-    const availableModels = this.getChatModels(assistant);
+    const availableModels =
+      this.availableModels.length > 0
+        ? this.availableModels
+        : this.getChatModels(assistant);
 
     if (modelIndex < 0 || modelIndex >= availableModels.length) {
       throw new Error(
@@ -281,8 +372,8 @@ export class ModelService
     return availableModels.findIndex(
       (model) =>
         model.provider === state.model?.provider &&
-        ((model as any).name || (model as any).model) ===
-          ((state.model as any).name || (state.model as any).model),
+        (model.model === state.model?.model ||
+          (model.name || model.model) === (state.model as ModelConfig).name),
     );
   }
 
@@ -302,7 +393,7 @@ export class ModelService
         : this.getChatModels(state.assistant);
 
     return availableModels.findIndex((model) => {
-      const names = [(model as any).name, (model as any).model];
+      const names = [model.name, model.model];
       const nameMatches = names.includes(modelName);
 
       if (provider) {

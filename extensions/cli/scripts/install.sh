@@ -14,7 +14,7 @@ FNM_VERSION="1.39.0"
 # The release URL defaults to a mutable GitHub tag. The adjacent checksum
 # protects against transfer corruption; use CONTINUE_CLI_RELEASE_URL pointing
 # at an immutable asset when the release/tag trust boundary is not sufficient.
-RELEASE_URL="${CONTINUE_CLI_RELEASE_URL:-https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz}"
+RELEASE_URL="${CONTINUE_CLI_RELEASE_URL:-https://github.com/continued-agent/continued/releases/download/cli-latest/continued-cli.tgz}"
 CHECKSUM_URL="${RELEASE_URL}.sha256"
 
 # Cleanup tracking
@@ -369,9 +369,9 @@ install_cli() {
 
     check_npm_permissions
 
-    INSTALL_TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/continue-cli.XXXXXX")"
-    local archive="$INSTALL_TEMP_DIR/continue-cli.tgz"
-    local checksum="$INSTALL_TEMP_DIR/continue-cli.tgz.sha256"
+    INSTALL_TEMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/continued-cli.XXXXXX")"
+    local archive="$INSTALL_TEMP_DIR/continued-cli.tgz"
+    local checksum="$INSTALL_TEMP_DIR/continued-cli.tgz.sha256"
 
     info "Downloading the prebuilt CLI..."
     if ! download "$RELEASE_URL" "$archive"; then

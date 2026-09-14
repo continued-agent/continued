@@ -1,9 +1,11 @@
 import { AssistantUnrolled, ModelConfig } from "@continuedev/config-yaml";
+import { fetchConfiguredModels as fetchModels } from "core/llm/fetchRemoteModels.js";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock dependencies before imports
 vi.mock("../config.js");
 vi.mock("../auth/workos.js");
+vi.mock("core/llm/fetchRemoteModels.js");
 
 import * as workos from "../auth/workos.js";
 import { AuthConfig } from "../auth/workos.js";
@@ -262,6 +264,93 @@ describe("ModelService", () => {
 
     test("should return -1 when no model is set", () => {
       expect(service.getCurrentModelIndex()).toBe(-1);
+    });
+  });
+
+  describe("refreshAvailableChatModels()", () => {
+    test("should fetch model identifiers and preserve provider configuration", async () => {
+      const assistant = {
+        ...mockAssistant,
+        models: [mockAssistant.models![0]],
+      };
+      vi.mocked(config.getLlmApi).mockReturnValue([
+        mockLlmApi as any,
+        assistant.models![0] as ModelConfig,
+      ]);
+      await service.initialize(assistant, mockAuthConfig);
+
+      vi.mocked(fetchModels).mockResolvedValue([
+        { name: "Claude display name", modelId: "openrouter/provider/model" },
+      ]);
+
+      const result = await service.refreshAvailableChatModels();
+
+      expect(result).toEqual({ errors: [], fetched: true });
+      expect(fetchModels).toHaveBeenCalledWith("openai", "test-key", undefined);
+      expect(service.getAvailableChatModels()).toEqual([
+        {
+          provider: "openai",
+          name: "openrouter/provider/model",
+          index: 0,
+        },
+      ]);
+
+      vi.mocked(config.createLlmApi).mockReturnValue(mockLlmApi as any);
+      await service.switchModel(0);
+      expect(config.createLlmApi).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          provider: "openai",
+          name: "openrouter/provider/model",
+          model: "openrouter/provider/model",
+          apiKey: "test-key",
+        }),
+        mockAuthConfig,
+      );
+    });
+
+    test("should keep configured models and return provider errors when fetching fails", async () => {
+      vi.mocked(config.getLlmApi).mockReturnValue([
+        mockLlmApi as any,
+        mockAssistant.models![0] as ModelConfig,
+      ]);
+      await service.initialize(mockAssistant, mockAuthConfig);
+      vi.mocked(fetchModels).mockRejectedValue(new Error("HTTP 503"));
+
+      const result = await service.refreshAvailableChatModels();
+
+      expect(result).toEqual({
+        errors: ["anthropic: HTTP 503", "openai: HTTP 503"],
+        fetched: false,
+      });
+      expect(service.getAvailableChatModels()).toEqual([
+        { provider: "anthropic", name: "Claude 3", index: 0 },
+        { provider: "openai", name: "GPT-4", index: 1 },
+      ]);
+    });
+
+    test("should retain a failed provider while using fetched models from another", async () => {
+      vi.mocked(config.getLlmApi).mockReturnValue([
+        mockLlmApi as any,
+        mockAssistant.models![0] as ModelConfig,
+      ]);
+      await service.initialize(mockAssistant, mockAuthConfig);
+      vi.mocked(fetchModels).mockImplementation(async (provider) => {
+        if (provider === "openai") {
+          return [{ name: "GPT-4.1", modelId: "gpt-4.1" }];
+        }
+        throw new Error("HTTP 503");
+      });
+
+      const result = await service.refreshAvailableChatModels();
+
+      expect(result).toEqual({
+        errors: ["anthropic: HTTP 503"],
+        fetched: true,
+      });
+      expect(service.getAvailableChatModels()).toEqual([
+        { provider: "anthropic", name: "Claude 3", index: 0 },
+        { provider: "openai", name: "gpt-4.1", index: 1 },
+      ]);
     });
   });
 

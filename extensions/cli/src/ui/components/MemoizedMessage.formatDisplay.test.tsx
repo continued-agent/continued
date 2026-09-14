@@ -110,6 +110,61 @@ describe("MemoizedMessage formatMessageContentForDisplay", () => {
     expect(frame?.split("\n").length).toBeGreaterThan(1);
   });
 
+  it("keeps wrapped user-message lines aligned with the content column", () => {
+    const historyItem = createTestHistoryItem(
+      "Salut très long message qui devrait dépasser la largeur et passer à la ligne",
+    );
+
+    const { lastFrame } = render(
+      <Box width={30}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
+    );
+
+    const lines = lastFrame()!.split("\n").filter(Boolean);
+    const firstContentColumn = lines[0].indexOf("Salut");
+
+    expect(firstContentColumn).toBeGreaterThanOrEqual(0);
+    expect(
+      lines.slice(1).every((line) => {
+        const content = line.trimStart();
+        return (
+          content.length === 0 || line.indexOf(content) === firstContentColumn
+        );
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps wrapped assistant-message lines aligned with the content column", () => {
+    const historyItem: ChatHistoryItem = {
+      message: {
+        role: "assistant",
+        content:
+          "Salut très long message qui devrait dépasser la largeur et passer à la ligne",
+      },
+      contextItems: [],
+    };
+
+    const { lastFrame } = render(
+      <Box width={30}>
+        <MemoizedMessage item={historyItem} index={1} />
+      </Box>,
+    );
+
+    const lines = lastFrame()!.split("\n").filter(Boolean);
+    const firstContentColumn = lines[0].indexOf("Salut");
+
+    expect(firstContentColumn).toBeGreaterThanOrEqual(0);
+    expect(
+      lines.slice(1).every((line) => {
+        const content = line.trimStart();
+        return (
+          content.length === 0 || line.indexOf(content) === firstContentColumn
+        );
+      }),
+    ).toBe(true);
+  });
+
   it("should display message with images using placeholders", () => {
     const messageParts: MessagePart[] = [
       { type: "text", text: "Here is an image: " },

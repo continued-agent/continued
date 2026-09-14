@@ -144,7 +144,6 @@ export async function postAgentMetadata(
     agentId,
     metadataKeys: Object.keys(metadata),
   });
-  logger.info("[metadata] Request body", { metadata });
 
   try {
     const response = await post(endpoint, { metadata });

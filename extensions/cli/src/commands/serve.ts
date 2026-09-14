@@ -43,7 +43,7 @@ import {
   type ServerState,
 } from "./serve.helpers.js";
 import { isServeRequestAuthorized, resolveServeToken } from "./serveAuth.js";
-import { isEnvironmentInstallAllowed } from "./serveOptions.js";
+import * as serveOptions from "./serveOptions.js";
 import { logServeStartup } from "./serveOutput.js";
 
 export interface ServeOptions extends ExtendedCommandOptions {
@@ -118,9 +118,9 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     }
   }
 
-  const timeoutSeconds = parseInt(options.timeout || "300", 10);
+  const timeoutSeconds = serveOptions.parseServeTimeout(options.timeout);
   const timeoutMs = timeoutSeconds * 1000;
-  const port = parseInt(options.port || "8000", 10);
+  const port = serveOptions.parseServePort(options.port);
 
   // Environment install script will be deferred until after server startup to avoid blocking
 
@@ -446,7 +446,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       generatedToken: generatedServeToken,
     });
 
-    if (isEnvironmentInstallAllowed(options)) {
+    if (serveOptions.isEnvironmentInstallAllowed(options)) {
       runEnvironmentInstallSafe();
     } else {
       logger.debug(

@@ -26,6 +26,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [currentModelIndex, setCurrentModelIndex] = useState<number>(-1);
 
   useEffect(() => {
@@ -44,13 +45,26 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
           return;
         }
 
+        const refreshResult = await services.model.refreshAvailableChatModels();
         const availableModels = services.model.getAvailableChatModels();
         const currentIndex = services.model.getCurrentModelIndex();
 
         if (availableModels.length === 0) {
-          setError("No chat models available in the configuration");
+          setError(
+            refreshResult.errors.length > 0
+              ? `Unable to fetch models: ${refreshResult.errors.join("; ")}`
+              : "No chat models available in the configuration",
+          );
           setLoading(false);
           return;
+        }
+
+        if (refreshResult.errors.length > 0) {
+          // Keep configured models visible while making partial failures
+          // explicit instead of silently presenting stale data.
+          setWarning(
+            `Some providers could not be refreshed: ${refreshResult.errors.join("; ")}`,
+          );
         }
 
         const modelOptions: ModelOption[] = availableModels.map((model) => ({
@@ -91,6 +105,7 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({
       selectedIndex={selectedIndex}
       loading={loading}
       error={error}
+      warning={warning}
       loadingMessage="Loading available models..."
       currentId={
         models.find((model) => model.index === currentModelIndex)?.id ?? null

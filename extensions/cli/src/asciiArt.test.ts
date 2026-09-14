@@ -56,7 +56,7 @@ describe("asciiArt", () => {
       const result = getDisplayableAsciiArt();
 
       expect(result).not.toBe(CONTINUE_ASCII_ART);
-      expect(result).toBe("✦ Continued CLI");
+      expect(result).toBe("  ✦ Continued CLI");
       expect(result).not.toContain("v0.0.0-dev");
     });
 
@@ -68,7 +68,7 @@ describe("asciiArt", () => {
       const result = getDisplayableAsciiArt();
 
       expect(result).not.toBe(CONTINUE_ASCII_ART);
-      expect(result).toBe("✦ Continued CLI");
+      expect(result).toBe("  ✦ Continued CLI");
     });
 
     it("should return full ASCII art at the width threshold", () => {
@@ -80,13 +80,13 @@ describe("asciiArt", () => {
       expect(result).toBe(CONTINUE_ASCII_ART);
     });
 
-    it("should return the compact brand when terminal is too short", () => {
+    it("should keep the full artwork when the terminal is short", () => {
       process.stdout.columns = 120;
-      process.stdout.rows = 56;
+      process.stdout.rows = 24;
 
       const result = getDisplayableAsciiArt();
 
-      expect(result).toBe("✦ Continued CLI");
+      expect(result).toBe(CONTINUE_ASCII_ART);
     });
 
     it("should default to 80 columns when columns is undefined", () => {

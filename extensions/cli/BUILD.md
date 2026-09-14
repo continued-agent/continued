@@ -76,7 +76,7 @@ When publishing to npm:
 
 ## Fork release artifact
 
-The fork’s one-line installers use the prebuilt `continue-cli.tgz` asset from
+The fork’s one-line installers use the prebuilt `continued-cli.tgz` asset from
 the `cli-latest` GitHub release instead of compiling the monorepo on the user’s
 machine. The `CLI Release Artifact` workflow builds packages, core, and the CLI
 on pushes to `main` (or through manual dispatch), then uploads the package and
@@ -84,6 +84,6 @@ its SHA-256 checksum. Keep the asset names stable because the installers use
 these URLs:
 
 ```text
-https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz
-https://github.com/continued-agent/continued/releases/download/cli-latest/continue-cli.tgz.sha256
+https://github.com/continued-agent/continued/releases/download/cli-latest/continued-cli.tgz
+https://github.com/continued-agent/continued/releases/download/cli-latest/continued-cli.tgz.sha256
 ```

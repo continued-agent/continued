@@ -1,14 +1,8 @@
 import { LLMClasses, llmFromProviderAndOptions } from "./llms/index.js";
+import { fetchRemoteModels, type FetchedModel } from "./fetchRemoteModels.js";
 
-export interface FetchedModel {
-  name: string;
-  modelId?: string;
-  description?: string;
-  icon?: string;
-  contextLength?: number;
-  maxTokens?: number;
-  supportsTools?: boolean;
-}
+export type { FetchedModel } from "./fetchRemoteModels.js";
+export { fetchConfiguredModels } from "./fetchRemoteModels.js";
 
 const OLLAMA_EXCLUDED_CAPABILITIES = ["vision", "audio", "embedding"];
 
@@ -121,34 +115,6 @@ async function fetchOllamaModels(): Promise<FetchedModel[]> {
   }
 }
 
-async function fetchOpenRouterModels(): Promise<FetchedModel[]> {
-  try {
-    const response = await fetch("https://openrouter.ai/api/v1/models");
-    if (!response.ok) {
-      throw new Error(`Failed to fetch OpenRouter models: ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.data || !Array.isArray(data.data)) {
-      return [];
-    }
-
-    return data.data
-      .filter((m: any) => m.id && m.name)
-      .map((m: any) => ({
-        name: m.name,
-        modelId: m.id,
-        icon: "openrouter.png",
-        contextLength: m.context_length,
-        maxTokens: m.top_provider?.max_completion_tokens,
-        supportsTools: (m.supported_parameters ?? []).includes("tools"),
-      }));
-  } catch (error) {
-    console.error("Error fetching OpenRouter models:", error);
-    return [];
-  }
-}
-
 async function fetchAnthropicModels(apiKey?: string): Promise<FetchedModel[]> {
   const response = await fetch(
     "https://api.anthropic.com/v1/models?limit=100",
@@ -171,51 +137,6 @@ async function fetchAnthropicModels(apiKey?: string): Promise<FetchedModel[]> {
     maxTokens: m.max_tokens,
     supportsTools: true,
   }));
-}
-
-async function fetchGeminiModels(
-  apiKey?: string,
-  apiBase?: string,
-): Promise<FetchedModel[]> {
-  const base = apiBase || "https://generativelanguage.googleapis.com/v1beta/";
-  const url = new URL("models", base);
-  const response = await fetch(url, {
-    headers: apiKey
-      ? { "x-goog-api-key": apiKey, "Content-Type": "application/json" }
-      : undefined,
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Gemini models: ${response.status}`);
-  }
-  const data = await response.json();
-  return (data.models ?? [])
-    .filter((m: any) => {
-      const id: string = m.name?.replace("models/", "") ?? "";
-      const methods: string[] = m.supportedGenerationMethods ?? [];
-      return (
-        !id.startsWith("gemini-2.0") &&
-        !id.startsWith("gemma-") && // Gemma models are supported through Ollama, not the Gemini API
-        !id.startsWith("nano-banana") &&
-        !id.startsWith("lyria") &&
-        methods.includes("generateContent") &&
-        !methods.includes("embedContent") &&
-        !methods.includes("predict") &&
-        !methods.includes("predictLongRunning") &&
-        !methods.includes("bidiGenerateContent") &&
-        !id.includes("tts") &&
-        !id.includes("image") &&
-        !id.includes("robotics") &&
-        !id.includes("computer-use")
-      );
-    })
-    .map((m: any) => ({
-      name: m.displayName ?? m.name?.replace("models/", ""),
-      modelId: m.name?.replace("models/", ""),
-      icon: "gemini.png",
-      contextLength: m.inputTokenLimit,
-      maxTokens: m.outputTokenLimit,
-      supportsTools: true,
-    }));
 }
 
 async function fetchProviderModelsViaListModels(
@@ -250,11 +171,11 @@ export async function fetchModels(
     case "ollama":
       return fetchOllamaModels();
     case "openrouter":
-      return fetchOpenRouterModels();
+      return fetchRemoteModels(provider, apiKey, apiBase);
     case "anthropic":
       return fetchAnthropicModels(apiKey);
     case "gemini":
-      return fetchGeminiModels(apiKey, apiBase);
+      return fetchRemoteModels(provider, apiKey, apiBase);
     default:
       return fetchProviderModelsViaListModels(provider, apiKey, apiBase);
   }
