@@ -12,6 +12,7 @@ const { http, https } = (followRedirects as any).default;
 
 const SENSITIVE_LOG_HEADERS = new Set([
   "authorization",
+  "api-key",
   "x-api-key",
   "x-goog-api-key",
   "proxy-authorization",

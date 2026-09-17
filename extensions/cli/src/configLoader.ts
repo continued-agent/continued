@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import { homedir } from "node:os";
 import { dirname } from "node:path";
 import * as path from "path";
 
@@ -130,7 +131,7 @@ function determineConfigSource(
 ): ConfigSource {
   // Priority 1: CLI --config flag
   if (cliConfigPath) {
-    return { type: "cli-flag", path: cliConfigPath };
+    return { type: "cli-flag", path: expandConfigPath(cliConfigPath) };
   }
 
   // Priority 2: Check for default config.yaml, then fallback to default config
@@ -564,6 +565,18 @@ function isFilePath(configPath: string): boolean {
     configPath.includes(".yml") ||
     configPath.includes(".json")
   );
+}
+
+export function expandConfigPath(configPath: string): string {
+  if (configPath === "~") {
+    return homedir();
+  }
+
+  if (configPath.startsWith("~/") || configPath.startsWith("~\\")) {
+    return path.join(homedir(), configPath.slice(2));
+  }
+
+  return configPath;
 }
 
 /**
