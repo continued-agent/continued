@@ -47,7 +47,7 @@ export function handlePermissionDenied(
 
   logger.info("Tool call denied", {
     name: toolCall.name,
-    arguments: toolCall.arguments,
+    argumentCount: getToolArgumentCount(toolCall.arguments),
     reason,
   });
 
@@ -418,7 +418,7 @@ export async function preprocessStreamedToolCalls(
       if (tool.preprocess) {
         logger.debug("Preprocessing tool call args", {
           name: toolCall.name,
-          arguments: toolCall.arguments,
+          argumentCount: getToolArgumentCount(toolCall.arguments),
         });
         const preprocessed = await tool.preprocess(toolCall.arguments);
         preprocessedCall.preprocessResult = preprocessed;
@@ -464,6 +464,12 @@ export async function preprocessStreamedToolCalls(
   }
 
   return { preprocessedCalls, errorChatEntries };
+}
+
+function getToolArgumentCount(argumentsValue: unknown): number {
+  return typeof argumentsValue === "object" && argumentsValue !== null
+    ? Object.keys(argumentsValue).length
+    : 0;
 }
 
 /**

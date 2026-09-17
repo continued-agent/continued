@@ -1,3 +1,7 @@
+import { vi } from "vitest";
+
+import { logger } from "../util/logger.js";
+
 import { extractToolCalls, getToolDisplayName } from "./index.js";
 
 describe("tools/index utilities", () => {
@@ -131,6 +135,22 @@ Another good call:
 
       // Restore console.error
       console.error = originalConsoleError;
+    });
+
+    it("does not log malformed tool payloads", () => {
+      const errorSpy = vi.spyOn(logger, "error");
+      const secretPayload = '{"name":"Read","filepath":"do-not-log"';
+
+      try {
+        expect(extractToolCalls(`<tool>${secretPayload}</tool>`)).toEqual([]);
+        expect(
+          errorSpy.mock.calls.some(([, metadata]) =>
+            JSON.stringify(metadata).includes(secretPayload),
+          ),
+        ).toBe(false);
+      } finally {
+        errorSpy.mockRestore();
+      }
     });
 
     it("should ignore tool calls missing required fields", () => {

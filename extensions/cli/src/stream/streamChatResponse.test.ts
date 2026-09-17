@@ -14,6 +14,7 @@ import { logger } from "../util/logger.js";
 
 import {
   executeStreamedToolCalls,
+  handlePermissionDenied,
   preprocessStreamedToolCalls,
 } from "./streamChatResponse.helpers.js";
 import { processStreamingResponse } from "./streamChatResponse.js";
@@ -555,6 +556,31 @@ describe("processStreamingResponse - content preservation", () => {
       ).toBe(false);
     } finally {
       debugSpy.mockRestore();
+    }
+  });
+
+  it("does not write tool argument values to logs", () => {
+    const infoSpy = vi.spyOn(logger, "info");
+    const secretArgument = "tool-secret-that-must-not-be-logged";
+    const toolCall: PreprocessedToolCall = {
+      id: "tool-call",
+      name: "Read",
+      arguments: { filepath: secretArgument },
+      argumentsStr: JSON.stringify({ filepath: secretArgument }),
+      startNotified: true,
+      tool: readFileTool,
+    };
+
+    try {
+      handlePermissionDenied(toolCall, []);
+
+      expect(
+        infoSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretArgument),
+        ),
+      ).toBe(false);
+    } finally {
+      infoSpy.mockRestore();
     }
   });
 });

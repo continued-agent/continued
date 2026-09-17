@@ -169,11 +169,19 @@ export function extractToolCalls(
         });
       }
     } catch {
-      logger.error("Failed to parse tool call:", { toolCall: match[1] });
+      logger.error("Failed to parse tool call", {
+        toolCallLength: match[1].length,
+      });
     }
   }
 
   return toolCalls;
+}
+
+function getToolArgumentCount(argumentsValue: unknown): number {
+  return typeof argumentsValue === "object" && argumentsValue !== null
+    ? Object.keys(argumentsValue).length
+    : 0;
 }
 
 export function convertToolToChatCompletionTool(
@@ -235,7 +243,7 @@ export async function executeToolCall(
   try {
     logger.debug("Executing tool", {
       toolName: toolCall.name,
-      arguments: toolCall.arguments,
+      argumentCount: getToolArgumentCount(toolCall.arguments),
       parallelToolCallCount: options.parallelToolCallCount,
     });
 
