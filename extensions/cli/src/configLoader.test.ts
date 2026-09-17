@@ -1,4 +1,5 @@
 import { homedir } from "node:os";
+import { join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +7,9 @@ import { expandConfigPath } from "./configLoader.js";
 
 describe("expandConfigPath", () => {
   it("expands a home-relative config path", () => {
-    expect(expandConfigPath("~/config.yaml")).toBe(`${homedir()}/config.yaml`);
+    expect(expandConfigPath("~/config.yaml")).toBe(
+      join(homedir(), "config.yaml"),
+    );
   });
 
   it("leaves absolute and assistant-slug paths unchanged", () => {
