@@ -310,6 +310,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
           isResolved = true;
           killProcessTreeWithEscalation(child);
           context?.signal?.removeEventListener("abort", abortChild);
+          backgroundSignalManager.off("backgroundRequested", moveToBackground);
           let output = stdout + (stderr ? `\nStderr: ${stderr}` : "");
           output += `\n\n[Command timed out after ${TIMEOUT_MS / 1000} seconds of no output]`;
 
@@ -398,6 +399,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
 
         if (code !== 0) {
           const details = stderr || stdout || "Command produced no output";
+          emitBashToolEnded();
           reject(`Error (exit code ${code}): ${details}`);
           return;
         }
@@ -435,6 +437,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         }
         context?.signal?.removeEventListener("abort", abortChild);
         backgroundSignalManager.off("backgroundRequested", moveToBackground);
+        emitBashToolEnded();
         reject(`Error: ${error.message}`);
       });
     });

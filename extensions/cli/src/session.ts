@@ -14,6 +14,7 @@ import { isValidSessionId } from "core/util/paths.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { DEFAULT_SESSION_TITLE } from "./constants/session.js";
+import { ensurePrivateDirectory } from "./util/filePermissions.js";
 import { logger } from "./util/logger.js";
 
 // Re-export BaseSessionMetadata for external consumers
@@ -39,10 +40,8 @@ function getSessionDir(): string {
     const sessionDir = path.join(process.env.HOME, ".continue", "sessions");
 
     // Create directory if it doesn't exist
-    if (!fs.existsSync(sessionDir)) {
-      // Sessions can contain chat history and secrets; keep them private.
-      fs.mkdirSync(sessionDir, { mode: 0o700, recursive: true });
-    }
+    // Sessions can contain chat history and secrets; keep them private.
+    ensurePrivateDirectory(sessionDir);
 
     return sessionDir;
   }
@@ -53,9 +52,7 @@ function getSessionDir(): string {
   const sessionDir = path.join(continueHome, "sessions");
 
   // Create directory if it doesn't exist
-  if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { mode: 0o700, recursive: true });
-  }
+  ensurePrivateDirectory(sessionDir);
 
   return sessionDir;
 }

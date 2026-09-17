@@ -14,6 +14,7 @@ import {
   OnboardingProvider,
 } from "./onboardingProviders.js";
 import { selectOnboardingProvider } from "./ui/ProviderSelector.js";
+import { ensurePrivateDirectory } from "./util/filePermissions.js";
 import {
   PromptCancelledError,
   question,
@@ -70,9 +71,7 @@ export function writeSecretToEnvFile(
   }
 
   const envDir = path.dirname(envPath);
-  if (!fs.existsSync(envDir)) {
-    fs.mkdirSync(envDir, { recursive: true });
-  }
+  ensurePrivateDirectory(envDir);
 
   const assignment = `${secretName}=${JSON.stringify(secretValue)}`;
   const existingContent = fs.existsSync(envPath)
@@ -265,10 +264,7 @@ export async function createOrUpdateProviderConfig(
   setup: ProviderSetup,
 ): Promise<void> {
   const configDir = path.dirname(CONFIG_PATH);
-
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-  }
+  ensurePrivateDirectory(configDir);
 
   const existingContent = fs.existsSync(CONFIG_PATH)
     ? fs.readFileSync(CONFIG_PATH, "utf8")
@@ -303,9 +299,7 @@ export async function createOrUpdateConfig(apiKey: string): Promise<void> {
   }
 
   const configDir = path.dirname(CONFIG_PATH);
-  if (!fs.existsSync(configDir)) {
-    fs.mkdirSync(configDir, { recursive: true });
-  }
+  ensurePrivateDirectory(configDir);
 
   const apiKeyReference = `\${{ secrets.${anthropicProvider.apiKeyEnv} }}`;
   const existingContent = fs.existsSync(CONFIG_PATH)

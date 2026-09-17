@@ -199,6 +199,18 @@ describe("provider onboarding persistence", () => {
     expect(config).not.toContain("sk-test-value");
   });
 
+  test("keeps the credentials directory private", () => {
+    if (process.platform === "win32") {
+      return;
+    }
+
+    const envPath = path.join(globalDir, "nested", ".env");
+    writeSecretToEnvFile("OPENAI_API_KEY", "sk-test-value", envPath);
+
+    expect(fs.statSync(path.dirname(envPath)).mode & 0o777).toBe(0o700);
+    expect(fs.statSync(envPath).mode & 0o777).toBe(0o600);
+  });
+
   test("treats an existing valid config as already onboarded", async () => {
     fs.mkdirSync(globalDir, { recursive: true });
     fs.writeFileSync(

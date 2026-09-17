@@ -2,6 +2,7 @@ import { vi } from "vitest";
 
 vi.mock("../services/BackgroundJobService.js", () => ({
   backgroundJobService: {
+    canAcceptJob: vi.fn(() => true),
     createJob: vi.fn(),
     createJobWithProcess: vi.fn(),
     startJob: vi.fn(),
@@ -20,6 +21,9 @@ vi.mock("../util/cli.js", () => ({
   emitBashToolEnded: vi.fn(),
   emitBashToolStarted: vi.fn(),
 }));
+
+import { backgroundSignalManager } from "../util/backgroundSignalManager.js";
+import { emitBashToolEnded } from "../util/cli.js";
 
 import {
   isRunningInWsl,
@@ -131,6 +135,40 @@ describe("runTerminalCommandTool", () => {
         await expect(
           runTerminalCommandTool.run({ command: "exit 7" }),
         ).rejects.toContain("exit code 7");
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "emits the Bash-ended event when the command fails",
+      async () => {
+        vi.mocked(emitBashToolEnded).mockClear();
+
+        await expect(
+          runTerminalCommandTool.run({ command: "exit 7" }),
+        ).rejects.toContain("exit code 7");
+
+        expect(emitBashToolEnded).toHaveBeenCalledOnce();
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "removes the background listener when a command times out",
+      async () => {
+        const listenerCount = backgroundSignalManager.listenerCount(
+          "backgroundRequested",
+        );
+
+        const result = await runTerminalCommandTool.run({
+          command: 'node -e "setTimeout(() => {}, 1000)"',
+          timeout: 0.01,
+        });
+
+        expect(result).toContain("Command timed out");
+        expect(
+          backgroundSignalManager.listenerCount("backgroundRequested"),
+        ).toBe(listenerCount);
       },
       SHELL_TEST_TIMEOUT_MS,
     );
