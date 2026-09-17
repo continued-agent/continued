@@ -197,6 +197,11 @@ describe("provider onboarding persistence", () => {
     const config = fs.readFileSync(path.join(globalDir, "config.yaml"), "utf8");
     expect(config).toContain("apiKey: ${{ secrets.OPENAI_API_KEY }}");
     expect(config).not.toContain("sk-test-value");
+    if (process.platform !== "win32") {
+      expect(
+        fs.statSync(path.join(globalDir, "config.yaml")).mode & 0o777,
+      ).toBe(0o600);
+    }
   });
 
   test("keeps the credentials directory private", () => {

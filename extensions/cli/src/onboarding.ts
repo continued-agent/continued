@@ -275,7 +275,7 @@ export async function createOrUpdateProviderConfig(
     writeSecretToEnvFile(setup.provider.apiKeyEnv, setup.apiKey);
   }
 
-  fs.writeFileSync(CONFIG_PATH, updatedContent);
+  fs.writeFileSync(CONFIG_PATH, updatedContent, { mode: 0o600 });
   setConfigFilePermissions(CONFIG_PATH);
 }
 
@@ -311,7 +311,7 @@ export async function createOrUpdateConfig(apiKey: string): Promise<void> {
   );
 
   writeSecretToEnvFile(anthropicProvider.apiKeyEnv, apiKey);
-  fs.writeFileSync(CONFIG_PATH, updatedContent);
+  fs.writeFileSync(CONFIG_PATH, updatedContent, { mode: 0o600 });
   setConfigFilePermissions(CONFIG_PATH);
 }
 
