@@ -10,6 +10,7 @@ import { readFileTool } from "../tools/readFile.js";
 import { searchCodeTool } from "../tools/searchCode.js";
 import { PreprocessedToolCall } from "../tools/types.js";
 import { writeFileTool } from "../tools/writeFile.js";
+import { logger } from "../util/logger.js";
 
 import {
   executeStreamedToolCalls,
@@ -530,6 +531,31 @@ describe("processStreamingResponse - content preservation", () => {
     expect(result.content).toBe("Hello world!");
     expect(result.toolCalls.length).toBe(0);
     expect(result.finalContent).toBe("Hello world!");
+  });
+
+  it("does not write streamed response payloads to debug logs", async () => {
+    const debugSpy = vi.spyOn(logger, "debug");
+    const secretContent = "model-output-that-must-not-be-logged";
+    chunks = [contentChunk(secretContent)];
+
+    try {
+      await processStreamingResponse({
+        chatHistory,
+        model: mockModel,
+        llmApi: mockLlmApi,
+        abortController: mockAbortController,
+        isHeadless: true,
+        systemMessage: "You are a helpful assistant.",
+      });
+
+      expect(
+        debugSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretContent),
+        ),
+      ).toBe(false);
+    } finally {
+      debugSpy.mockRestore();
+    }
   });
 });
 

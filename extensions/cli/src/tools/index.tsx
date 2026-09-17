@@ -276,7 +276,6 @@ export async function executeToolCall(
       toolName: toolCall.name,
       success: true,
       durationMs: duration,
-      toolParameters: JSON.stringify(toolCall.arguments),
     });
     logger.debug("Tool execution completed", {
       toolName: toolCall.name,
@@ -299,7 +298,6 @@ export async function executeToolCall(
       durationMs: duration,
       error: errorMessage,
       errorReason,
-      toolParameters: JSON.stringify(toolCall.arguments),
     });
     throw error;
   } finally {
