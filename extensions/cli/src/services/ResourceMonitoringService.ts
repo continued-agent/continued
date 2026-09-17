@@ -48,6 +48,11 @@ class ResourceMonitoringService {
   private lastFdCheckTime = Date.now();
   private fdCheckIntervalMs = 5000; // Check file descriptors every 5 seconds
   private cacheFileCount: number | null = null;
+  private cleanupHandlersRegistered = false;
+
+  private readonly handleProcessCleanup = () => {
+    void this.cleanup();
+  };
 
   async initialize(): Promise<void> {
     // Start monitoring if verbose mode is enabled
@@ -55,10 +60,14 @@ class ResourceMonitoringService {
       this.startMonitoring();
     }
 
-    // Cleanup on exit
-    process.on("exit", () => this.cleanup());
-    process.on("SIGINT", () => this.cleanup());
-    process.on("SIGTERM", () => this.cleanup());
+    // Cleanup on exit. Initialization can be repeated when the service
+    // registry is reloaded, so register these listeners only once.
+    if (!this.cleanupHandlersRegistered) {
+      process.once("exit", this.handleProcessCleanup);
+      process.once("SIGINT", this.handleProcessCleanup);
+      process.once("SIGTERM", this.handleProcessCleanup);
+      this.cleanupHandlersRegistered = true;
+    }
   }
 
   async cleanup(): Promise<void> {
