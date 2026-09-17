@@ -659,6 +659,35 @@ describe("preprocessStreamedToolCalls", () => {
       "Tool nonexistent_tool not found",
     );
   });
+
+  it("rejects malformed arguments for tools without required parameters", async () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "call-malformed",
+        name: "Exit",
+        arguments: {},
+        argumentsStr: '{"unclosed":',
+        startNotified: false,
+      },
+    ];
+
+    const callbacks = {
+      onToolStart: vi.fn(),
+      onToolError: vi.fn(),
+    };
+
+    const { preprocessedCalls, errorChatEntries } =
+      await preprocessStreamedToolCalls(true, toolCalls, callbacks);
+
+    expect(preprocessedCalls).toHaveLength(0);
+    expect(errorChatEntries).toHaveLength(1);
+    expect(errorChatEntries[0].content).toContain("Malformed arguments");
+    expect(callbacks.onToolError).toHaveBeenCalledWith(
+      expect.stringContaining("Malformed arguments"),
+      "Exit",
+      "call-malformed",
+    );
+  });
 });
 
 // Tests for executeStreamedToolCalls function
