@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import chalk from "chalk";
 import type { ChatHistoryItem } from "core/index.js";
 import express, { Request, Response } from "express";
@@ -293,7 +294,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
 
     // Process messages if not already processing
     if (!state.isProcessing) {
-      processMessages(state, llmApi);
+      startMessageProcessing();
     }
   });
 
@@ -473,7 +474,7 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       if (shouldQueueInitialPrompt(existingHistory, initialPrompt)) {
         logger.info(chalk.dim("\nProcessing initial prompt..."));
         await messageQueue.enqueueMessage(initialPrompt);
-        processMessages(state, llmApi);
+        startMessageProcessing();
       } else {
         logger.info(
           chalk.dim(
@@ -483,6 +484,15 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
       }
     }
   });
+
+  function startMessageProcessing(): void {
+    void processMessages(state, llmApi).catch((error: unknown) => {
+      const errorMessage = formatError(error);
+      logger.error(`Message processing failed: ${errorMessage}`);
+      addAssistantErrorMessage(state, `Error: ${errorMessage}`);
+      void reportAgentFailure(errorMessage);
+    });
+  }
 
   async function processMessages(state: ServerState, llmApi: any) {
     // Keep the processing lock held for the entire drain, including metadata
