@@ -609,8 +609,9 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
     }
   }, 1000);
 
-  // Handle graceful shutdown
-  process.on("SIGINT", () => {
+  // Handle graceful shutdown. The generic CLI signal handlers are disabled for
+  // this subcommand so server cleanup cannot race a second process.exit call.
+  const handleShutdownSignal = () => {
     console.log(chalk.yellow("\nShutting down server..."));
     state.serverRunning = false;
     stopStorageSync();
@@ -634,5 +635,8 @@ export async function serve(prompt?: string, options: ServeOptions = {}) {
         process.exit(1);
       });
     });
-  });
+  };
+
+  process.on("SIGINT", handleShutdownSignal);
+  process.on("SIGTERM", handleShutdownSignal);
 }

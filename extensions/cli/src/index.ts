@@ -17,7 +17,7 @@ import {
 import { configureConsoleForHeadless, safeStderr } from "./init.js";
 import { addCommonOptions, mergeParentOptions } from "./shared-options.js";
 import { post } from "./util/apiClient.js";
-import { isAcpMode } from "./util/cli.js";
+import { isAcpMode, isServe } from "./util/cli.js";
 import { markUnhandledError } from "./util/errorState.js";
 import { gracefulExit } from "./util/exit.js";
 import { configureAcpMode, logger } from "./util/logger.js";
@@ -165,7 +165,7 @@ process.on("uncaughtException", (error) => {
 });
 
 // keyboard interruption handler for non-TUI flows
-if (!isAcpMode()) {
+if (!isAcpMode() && !isServe()) {
   process.on("SIGINT", async () => {
     await gracefulExit(130);
   });
@@ -436,7 +436,7 @@ export async function runCli(): Promise<void> {
     process.exit(1);
   }
 
-  if (!isAcpMode()) {
+  if (!isAcpMode() && !isServe()) {
     process.on("SIGTERM", async () => {
       await gracefulExit(0);
     });
