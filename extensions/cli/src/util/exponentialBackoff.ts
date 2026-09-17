@@ -163,6 +163,26 @@ function calculateDelay(
   return cappedDelay;
 }
 
+function waitForRetry(delay: number, abortSignal: AbortSignal): Promise<void> {
+  if (abortSignal.aborted) {
+    return Promise.reject(new Error("Request aborted"));
+  }
+
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      abortSignal.removeEventListener("abort", onAbort);
+      resolve();
+    }, delay);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      abortSignal.removeEventListener("abort", onAbort);
+      reject(new Error("Request aborted"));
+    };
+
+    abortSignal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
 /**
  * Wrapper around llmApi.chatCompletionStream with exponential backoff retry logic
  */
@@ -229,7 +249,7 @@ export async function chatCompletionStreamWithBackoff(
       }
 
       // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await waitForRetry(delay, abortSignal);
     }
   }
 
@@ -255,6 +275,7 @@ export async function* withExponentialBackoff<T>(
 ): AsyncGenerator<T> {
   const opts = { ...DEFAULT_OPTIONS, ...options };
   let lastError: any;
+  let hasYielded = false;
 
   for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
     // Create a new AbortController for this retry attempt
@@ -287,6 +308,7 @@ export async function* withExponentialBackoff<T>(
           throw new Error("Request aborted");
         }
 
+        hasYielded = true;
         yield chunk;
       }
 
@@ -315,6 +337,13 @@ export async function* withExponentialBackoff<T>(
         break;
       }
 
+      // A streaming request cannot resume from a token boundary. Retrying
+      // after yielding would replay already-rendered content and can also
+      // duplicate partial tool-call arguments.
+      if (hasYielded) {
+        throw err;
+      }
+
       // Only retry if the error is retryable
       if (!isRetryableError(err)) {
         throw err;
@@ -334,7 +363,7 @@ export async function* withExponentialBackoff<T>(
 
       // Wait before retrying
       logger.debug("Waiting before retry", { delayMs: delay });
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await waitForRetry(delay, abortSignal);
     }
   }
 
