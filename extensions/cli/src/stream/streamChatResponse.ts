@@ -413,7 +413,7 @@ export async function processStreamingResponse(
         id: tc.id,
         name: tc.name,
         hasArguments: !!tc.arguments,
-        argumentsStr: tc.argumentsStr,
+        argumentLength: tc.argumentsStr.length,
       });
       return false;
     }

@@ -583,6 +583,31 @@ describe("processStreamingResponse - content preservation", () => {
       infoSpy.mockRestore();
     }
   });
+
+  it("does not write incomplete tool argument values to error logs", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    const secretArgument = '{"filepath":"incomplete-secret"';
+    chunks = [toolCallChunk("tool-call", undefined, secretArgument)];
+
+    try {
+      await processStreamingResponse({
+        chatHistory,
+        model: mockModel,
+        llmApi: mockLlmApi,
+        abortController: mockAbortController,
+        isHeadless: true,
+        systemMessage: "You are a helpful assistant.",
+      });
+
+      expect(
+        errorSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretArgument),
+        ),
+      ).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
 
 // Tests for preprocessStreamedToolCalls function
