@@ -118,4 +118,60 @@ describe("withExponentialBackoff", () => {
 
     expect(generatorFactory).toHaveBeenCalledTimes(0);
   });
+
+  it("should abort while waiting for a retry instead of waiting for the timer", async () => {
+    const generatorFactory = vi.fn(async () => {
+      const error = new Error("Connection reset");
+      (error as any).code = "ECONNRESET";
+      throw error;
+    });
+
+    const generator = withExponentialBackoff(
+      generatorFactory,
+      abortController.signal,
+      { maxRetries: 2, initialDelay: 10_000 },
+    );
+    const consuming = (async () => {
+      for await (const _chunk of generator) {
+        // The generator never yields.
+      }
+    })();
+
+    await vi.waitFor(() => {
+      expect(generatorFactory).toHaveBeenCalledTimes(1);
+    });
+    abortController.abort();
+
+    await expect(consuming).rejects.toThrow("Request aborted");
+    expect(generatorFactory).toHaveBeenCalledTimes(1);
+  });
+
+  it("should not retry a stream after it has yielded content", async () => {
+    const generatorFactory = vi.fn(async () => {
+      return (async function* () {
+        yield "partial";
+        const error = new Error("Connection reset");
+        (error as any).code = "ECONNRESET";
+        throw error;
+      })();
+    });
+
+    const results: string[] = [];
+    const generator = withExponentialBackoff(
+      generatorFactory,
+      abortController.signal,
+      { maxRetries: 2, initialDelay: 1 },
+    );
+
+    await expect(
+      (async () => {
+        for await (const chunk of generator) {
+          results.push(chunk);
+        }
+      })(),
+    ).rejects.toThrow("Connection reset");
+
+    expect(results).toEqual(["partial"]);
+    expect(generatorFactory).toHaveBeenCalledTimes(1);
+  });
 });

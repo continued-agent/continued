@@ -7,6 +7,8 @@ import winston from "winston";
 
 import { env } from "../env.js";
 
+import { ensurePrivateDirectory } from "./filePermissions.js";
+
 const { combine, timestamp, printf, errors } = winston.format;
 
 // Generate a unique session ID for this process
@@ -16,10 +18,7 @@ const SESSION_ID = crypto.randomBytes(4).toString("hex");
 function getLogDir(): string {
   const logDir = path.join(env.continueHome, "logs");
 
-  // Create directory if it doesn't exist
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
+  ensurePrivateDirectory(logDir);
 
   return logDir;
 }
@@ -27,7 +26,17 @@ function getLogDir(): string {
 // Get current log file path
 function getLogFilePath(): string {
   const logDir = getLogDir();
-  return path.join(logDir, "cn.log");
+  const logFilePath = path.join(logDir, "cn.log");
+
+  if (process.platform !== "win32") {
+    // Create/chmod before Winston opens the stream so an existing permissive
+    // file and files created by a restrictive umask are both corrected.
+    const fileDescriptor = fs.openSync(logFilePath, "a", 0o600);
+    fs.closeSync(fileDescriptor);
+    fs.chmodSync(logFilePath, 0o600);
+  }
+
+  return logFilePath;
 }
 
 // Simple replacer for JSON.stringify to handle common issues
@@ -111,6 +120,7 @@ const winstonLogger = winston.createLogger({
     // File transport for all logs
     new winston.transports.File({
       filename: getLogFilePath(),
+      options: { flags: "a", mode: 0o600 },
       maxsize: 10 * 1024 * 1024, // 10MB
       maxFiles: 5,
     }),

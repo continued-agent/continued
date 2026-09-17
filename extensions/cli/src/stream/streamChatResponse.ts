@@ -192,6 +192,20 @@ interface ProcessStreamingResponseOptions {
   systemMessage: string;
 }
 
+function getChunkDebugMetadata(
+  chunk: any,
+  chunkCount: number,
+): Record<string, number | boolean> {
+  const firstChoice = chunk.choices?.[0];
+  return {
+    chunkCount,
+    choiceCount: chunk.choices?.length ?? 0,
+    hasContent: Boolean(firstChoice?.delta?.content),
+    toolCallCount: firstChoice?.delta?.tool_calls?.length ?? 0,
+    hasUsage: Boolean(chunk.usage),
+  };
+}
+
 // Process a single streaming response and return whether we need to continue
 // eslint-disable-next-line max-statements
 export async function processStreamingResponse(
@@ -294,7 +308,7 @@ export async function processStreamingResponse(
     for await (const chunk of streamWithBackoff) {
       chunkCount++;
 
-      logger.debug("Received chunk", { chunkCount, chunk });
+      logger.debug("Received chunk", getChunkDebugMetadata(chunk, chunkCount));
 
       // Track token usage if available
       if (chunk.usage) {
@@ -399,7 +413,7 @@ export async function processStreamingResponse(
         id: tc.id,
         name: tc.name,
         hasArguments: !!tc.arguments,
-        argumentsStr: tc.argumentsStr,
+        argumentLength: tc.argumentsStr.length,
       });
       return false;
     }

@@ -2,6 +2,7 @@ import { vi } from "vitest";
 
 vi.mock("../services/BackgroundJobService.js", () => ({
   backgroundJobService: {
+    canAcceptJob: vi.fn(() => true),
     createJob: vi.fn(),
     createJobWithProcess: vi.fn(),
     startJob: vi.fn(),
@@ -21,6 +22,9 @@ vi.mock("../util/cli.js", () => ({
   emitBashToolStarted: vi.fn(),
 }));
 
+import { backgroundSignalManager } from "../util/backgroundSignalManager.js";
+import { emitBashToolEnded } from "../util/cli.js";
+
 import {
   isRunningInWsl,
   runTerminalCommandTool,
@@ -34,6 +38,24 @@ describe("runTerminalCommandTool", () => {
   const isWindows = process.platform === "win32";
   const isMac = process.platform === "darwin";
   const isLinux = process.platform === "linux";
+
+  describe("argument validation", () => {
+    it("rejects malformed timeout values before starting a process", async () => {
+      await expect(
+        runTerminalCommandTool.preprocess!({
+          command: "echo hello",
+          timeout: "soon",
+        } as any),
+      ).rejects.toThrow("timeout must be a finite, non-negative number");
+
+      await expect(
+        runTerminalCommandTool.preprocess!({
+          command: "echo hello",
+          timeout: -1,
+        }),
+      ).rejects.toThrow("timeout must be a finite, non-negative number");
+    });
+  });
 
   describe("basic platform-specific terminal execution", () => {
     it(
@@ -131,6 +153,66 @@ describe("runTerminalCommandTool", () => {
         await expect(
           runTerminalCommandTool.run({ command: "exit 7" }),
         ).rejects.toContain("exit code 7");
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "emits the Bash-ended event when the command fails",
+      async () => {
+        vi.mocked(emitBashToolEnded).mockClear();
+
+        await expect(
+          runTerminalCommandTool.run({ command: "exit 7" }),
+        ).rejects.toContain("exit code 7");
+
+        expect(emitBashToolEnded).toHaveBeenCalledOnce();
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "removes the background listener when a command times out",
+      async () => {
+        const listenerCount = backgroundSignalManager.listenerCount(
+          "backgroundRequested",
+        );
+
+        const result = await runTerminalCommandTool.run({
+          command: 'node -e "setTimeout(() => {}, 1000)"',
+          timeout: 0.01,
+        });
+
+        expect(result).toContain("Command timed out");
+        expect(
+          backgroundSignalManager.listenerCount("backgroundRequested"),
+        ).toBe(listenerCount);
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "kills descendants when the output limit is reached",
+      async () => {
+        const originalLimit = process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS;
+        process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS = "10";
+
+        try {
+          const result = await runTerminalCommandTool.run({
+            command:
+              "node -e \"process.stdout.write('x'.repeat(100)); setInterval(() => {}, 1000)\"",
+          });
+
+          expect(result).toContain(
+            "Command stopped after reaching the output limit",
+          );
+        } finally {
+          if (originalLimit === undefined) {
+            delete process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS;
+          } else {
+            process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS = originalLimit;
+          }
+        }
       },
       SHELL_TEST_TIMEOUT_MS,
     );

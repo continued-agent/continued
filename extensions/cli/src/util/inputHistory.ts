@@ -3,6 +3,8 @@ import path from "path";
 
 import { env } from "../env.js";
 
+import { ensurePrivateDirectory } from "./filePermissions.js";
+
 const HISTORY_FILE = path.join(env.continueHome, "input_history.json");
 const MAX_HISTORY_SIZE = 1000;
 
@@ -23,9 +25,7 @@ export class InputHistory {
   private loadHistory(): void {
     try {
       const dir = path.dirname(HISTORY_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { mode: 0o700, recursive: true });
-      }
+      ensurePrivateDirectory(dir);
 
       if (fs.existsSync(HISTORY_FILE)) {
         fs.chmodSync(HISTORY_FILE, 0o600);
@@ -41,9 +41,7 @@ export class InputHistory {
   private saveHistory(): void {
     try {
       const dir = path.dirname(HISTORY_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { mode: 0o700, recursive: true });
-      }
+      ensurePrivateDirectory(dir);
 
       fs.writeFileSync(HISTORY_FILE, JSON.stringify(this.history, null, 2), {
         mode: 0o600,

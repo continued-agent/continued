@@ -165,6 +165,14 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
     if (!command || typeof command !== "string") {
       throw new Error("command arg is required and must be a non-empty string");
     }
+    if (
+      args.timeout !== undefined &&
+      (typeof args.timeout !== "number" ||
+        !Number.isFinite(args.timeout) ||
+        args.timeout < 0)
+    ) {
+      throw new Error("timeout must be a finite, non-negative number");
+    }
     const truncatedCmd =
       command.length > 60 ? command.substring(0, 60) + "..." : command;
     return {
@@ -310,6 +318,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
           isResolved = true;
           killProcessTreeWithEscalation(child);
           context?.signal?.removeEventListener("abort", abortChild);
+          backgroundSignalManager.off("backgroundRequested", moveToBackground);
           let output = stdout + (stderr ? `\nStderr: ${stderr}` : "");
           output += `\n\n[Command timed out after ${TIMEOUT_MS / 1000} seconds of no output]`;
 
@@ -354,7 +363,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         }
 
         outputLimitReached = true;
-        child.kill();
+        killProcessTreeWithEscalation(child);
         return currentOutput + output.slice(0, remaining);
       };
 
@@ -398,6 +407,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
 
         if (code !== 0) {
           const details = stderr || stdout || "Command produced no output";
+          emitBashToolEnded();
           reject(`Error (exit code ${code}): ${details}`);
           return;
         }
@@ -435,6 +445,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         }
         context?.signal?.removeEventListener("abort", abortChild);
         backgroundSignalManager.off("backgroundRequested", moveToBackground);
+        emitBashToolEnded();
         reject(`Error: ${error.message}`);
       });
     });

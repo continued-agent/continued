@@ -7,6 +7,7 @@ describe("verbose fetch log redaction", () => {
     for (const header of [
       "authorization",
       "Authorization",
+      "api-key",
       "cookie",
       "set-cookie",
       "www-authenticate",

@@ -54,13 +54,12 @@ export async function checkClipboardForImage(): Promise<boolean> {
  * @returns Promise<Buffer | null> - Image buffer if available, null otherwise
  */
 export async function getClipboardImage(): Promise<Buffer | null> {
+  let tempImagePath: string | undefined;
+
   try {
     const platform = os.platform();
     const tempDir = os.tmpdir();
-    const tempImagePath = path.join(
-      tempDir,
-      `continue-clipboard-${Date.now()}.png`,
-    );
+    tempImagePath = path.join(tempDir, `continue-clipboard-${Date.now()}.png`);
 
     if (platform === "darwin") {
       // macOS: Save clipboard image using osascript
@@ -84,14 +83,15 @@ export async function getClipboardImage(): Promise<Buffer | null> {
     // Read the temporary file
     const imageBuffer = await readFile(tempImagePath);
 
-    // Clean up the temporary file
-    await unlink(tempImagePath).catch(() => {
-      // Ignore cleanup errors
-    });
-
     return imageBuffer;
   } catch (error) {
     logger.debug("Error reading image from clipboard:", error);
     return null;
+  } finally {
+    if (tempImagePath) {
+      await unlink(tempImagePath).catch(() => {
+        // Ignore cleanup errors
+      });
+    }
   }
 }

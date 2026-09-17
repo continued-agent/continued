@@ -58,7 +58,40 @@ export function isAcpMode(): boolean {
 }
 
 export function isServe(): boolean {
-  return process.argv?.includes("serve") ?? false;
+  const args = process.argv?.slice(2) ?? [];
+  if (args.includes("-p") || args.includes("--print")) {
+    return false;
+  }
+
+  const optionsWithValues = new Set([
+    "--config",
+    "--org",
+    "--rule",
+    "--mcp",
+    "--model",
+    "--prompt",
+    "--allow",
+    "--ask",
+    "--exclude",
+    "--agent",
+  ]);
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--") {
+      return false;
+    }
+    if (optionsWithValues.has(arg)) {
+      index++;
+      continue;
+    }
+    if (arg.startsWith("-")) {
+      continue;
+    }
+    return arg === "serve";
+  }
+
+  return false;
 }
 
 /**

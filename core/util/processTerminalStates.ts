@@ -1,5 +1,7 @@
 import { ChildProcess } from "child_process";
 
+import { killProcessTree } from "./processTree";
+
 // Track which processes have been backgrounded
 const processTerminalBackgroundStates = new Map<string, boolean>();
 
@@ -72,12 +74,12 @@ export async function killTerminalProcess(toolCallId: string): Promise<void> {
   if (processInfo && !processInfo.process.killed) {
     const { process } = processInfo;
 
-    process.kill("SIGTERM");
+    killProcessTree(process, "SIGTERM");
 
     // Force kill after 5 seconds if still running
     setTimeout(() => {
       if (!process.killed) {
-        process.kill("SIGKILL");
+        killProcessTree(process, "SIGKILL");
       }
     }, 5000);
 

@@ -61,7 +61,7 @@ credential chain and respects `AWS_REGION`, `AWS_DEFAULT_REGION`, and
 
 The interactive startup screen displays a compact, color-gradient Continued mark
 that fits comfortably in a standard 80-column terminal. On narrower terminals,
-it falls back to the version number to avoid wrapping the artwork.
+it falls back to a compact `✦ Continued CLI` mark to avoid wrapping the artwork.
 
 ### TUI spacing
 
@@ -153,15 +153,12 @@ cn ls --json
 
 - `CONTINUE_CLI_DISABLE_COMMIT_SIGNATURE`: Disable adding the Continued commit signature to generated commit messages
 - `CONTINUE_USE_BEDROCK=1`: Use a one-shot AWS Bedrock configuration without replacing the saved config
-- `FORCE_NO_TTY`: Force TTY-less mode, prevents stdin reading (useful for testing and automation)
+- `FORCE_NO_TTY`: Force TTY-less mode, preventing stdin reads (useful for testing and automation)
 
 ## Commands
 
 - `cn`: Start an interactive chat session
 - `cn ls`: List recent sessions with TUI selector to choose one to resume
-- `cn login`: Authenticate with Continued
-- `cn logout`: Sign out of current session
-- `cn remote`: Launch a remote instance
 - `cn serve`: Start HTTP server mode
 - `cn acp`: Run Continued as an ACP Agent over stdio
 
@@ -169,7 +166,7 @@ cn ls --json
 
 Shows recent sessions, limited by screen height to ensure it fits on your terminal.
 
-- `--json`: Output in JSON format for scripting (always shows 10 sessions)
+- `--json`: Output in JSON format for scripting
 
 ## TTY-less Support
 

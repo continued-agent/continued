@@ -50,6 +50,20 @@ describe("ResourceMonitoringService", () => {
     expect(usage.timestamp).toBeGreaterThan(0);
   });
 
+  it("does not register duplicate process cleanup listeners", async () => {
+    const listenerCounts = {
+      exit: process.listenerCount("exit"),
+      sigint: process.listenerCount("SIGINT"),
+      sigterm: process.listenerCount("SIGTERM"),
+    };
+
+    await service.initialize();
+
+    expect(process.listenerCount("exit")).toBe(listenerCounts.exit);
+    expect(process.listenerCount("SIGINT")).toBe(listenerCounts.sigint);
+    expect(process.listenerCount("SIGTERM")).toBe(listenerCounts.sigterm);
+  });
+
   it("should collect current resource usage", () => {
     const usage = service.getCurrentResourceUsage();
 

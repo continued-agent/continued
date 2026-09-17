@@ -45,6 +45,16 @@ describe("CLI utility functions", () => {
       process.argv = ["node", "script.js", "-p", "test"];
       expect(isServe()).toBe(false);
     });
+
+    it("should not treat a headless prompt containing serve as the command", () => {
+      process.argv = ["node", "script.js", "-p", "serve"];
+      expect(isServe()).toBe(false);
+    });
+
+    it("should find serve after global options", () => {
+      process.argv = ["node", "script.js", "--config", "agent.yaml", "serve"];
+      expect(isServe()).toBe(true);
+    });
   });
 
   describe("isAcpMode", () => {

@@ -226,6 +226,26 @@ describe("clipboard utilities", () => {
       expect(fs.unlink).toHaveBeenCalled();
     });
 
+    it("should clean up the temp file when reading it fails", async () => {
+      const os = await import("os");
+      const path = await import("path");
+      const fs = await import("fs/promises");
+
+      vi.mocked(os.default.platform).mockReturnValue("linux");
+      vi.mocked(os.default.tmpdir).mockReturnValue("/tmp");
+      vi.mocked(path.default.join).mockReturnValue(
+        "/tmp/continue-clipboard-123.png",
+      );
+      mockExecAsync.mockResolvedValue({ stdout: "", stderr: "" });
+      vi.mocked(fs.readFile).mockRejectedValue(new Error("Failed to read"));
+      vi.mocked(fs.unlink).mockResolvedValue(undefined);
+
+      const result = await getClipboardImage();
+
+      expect(result).toBeNull();
+      expect(fs.unlink).toHaveBeenCalledWith("/tmp/continue-clipboard-123.png");
+    });
+
     it("should return null and log error on exception", async () => {
       const os = await import("os");
       vi.mocked(os.default.platform).mockReturnValue("darwin");

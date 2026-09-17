@@ -10,9 +10,11 @@ import { readFileTool } from "../tools/readFile.js";
 import { searchCodeTool } from "../tools/searchCode.js";
 import { PreprocessedToolCall } from "../tools/types.js";
 import { writeFileTool } from "../tools/writeFile.js";
+import { logger } from "../util/logger.js";
 
 import {
   executeStreamedToolCalls,
+  handlePermissionDenied,
   preprocessStreamedToolCalls,
 } from "./streamChatResponse.helpers.js";
 import { processStreamingResponse } from "./streamChatResponse.js";
@@ -531,6 +533,81 @@ describe("processStreamingResponse - content preservation", () => {
     expect(result.toolCalls.length).toBe(0);
     expect(result.finalContent).toBe("Hello world!");
   });
+
+  it("does not write streamed response payloads to debug logs", async () => {
+    const debugSpy = vi.spyOn(logger, "debug");
+    const secretContent = "model-output-that-must-not-be-logged";
+    chunks = [contentChunk(secretContent)];
+
+    try {
+      await processStreamingResponse({
+        chatHistory,
+        model: mockModel,
+        llmApi: mockLlmApi,
+        abortController: mockAbortController,
+        isHeadless: true,
+        systemMessage: "You are a helpful assistant.",
+      });
+
+      expect(
+        debugSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretContent),
+        ),
+      ).toBe(false);
+    } finally {
+      debugSpy.mockRestore();
+    }
+  });
+
+  it("does not write tool argument values to logs", () => {
+    const infoSpy = vi.spyOn(logger, "info");
+    const secretArgument = "tool-secret-that-must-not-be-logged";
+    const toolCall: PreprocessedToolCall = {
+      id: "tool-call",
+      name: "Read",
+      arguments: { filepath: secretArgument },
+      argumentsStr: JSON.stringify({ filepath: secretArgument }),
+      startNotified: true,
+      tool: readFileTool,
+    };
+
+    try {
+      handlePermissionDenied(toolCall, []);
+
+      expect(
+        infoSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretArgument),
+        ),
+      ).toBe(false);
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  it("does not write incomplete tool argument values to error logs", async () => {
+    const errorSpy = vi.spyOn(logger, "error");
+    const secretArgument = '{"filepath":"incomplete-secret"';
+    chunks = [toolCallChunk("tool-call", undefined, secretArgument)];
+
+    try {
+      await processStreamingResponse({
+        chatHistory,
+        model: mockModel,
+        llmApi: mockLlmApi,
+        abortController: mockAbortController,
+        isHeadless: true,
+        systemMessage: "You are a helpful assistant.",
+      });
+
+      expect(
+        errorSpy.mock.calls.some(([, metadata]) =>
+          JSON.stringify(metadata).includes(secretArgument),
+        ),
+      ).toBe(false);
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
 });
 
 // Tests for preprocessStreamedToolCalls function
@@ -657,6 +734,35 @@ describe("preprocessStreamedToolCalls", () => {
     expect(errorChatEntries).toHaveLength(1);
     expect(errorChatEntries[0].content).toContain(
       "Tool nonexistent_tool not found",
+    );
+  });
+
+  it("rejects malformed arguments for tools without required parameters", async () => {
+    const toolCalls: ToolCall[] = [
+      {
+        id: "call-malformed",
+        name: "Exit",
+        arguments: {},
+        argumentsStr: '{"unclosed":',
+        startNotified: false,
+      },
+    ];
+
+    const callbacks = {
+      onToolStart: vi.fn(),
+      onToolError: vi.fn(),
+    };
+
+    const { preprocessedCalls, errorChatEntries } =
+      await preprocessStreamedToolCalls(true, toolCalls, callbacks);
+
+    expect(preprocessedCalls).toHaveLength(0);
+    expect(errorChatEntries).toHaveLength(1);
+    expect(errorChatEntries[0].content).toContain("Malformed arguments");
+    expect(callbacks.onToolError).toHaveBeenCalledWith(
+      expect.stringContaining("Malformed arguments"),
+      "Exit",
+      "call-malformed",
     );
   });
 });

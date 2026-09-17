@@ -1,4 +1,3 @@
-// @ts-ignore
 import { ContinueError, ContinueErrorReason } from "core/util/errors.js";
 import { ChatCompletionTool } from "openai/resources.mjs";
 
@@ -170,11 +169,19 @@ export function extractToolCalls(
         });
       }
     } catch {
-      logger.error("Failed to parse tool call:", { toolCall: match[1] });
+      logger.error("Failed to parse tool call", {
+        toolCallLength: match[1].length,
+      });
     }
   }
 
   return toolCalls;
+}
+
+function getToolArgumentCount(argumentsValue: unknown): number {
+  return typeof argumentsValue === "object" && argumentsValue !== null
+    ? Object.keys(argumentsValue).length
+    : 0;
 }
 
 export function convertToolToChatCompletionTool(
@@ -236,7 +243,7 @@ export async function executeToolCall(
   try {
     logger.debug("Executing tool", {
       toolName: toolCall.name,
-      arguments: toolCall.arguments,
+      argumentCount: getToolArgumentCount(toolCall.arguments),
       parallelToolCallCount: options.parallelToolCallCount,
     });
 
@@ -277,7 +284,6 @@ export async function executeToolCall(
       toolName: toolCall.name,
       success: true,
       durationMs: duration,
-      toolParameters: JSON.stringify(toolCall.arguments),
     });
     logger.debug("Tool execution completed", {
       toolName: toolCall.name,
@@ -300,7 +306,6 @@ export async function executeToolCall(
       durationMs: duration,
       error: errorMessage,
       errorReason,
-      toolParameters: JSON.stringify(toolCall.arguments),
     });
     throw error;
   } finally {
@@ -335,8 +340,25 @@ export async function executeToolCall(
   }
 }
 
-// Only checks top-level required
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+// Validates the streamed JSON payload before checking top-level required args.
 export function validateToolCallArgsPresent(toolCall: ToolCall, tool: Tool) {
+  let parsedArguments: unknown;
+  try {
+    parsedArguments = JSON.parse(toolCall.argumentsStr);
+  } catch {
+    throw new Error(`Malformed arguments for tool "${toolCall.name}"`);
+  }
+
+  if (!isObjectRecord(parsedArguments)) {
+    throw new Error(`Arguments for tool "${toolCall.name}" must be an object`);
+  }
+
+  toolCall.arguments = parsedArguments;
+
   const requiredParams = tool.parameters.required ?? [];
   for (const paramName of requiredParams) {
     if (

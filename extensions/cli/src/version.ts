@@ -27,6 +27,22 @@ function getEventUserId(): string {
 // Singleton to cache the latest version result
 let latestVersionCache: Promise<string | null> | null = null;
 
+export function parseLatestVersionResponse(data: unknown): string {
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("version" in data) ||
+    typeof data.version !== "string" ||
+    !/^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
+      data.version,
+    )
+  ) {
+    throw new Error("Invalid version response");
+  }
+
+  return data.version;
+}
+
 export async function getLatestVersion(
   signal?: AbortSignal,
 ): Promise<string | null> {
@@ -47,7 +63,7 @@ export async function getLatestVersion(
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
-      return data.version;
+      return parseLatestVersionResponse(data);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         // Request was aborted, don't log
@@ -81,7 +97,12 @@ export function compareVersions(
   current: string,
   latest: string,
 ): "newer" | "same" | "older" {
-  if (current === "unknown" || latest === "unknown") {
+  if (
+    typeof current !== "string" ||
+    typeof latest !== "string" ||
+    current === "unknown" ||
+    latest === "unknown"
+  ) {
     return "same";
   }
 

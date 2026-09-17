@@ -66,6 +66,7 @@ import {
   removeRunningProcess,
   updateProcessOutput,
 } from "../../util/processTerminalStates";
+import { killProcessTree } from "../../util/processTree";
 import { getBooleanArg, getStringArg } from "../parseArgs";
 
 /**
@@ -170,6 +171,7 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
           const childProc = childProcess.spawn(shell, args, {
             cwd,
             env: getColorEnv(), // Add enhanced environment for colors
+            detached: process.platform !== "win32",
           });
 
           // Track this process for foreground cancellation
@@ -213,12 +215,12 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
                 }
 
                 // Try graceful termination first
-                childProc.kill("SIGTERM");
+                killProcessTree(childProc, "SIGTERM");
 
                 // Force kill after 5 seconds if still running
                 sigkillTimeoutId = setTimeout(() => {
                   if (isRunning()) {
-                    childProc.kill("SIGKILL");
+                    killProcessTree(childProc, "SIGKILL");
                   }
                 }, 5_000);
               }
@@ -411,6 +413,7 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
                 {
                   cwd,
                   env: getColorEnv(),
+                  detached: process.platform !== "win32",
                 },
               );
 
@@ -437,12 +440,12 @@ export const runTerminalCommandImpl: ToolImpl = async (args, extras) => {
                   );
 
                   // Try graceful termination first
-                  childProc.kill("SIGTERM");
+                  killProcessTree(childProc, "SIGTERM");
 
                   // Force kill after 5 seconds if still running
                   sigkillTimeoutId = setTimeout(() => {
                     if (isRunning()) {
-                      childProc.kill("SIGKILL");
+                      killProcessTree(childProc, "SIGKILL");
                     }
                   }, 5_000);
                 }
