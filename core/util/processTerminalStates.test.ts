@@ -224,7 +224,7 @@ describe("processTerminalStates", () => {
         await killTerminalProcess(toolCallId);
 
         expect(processKillSpy).toHaveBeenCalledWith(-123, "SIGTERM");
-        mockProcess.killed = true;
+        Object.defineProperty(mockProcess, "killed", { value: true });
         jest.advanceTimersByTime(5000);
       } finally {
         processKillSpy.mockRestore();
