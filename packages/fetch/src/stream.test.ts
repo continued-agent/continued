@@ -54,6 +54,37 @@ describe("streamSse", () => {
     expect(results).toEqual([{ foo: "bar" }, { baz: 42 }]);
   });
 
+  it("stops at [DONE] and ignores later SSE data", async () => {
+    const response = createMockResponse([
+      'data: {"beforeDone": true}',
+      "data: [DONE]",
+      'data: {"afterDone": true}',
+    ]);
+
+    const results = [];
+    for await (const data of streamSse(response)) {
+      results.push(data);
+    }
+
+    expect(results).toEqual([{ beforeDone: true }]);
+  });
+
+  it("continues after SSE ping comments", async () => {
+    const response = createMockResponse([
+      'data: {"beforePing": true}',
+      ": ping",
+      'data: {"afterPing": true}',
+      "data:[DONE]",
+    ]);
+
+    const results = [];
+    for await (const data of streamSse(response)) {
+      results.push(data);
+    }
+
+    expect(results).toEqual([{ beforePing: true }, { afterPing: true }]);
+  });
+
   it("throws on malformed JSON", async () => {
     const sseLines = ['data: {"foo": "bar"', "data:[DONE]"];
     const response = createMockResponse(sseLines);
