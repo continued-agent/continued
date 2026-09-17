@@ -165,6 +165,14 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
     if (!command || typeof command !== "string") {
       throw new Error("command arg is required and must be a non-empty string");
     }
+    if (
+      args.timeout !== undefined &&
+      (typeof args.timeout !== "number" ||
+        !Number.isFinite(args.timeout) ||
+        args.timeout < 0)
+    ) {
+      throw new Error("timeout must be a finite, non-negative number");
+    }
     const truncatedCmd =
       command.length > 60 ? command.substring(0, 60) + "..." : command;
     return {

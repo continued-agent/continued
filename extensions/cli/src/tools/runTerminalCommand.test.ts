@@ -39,6 +39,24 @@ describe("runTerminalCommandTool", () => {
   const isMac = process.platform === "darwin";
   const isLinux = process.platform === "linux";
 
+  describe("argument validation", () => {
+    it("rejects malformed timeout values before starting a process", async () => {
+      await expect(
+        runTerminalCommandTool.preprocess!({
+          command: "echo hello",
+          timeout: "soon",
+        } as any),
+      ).rejects.toThrow("timeout must be a finite, non-negative number");
+
+      await expect(
+        runTerminalCommandTool.preprocess!({
+          command: "echo hello",
+          timeout: -1,
+        }),
+      ).rejects.toThrow("timeout must be a finite, non-negative number");
+    });
+  });
+
   describe("basic platform-specific terminal execution", () => {
     it(
       "should execute a simple echo command",
