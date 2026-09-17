@@ -212,6 +212,25 @@ describe("processTerminalStates", () => {
       expect(isProcessRunning(toolCallId)).toBe(false);
     });
 
+    test("kills the process tree during cancellation", async () => {
+      const toolCallId = "test-tree-123";
+      const mockProcess = createMockProcess();
+      const processKillSpy = jest
+        .spyOn(process, "kill")
+        .mockImplementation(() => true);
+
+      try {
+        markProcessAsRunning(toolCallId, mockProcess);
+        await killTerminalProcess(toolCallId);
+
+        expect(processKillSpy).toHaveBeenCalledWith(-123, "SIGTERM");
+        mockProcess.killed = true;
+        jest.advanceTimersByTime(5000);
+      } finally {
+        processKillSpy.mockRestore();
+      }
+    });
+
     test("should handle cancelling non-existent process", async () => {
       const toolCallId = "non-existent";
 

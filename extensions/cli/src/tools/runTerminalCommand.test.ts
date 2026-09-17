@@ -190,6 +190,32 @@ describe("runTerminalCommandTool", () => {
       },
       SHELL_TEST_TIMEOUT_MS,
     );
+
+    it(
+      "kills descendants when the output limit is reached",
+      async () => {
+        const originalLimit = process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS;
+        process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS = "10";
+
+        try {
+          const result = await runTerminalCommandTool.run({
+            command:
+              "node -e \"process.stdout.write('x'.repeat(100)); setInterval(() => {}, 1000)\"",
+          });
+
+          expect(result).toContain(
+            "Command stopped after reaching the output limit",
+          );
+        } finally {
+          if (originalLimit === undefined) {
+            delete process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS;
+          } else {
+            process.env.CONTINUE_CLI_BASH_MAX_OUTPUT_CHARS = originalLimit;
+          }
+        }
+      },
+      SHELL_TEST_TIMEOUT_MS,
+    );
   });
 
   describe("platform-specific features", () => {

@@ -363,7 +363,7 @@ IMPORTANT: To edit files, use Edit/MultiEdit tools instead of bash commands (sed
         }
 
         outputLimitReached = true;
-        child.kill();
+        killProcessTreeWithEscalation(child);
         return currentOutput + output.slice(0, remaining);
       };
 

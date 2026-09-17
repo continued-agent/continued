@@ -149,6 +149,32 @@ describe("runTerminalCommand timeout functionality", () => {
     );
   });
 
+  it("should signal the process group on timeout", async () => {
+    const extras = createMockExtras();
+    const processKillSpy = vi
+      .spyOn(process, "kill")
+      .mockImplementation(() => true);
+    mockChildProc.pid = 12345;
+
+    try {
+      const resultPromise = runTerminalCommandImpl(
+        { command: "sleep 300", waitForCompletion: true },
+        extras,
+      );
+      await vi.runOnlyPendingTimersAsync();
+      await vi.advanceTimersByTimeAsync(120_000);
+
+      expect(processKillSpy).toHaveBeenCalledWith(-12345, "SIGTERM");
+
+      mockChildProc.exitCode = 143;
+      mockChildProc.signalCode = "SIGTERM";
+      mockChildProc.emit("close", 143);
+      await resultPromise;
+    } finally {
+      processKillSpy.mockRestore();
+    }
+  });
+
   it("should clear timeout on normal process exit", async () => {
     const extras = createMockExtras();
     const args = { command: "echo quick", waitForCompletion: true };
