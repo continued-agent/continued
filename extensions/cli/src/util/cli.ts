@@ -13,6 +13,15 @@ export function isHeadlessMode(): boolean {
 }
 
 /**
+ * Check for the long-lived HTTP/WebSocket mode before the CLI dependency graph
+ * is loaded. This keeps early dependency logs off stdout, which is reserved for
+ * the single machine-readable `ready` line in remote mode.
+ */
+export function isRemoteMode(): boolean {
+  return process.argv.slice(2).some((arg) => arg === "--no-tui");
+}
+
+/**
  * Check for ACP mode before the rest of the CLI dependency graph is loaded.
  */
 export function isAcpMode(): boolean {
@@ -111,7 +120,7 @@ export function isTTYless(): boolean {
  * Returns false if in headless mode or TTY-less environment
  */
 export function supportsInteractive(): boolean {
-  return !isTTYless() && !isHeadlessMode();
+  return !isTTYless() && !isHeadlessMode() && !isRemoteMode();
 }
 
 /**

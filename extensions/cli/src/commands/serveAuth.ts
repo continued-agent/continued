@@ -1,4 +1,6 @@
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { randomBytes } from "node:crypto";
+
+import { tokensEqual } from "../util/tokenAuth.js";
 
 const SERVE_TOKEN_ENV = "CONTINUE_SERVE_TOKEN";
 const SERVE_TOKEN_BYTES = 32;
@@ -34,9 +36,5 @@ export function isServeRequestAuthorized(
     return false;
   }
 
-  const provided = Buffer.from(authorization.slice(prefix.length), "utf8");
-  const expected = Buffer.from(expectedToken, "utf8");
-  return (
-    provided.length === expected.length && timingSafeEqual(provided, expected)
-  );
+  return tokensEqual(authorization.slice(prefix.length), expectedToken);
 }

@@ -1,0 +1,217 @@
+---
+title: "Remote / No-TUI mode"
+---
+
+`cn --no-tui` starts a persistent local HTTP and WebSocket server. It does not run the Ink interface and it does not behave like `-p`: the process stays alive until it receives `SIGINT` or `SIGTERM`.
+
+## Start the server
+
+Run it from the workspace that the remote client should control:
+
+```bash
+cn --no-tui
+```
+
+The default bind address is `127.0.0.1` and the default port is `4173`. If no token is supplied, `cn` creates a random token and writes it to a private file under `~/.continue`. The token is never printed; stderr contains only the file path. Copy the token from that file into the client’s `Authorization` header.
+
+To make the server reachable on a local network, opt in explicitly and provide a token:
+
+```bash
+cn --no-tui --host 0.0.0.0 --port 4173 --auth-token "$CONTINUE_REMOTE_TOKEN"
+```
+
+The process writes exactly one JSON line to stdout after the socket is listening:
+
+```json
+{ "type": "ready", "protocol": 1, "url": "http://127.0.0.1:4173", "pid": 1234 }
+```
+
+All diagnostics and warnings go to stderr. Do not parse human-readable logs as protocol messages.
+
+## Flags
+
+| Flag                     | Default               | Description                                                                                                                                      |
+| ------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `--no-tui`               | —                     | Start the persistent remote server.                                                                                                              |
+| `--host <addr>`          | `127.0.0.1`           | Bind address. Non-loopback addresses require a token.                                                                                            |
+| `--port <n>`             | `4173`                | TCP port. `0` asks the operating system for an available port. A busy explicit port is an error; the server does not increment it automatically. |
+| `--auth-token <token>`   | generated on loopback | Bearer token. `CONTINUE_REMOTE_TOKEN` is used when the flag is absent.                                                                           |
+| `--workspace <path>`     | current directory     | Existing directory resolved with `realpath`.                                                                                                     |
+| `--session <id>`         | —                     | Resume this persisted session, or create it with this ID when it does not exist.                                                                 |
+| `--log-level <level>`    | `info`                | `error`, `warn`, `info`, or `debug`.                                                                                                             |
+| `--cors-origin <origin>` | disabled              | Exact browser origin allowed for HTTP and WebSocket requests. Repeatable.                                                                        |
+| `--read-only`            | false                 | Disable `PUT /workspaces/:id/file`. Agent tool permissions are unchanged.                                                                        |
+
+`--no-tui` is incompatible with `-p`/`--print`, a positional prompt, `--prompt`, `--agent`, `--fork`, `--resume`, and subcommands such as `ls`, `serve`, and `acp`. `--session` is the remote-mode replacement for `--resume`.
+
+Exit codes are `0` for a clean shutdown, `1` for a runtime failure, and `2` for invalid arguments or a rejected unsafe bind configuration.
+
+## Security
+
+The server assumes an authenticated client is a trusted operator of the agent. It never exposes a shell endpoint: tool calls still run through Continued’s existing tool and permission system.
+
+- Every route except `GET /health` requires `Authorization: Bearer <token>`.
+- WebSocket clients use the same header or put the token in `Sec-WebSocket-Protocol`. Tokens in query strings are rejected.
+- Tokens are compared using SHA-256 digests and `crypto.timingSafeEqual`.
+- Host headers are checked to reduce DNS-rebinding risk. Browser `Origin` values are rejected unless they exactly match `--cors-origin`; non-browser clients may omit `Origin`.
+- Request bodies and WebSocket messages are limited to 1 MiB. Files are limited to 5 MiB, WebSocket connections to 16, and directory listings to 1,000 entries.
+- Authenticated HTTP clients are rate-limited to 120 requests per 10 seconds per peer address; WebSocket clients are limited to 100 messages per 10 seconds.
+- Client paths must be relative to the configured workspace. Absolute paths, `..`, encoded path tricks, NUL bytes, Windows separators, and symlinks that resolve outside the workspace are rejected. Writes below `.git` are rejected.
+- Git commands use `execFile` with fixed arguments, a timeout, and a bounded output buffer.
+- Tool arguments and results sent in events are redacted and truncated. Tokens and internal error details are not returned to clients.
+
+There is no native TLS. Exposing `cn --no-tui` directly to the Internet is forbidden. Put it behind a TLS reverse proxy and keep authentication enabled.
+
+## REST API
+
+All responses are JSON and include `X-Request-Id`. The request ID is also included in errors:
+
+```json
+{
+  "error": {
+    "code": "SESSION_NOT_FOUND",
+    "message": "Session not found",
+    "requestId": "req-123"
+  }
+}
+```
+
+The main routes are:
+
+| Method   | Route                                        | Description                                                                                    |
+| -------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `GET`    | `/health`                                    | Liveness check; no token required.                                                             |
+| `GET`    | `/info`                                      | Protocol version, capabilities, and configured workspace.                                      |
+| `GET`    | `/sessions`                                  | List persisted and in-memory sessions.                                                         |
+| `POST`   | `/sessions`                                  | Create a session. Optional body: `{"workspaceId":"..."}`.                                      |
+| `GET`    | `/sessions/:id?offset=0&limit=100`           | Session metadata and paginated history.                                                        |
+| `DELETE` | `/sessions/:id`                              | Cancel an active run and delete the session.                                                   |
+| `POST`   | `/sessions/:id/prompt`                       | Start a run. Body: `{"content":"...","clientMessageId":"..."}`. Returns `202 {"runId":"..."}`. |
+| `POST`   | `/sessions/:id/cancel`                       | Cancel the active run; idempotent.                                                             |
+| `GET`    | `/workspaces`                                | List the configured workspace.                                                                 |
+| `GET`    | `/workspaces/:id/files?path=src`             | List a bounded directory.                                                                      |
+| `GET`    | `/workspaces/:id/file?path=src/index.ts`     | Read a file and return its `ETag`.                                                             |
+| `PUT`    | `/workspaces/:id/file?path=src/index.ts`     | Write JSON `{"content":"..."}`. Existing files require matching `If-Match`.                    |
+| `GET`    | `/workspaces/:id/git/status`                 | Read Git status.                                                                               |
+| `GET`    | `/workspaces/:id/git/diff?path=src/index.ts` | Read a bounded Git diff.                                                                       |
+| `POST`   | `/permissions/:id/approve`                   | Resolve a pending permission.                                                                  |
+| `POST`   | `/permissions/:id/deny`                      | Deny a pending permission.                                                                     |
+
+Prompt requests are idempotent for a session when the same `clientMessageId` is retried. Only one run can be active per session; concurrent prompts receive `SESSION_BUSY`.
+
+## WebSocket API
+
+Connect to `/ws` with the bearer token. The server sends a connection event without a sequence number:
+
+```json
+{
+  "v": 1,
+  "ts": "2026-01-01T12:00:00.000Z",
+  "type": "connected",
+  "connectionId": "...",
+  "capabilities": ["sessions", "streaming"]
+}
+```
+
+Session events use a strictly increasing `seq` per session. Clients should deduplicate by `(sessionId, seq)` and detect gaps. Subscribe and replay after a reconnect with:
+
+```json
+{
+  "v": 1,
+  "type": "subscribe",
+  "requestId": "sub-1",
+  "sessionId": "...",
+  "afterSeq": 184
+}
+```
+
+If the requested sequence is older than the circular replay buffer, the server sends `resync_required`; fetch `GET /sessions/:id` and subscribe again without an old sequence.
+
+The server event types are `session_created`, `session_updated`, `agent_started`, `agent_thinking`, `message_start`, `message_delta`, `message_end`, `tool_start`, `tool_update`, `tool_end`, `permission_request`, `permission_resolved`, `agent_finished`, `agent_error`, `session_cancelled`, `filesystem_changed`, `git_changed`, and `resync_required`. Connection events are `connected`, `pong`, `ack`, `error`, and `server_shutdown`.
+
+Client messages are `create_session`, `resume_session`, `prompt`, `cancel`, `permission_response`, `subscribe`, `unsubscribe`, and `ping`. Every message may include `requestId`; an `ack` or structured `error` uses the same value. Invalid messages are reported and the connection is closed. A slow client is closed with a resynchronization instruction rather than silently dropping the stream.
+
+A permission request is not auto-approved. Approve or deny it through REST or WebSocket. WebSocket responses include the originating `sessionId`; REST responses may include the same value in the JSON body (`{"sessionId":"..."}`) so the server can reject a permission ID from another session. The first response wins; unknown, expired, or already resolved permissions return `PERMISSION_NOT_FOUND` or `PERMISSION_ALREADY_RESOLVED`.
+
+## TypeScript client
+
+Install the `ws` package, then run this client while `cn --no-tui` is active:
+
+```ts
+import { randomUUID } from "node:crypto";
+import WebSocket from "ws";
+
+const baseUrl = "http://127.0.0.1:4173";
+const token = process.env.CONTINUE_REMOTE_TOKEN;
+if (!token) throw new Error("Set CONTINUE_REMOTE_TOKEN");
+
+const headers = { Authorization: `Bearer ${token}` };
+const created = await fetch(`${baseUrl}/sessions`, {
+  method: "POST",
+  headers: { ...headers, "Content-Type": "application/json" },
+  body: JSON.stringify({}),
+});
+const session = (await created.json()) as { id: string };
+
+const socket = new WebSocket(`${baseUrl.replace("http", "ws")}/ws`, {
+  headers,
+});
+socket.on("message", (raw) => {
+  const event = JSON.parse(raw.toString()) as {
+    type: string;
+    sessionId?: string;
+    permissionId?: string;
+    decision?: "approve" | "deny";
+    delta?: string;
+  };
+  if (event.type === "message_delta") process.stdout.write(event.delta ?? "");
+  if (event.type === "permission_request" && event.permissionId) {
+    socket.send(
+      JSON.stringify({
+        v: 1,
+        type: "permission_response",
+        requestId: randomUUID(),
+        sessionId: event.sessionId,
+        permissionId: event.permissionId,
+        decision: "approve",
+      }),
+    );
+  }
+});
+
+await new Promise<void>((resolve) => socket.once("open", () => resolve()));
+socket.send(
+  JSON.stringify({
+    v: 1,
+    type: "subscribe",
+    requestId: "subscribe-1",
+    sessionId: session.id,
+  }),
+);
+await fetch(`${baseUrl}/sessions/${session.id}/prompt`, {
+  method: "POST",
+  headers: { ...headers, "Content-Type": "application/json" },
+  body: JSON.stringify({
+    content: "Inspect the current test failures and summarize them.",
+    clientMessageId: randomUUID(),
+  }),
+});
+```
+
+## Mobile clients
+
+For a phone or tablet on the same trusted network, bind to the host’s LAN address or `0.0.0.0`, use a strong token, and allow the mobile app’s exact origin only when it is a browser client. Keep the workstation and device on a private network. Mobile clients should persist the session ID and last sequence, reconnect after sleep, call `GET /sessions/:id`, and resubscribe with `afterSeq`. For remote access, use a TLS reverse proxy with authentication rather than forwarding the raw server port.
+
+## Isolation and shutdown
+
+Session histories are persisted using the same Continued session files used by `cn --resume` and `cn ls`. The runtime stores separate histories and event buffers per session, but Continued’s service registry and permission manager are process-wide singletons. Runs are therefore serialized across sessions; only one run executes at a time in a process. This is intentional and avoids cross-session model, permission, and workspace state leaks.
+
+On `SIGINT` or `SIGTERM`, the server stops accepting requests, rejects pending permissions, cancels active runs, persists histories, sends `server_shutdown`, closes WebSockets with code `1001`, and closes the HTTP listener. A second signal exits immediately.
+
+## Known limitations
+
+- The server currently exposes one configured workspace per process. Start a separate `cn --no-tui` process for another workspace.
+- Continued’s service registry is process-wide, so runs from different sessions are serialized rather than executed concurrently.
+- Idempotency keys are retained in memory for the lifetime of the process; reconnecting after a restart should use a new key unless the client has confirmed the previous result.
+- Filesystem and Git watchers are best effort. Clients should refresh session and Git state after reconnecting or when a watcher event is missed.
+- The transport has no native TLS. Use a trusted local network or an authenticated TLS reverse proxy; never expose the raw listener to the public Internet.

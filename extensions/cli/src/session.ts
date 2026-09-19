@@ -10,7 +10,10 @@ import type {
   Usage,
 } from "core/index.js";
 import historyManager from "core/util/history.js";
-import { isValidSessionId } from "core/util/paths.js";
+import {
+  getSessionFilePath as getPersistedSessionFilePath,
+  isValidSessionId,
+} from "core/util/paths.js";
 import { v4 as uuidv4 } from "uuid";
 
 import { DEFAULT_SESSION_TITLE } from "./constants/session.js";
@@ -507,6 +510,33 @@ export async function listSessions(
 }
 
 /**
+ * List only local persisted sessions without contacting the Continue API.
+ * Remote control clients must not trigger network discovery as a side effect
+ * of asking for the local server's session list.
+ */
+export function listPersistedSessions(
+  limit: number = 100,
+): ExtendedSessionMetadata[] {
+  try {
+    const localSessions = historyManager.list({ limit });
+    return localSessions.flatMap((sessionMeta) => {
+      const sessionFilePath = path.join(
+        getSessionDir(),
+        `${sessionMeta.sessionId}.json`,
+      );
+      if (fs.existsSync(sessionFilePath)) {
+        const metadata = getSessionMetadataWithPreview(sessionFilePath);
+        return metadata ? [{ ...metadata, isRemote: false }] : [];
+      }
+      return [{ ...sessionMeta, isRemote: false }];
+    });
+  } catch (error) {
+    logger.error("Error listing persisted sessions:", error);
+    return [];
+  }
+}
+
+/**
  * Load session by ID
  */
 export function loadSessionById(sessionId: string): Session | null {
@@ -517,6 +547,22 @@ export function loadSessionById(sessionId: string): Session | null {
     logger.error("Error loading session by ID:", error);
     return null;
   }
+}
+
+/**
+ * Delete a persisted session and its metadata entry. Remote transport uses
+ * this instead of unlinking the JSON file directly so `cn ls` cannot retain a
+ * stale session entry.
+ */
+export function deleteSessionById(sessionId: string): void {
+  if (!isValidSessionId(sessionId)) {
+    throw new Error("Invalid session id");
+  }
+  const sessionPath = getPersistedSessionFilePath(sessionId);
+  if (!fs.existsSync(sessionPath)) {
+    return;
+  }
+  historyManager.delete(sessionId);
 }
 
 /**

@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 
 import node_machine_id from "node-machine-id";
 
-import { isAcpMode } from "./util/cli.js";
+import { isAcpMode, isRemoteMode } from "./util/cli.js";
 import { logger } from "./util/logger.js";
 
 export function getVersion(): string {
@@ -79,7 +79,7 @@ export async function getLatestVersion(
   return latestVersionCache;
 }
 
-if (!isAcpMode()) {
+if (!isAcpMode() && !isRemoteMode()) {
   getLatestVersion()
     .then((version) => {
       if (version) {
