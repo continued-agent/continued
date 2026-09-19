@@ -15,9 +15,10 @@ import {
   validateFlags,
 } from "./flags/flagValidator.js";
 import { configureConsoleForHeadless, safeStderr } from "./init.js";
+import { runRemoteMode, type RootCommandOptions } from "./remote/cli.js";
 import { addCommonOptions, mergeParentOptions } from "./shared-options.js";
 import { post } from "./util/apiClient.js";
-import { isAcpMode, isServe } from "./util/cli.js";
+import { isAcpMode, isRemoteMode, isServe } from "./util/cli.js";
 import { markUnhandledError } from "./util/errorState.js";
 import { gracefulExit } from "./util/exit.js";
 import { configureAcpMode, logger } from "./util/logger.js";
@@ -165,7 +166,7 @@ process.on("uncaughtException", (error) => {
 });
 
 // keyboard interruption handler for non-TUI flows
-if (!isAcpMode() && !isServe()) {
+if (!isAcpMode() && !isServe() && !isRemoteMode()) {
   process.on("SIGINT", async () => {
     await gracefulExit(130);
   });
@@ -194,12 +195,51 @@ addCommonOptions(program)
     "Strip <think></think> tags and excess whitespace from output. Only works with -p/--print flag.",
   )
   .option("--resume", "Resume from last session")
+  .option(
+    "--no-tui",
+    "Start a persistent local HTTP/WebSocket server without rendering Ink",
+  )
+  .option("--host <addr>", "Remote server bind address (default: 127.0.0.1)")
+  .option(
+    "--port <n>",
+    "Remote server port (default: 4173; 0 selects an OS port)",
+  )
+  .option(
+    "--auth-token <token>",
+    "Remote server bearer token (also accepts CONTINUE_REMOTE_TOKEN)",
+  )
+  .option("--workspace <path>", "Remote server workspace (default: cwd)")
+  .option("--session <id>", "Resume or create this remote session ID")
+  .option(
+    "--log-level <level>",
+    "Remote server log level (error, warn, info, debug)",
+    "info",
+  )
+  .option(
+    "--cors-origin <origin>",
+    "Allow this exact browser Origin (repeatable)",
+    (value: string, previous: string[] | undefined) => [
+      ...(previous ?? []),
+      value,
+    ],
+    [] as string[],
+  )
+  .option(
+    "--read-only",
+    "Disable remote PUT file operations (does not change agent permissions)",
+  )
   .option("--fork <sessionId>", "Fork from an existing session ID")
   .option(
     "--beta-subagent-tool",
     "Enable beta Subagent tool for invoking subagents",
   )
-  .action(async (prompt, options) => {
+  .action(async (prompt: string | undefined, options: RootCommandOptions) => {
+    const noTui = options.tui === false;
+    if (noTui) {
+      await runRemoteMode(prompt, options);
+      return;
+    }
+
     // Handle piped input - detect it early and decide on mode
     let stdinInput = null;
 
@@ -224,8 +264,8 @@ addCommonOptions(program)
 
     // Configure console overrides FIRST, before any other logging
     const isHeadless = options.print;
-    configureConsoleForHeadless(isHeadless);
-    logger.configureHeadlessMode(isHeadless);
+    configureConsoleForHeadless(Boolean(isHeadless));
+    logger.configureHeadlessMode(Boolean(isHeadless));
 
     // Validate all command line flags
     const validation = validateFlags({
@@ -428,15 +468,72 @@ export async function runCli(): Promise<void> {
     return;
   }
 
+  if (process.argv.slice(2).includes("--no-tui")) {
+    const subcommands = new Set(["ls", "serve", "acp", "checks", "review"]);
+    const valueOptions = new Set([
+      "--config",
+      "--org",
+      "--rule",
+      "--mcp",
+      "--model",
+      "--prompt",
+      "--allow",
+      "--ask",
+      "--exclude",
+      "--agent",
+      "--host",
+      "--port",
+      "--auth-token",
+      "--workspace",
+      "--session",
+      "--log-level",
+      "--cors-origin",
+    ]);
+    const args = process.argv.slice(2);
+    let command: string | undefined;
+    for (let index = 0; index < args.length; index += 1) {
+      if (valueOptions.has(args[index])) {
+        index += 1;
+        continue;
+      }
+      if (subcommands.has(args[index])) {
+        command = args[index];
+        break;
+      }
+    }
+    if (command) {
+      safeStderr(
+        `Error: --no-tui cannot be combined with the '${command}' subcommand\n`,
+      );
+      process.exitCode = 2;
+      return;
+    }
+  }
+
   // Parse arguments and handle errors
+  if (isRemoteMode()) {
+    program.exitOverride();
+  }
   try {
-    program.parse();
+    await program.parseAsync();
   } catch (error) {
+    if (isRemoteMode()) {
+      const commanderError = error as { code?: string; message?: string };
+      if (commanderError.code === "commander.helpDisplayed") {
+        process.exitCode = 0;
+        return;
+      }
+      safeStderr(
+        `Error: ${commanderError.message ?? "Invalid command-line arguments"}\n`,
+      );
+      process.exitCode = 2;
+      return;
+    }
     console.error(error);
     process.exit(1);
   }
 
-  if (!isAcpMode() && !isServe()) {
+  if (!isAcpMode() && !isServe() && !isRemoteMode()) {
     process.on("SIGTERM", async () => {
       await gracefulExit(0);
     });

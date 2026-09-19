@@ -6,12 +6,14 @@
 import {
   isAcpMode as checkIsAcpMode,
   isHeadlessMode as checkIsHeadlessMode,
+  isRemoteMode as checkIsRemoteMode,
 } from "./util/cli.js";
 
 // Check if we're in headless mode by looking at process arguments
 // We need to do this before any imports to catch early logging
 const isHeadlessMode = checkIsHeadlessMode();
 const isAcpMode = checkIsAcpMode();
+const isRemoteMode = checkIsRemoteMode();
 
 // Store original methods before ANY dependencies can use them
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -42,7 +44,7 @@ const originalConsole = {
 let isHeadlessModeConfigured = false;
 
 // Override console methods if in headless mode
-if (isHeadlessMode) {
+if (isHeadlessMode || isRemoteMode) {
   // Override ALL console methods to no-ops
   Object.keys(originalConsole).forEach((method) => {
     (console as any)[method] = () => {};
@@ -121,7 +123,7 @@ export function configureConsoleForHeadless(headless: boolean): void {
  * Use this for intentional output in headless mode
  */
 export function safeStdout(message: string): void {
-  if (isHeadlessMode || isHeadlessModeConfigured) {
+  if (isHeadlessMode || isRemoteMode || isHeadlessModeConfigured) {
     // Use the original stdout that was saved before any overrides
     originalStdoutWrite(message);
   } else {
@@ -135,7 +137,7 @@ export function safeStdout(message: string): void {
  * Use this for error messages that should always be visible
  */
 export function safeStderr(message: string): void {
-  if (isHeadlessMode || isHeadlessModeConfigured) {
+  if (isHeadlessMode || isRemoteMode || isHeadlessModeConfigured) {
     // Use the original stderr that was saved before any overrides
     originalStderrWrite(message);
   } else {

@@ -50,7 +50,8 @@
   "dependencies": {
     "fdir": "^6.4.2",
     "find-up": "^8.0.0",
-    "fzf": "^0.5.2"
+    "fzf": "^0.5.2",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@agentclientprotocol/sdk": "^1.4.0",
